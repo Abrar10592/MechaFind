@@ -48,7 +48,7 @@ class WelcomePage extends StatelessWidget {
               SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: () {
-                  Navigator.pushNamed(context, '/signup');
+                  Navigator.pushNamed(context, '/role');
                 },
                 icon: Icon(Icons.person_add),
                 label: Text('Create Account'),
