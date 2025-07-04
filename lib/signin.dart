@@ -107,7 +107,7 @@ class _SignInPageState extends State<SignInPage> {
               height: 50,
               child: ElevatedButton(
                 onPressed: () {
-                  // Handle sign in logic here
+                  Navigator.pushNamed(context, '/userHome'); // Handle sign in logic here
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue[700],
@@ -130,7 +130,7 @@ class _SignInPageState extends State<SignInPage> {
                 Text('Don\'t have an account? '),
                 GestureDetector(
                   onTap: () {
-                    Navigator.pushNamed(context, '/signup');
+                    Navigator.pushNamed(context, '/role');
                   },
                   child: Text(
                     'Sign Up',
