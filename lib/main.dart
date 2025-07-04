@@ -3,6 +3,7 @@ import 'home.dart';
 import 'signup.dart';
 import 'signin.dart';
 import 'role.dart';
+import 'user_home.dart';
 
 // Suppose you will create this page
 
@@ -22,6 +23,7 @@ class MechFindApp extends StatelessWidget {
         '/signup': (context) => SignUpPage(),
         '/signin': (context) => SignInPage(),
         '/role': (context) => RoleSelectionPage(),
+        '/userHome': (context) => UserHomePage(),
         //'/create_account': (context) => CreateAccountPage(),
       },
     );
