@@ -105,7 +105,26 @@ class _UserHomePageState extends State<UserHomePage> {
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavBar(),
+      bottomNavigationBar: BottomNavBar(
+        currentIndex: 0, // Home tab index
+        onTap: (index) {
+          if (index == 0) return; // Already on Home
+          switch (index) {
+            case 1:
+              Navigator.pushReplacementNamed(context, '/find-mechanics');
+              break;
+            case 2:
+              Navigator.pushReplacementNamed(context, '/messages'); // add if exists
+              break;
+            case 3:
+              Navigator.pushReplacementNamed(context, '/history'); // add if exists
+              break;
+            case 4:
+              Navigator.pushReplacementNamed(context, '/profile'); // add if exists
+              break;
+          }
+        },
+      ),
     );
   }
 }

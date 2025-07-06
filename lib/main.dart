@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'find_mechanics.dart';
 import 'home.dart';
 import 'signup.dart';
 import 'signin.dart';
@@ -26,6 +27,8 @@ class MechFindApp extends StatelessWidget {
         '/role': (context) => RoleSelectionPage(),
         '/userHome': (context) => UserHomePage(),
         '/home': (context) => WelcomePage(),
+        '/find-mechanics': (context) => const FindMechanicsPage(),
+
         //'/create_account': (context) => CreateAccountPage(),
       },
     );
