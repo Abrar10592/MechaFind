@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mechfind/utils.dart';
 import 'package:mechfind/mechanic/mechanic_landing_screen.dart';
 import 'package:mechfind/mechanic/mechanic_map.dart';
 import 'package:mechfind/mechanic/mechanic_profile.dart';
@@ -14,19 +15,18 @@ class Mechanic extends StatefulWidget {
 class _MechanicState extends State<Mechanic> {
   int _selectedIndex = 0;
 
-  // This method returns only the selected page
   Widget _getPage(int index) {
     switch (index) {
       case 0:
-        return MechanicLandingScreen();
+        return const MechanicLandingScreen();
       case 1:
-        return MechanicMap();
+        return const MechanicMap();
       case 2:
-        return MechanicProfile();
+        return const MechanicProfile();
       case 3:
-        return MechanicSettings();
+        return const MechanicSettings();
       default:
-        return MechanicLandingScreen();
+        return const MechanicLandingScreen();
     }
   }
 
@@ -39,11 +39,19 @@ class _MechanicState extends State<Mechanic> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _getPage(_selectedIndex), // only selected page is rendered
+      body: _getPage(_selectedIndex),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
-        selectedItemColor: Colors.blue,
-        unselectedItemColor: Colors.grey,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: AppColors.textSecondary,
+        selectedLabelStyle: const TextStyle(
+          fontFamily: AppFonts.primaryFont,
+          fontWeight: FontWeight.w600,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontFamily: AppFonts.secondaryFont,
+          fontWeight: FontWeight.w400,
+        ),
         onTap: _onTabTapped,
         type: BottomNavigationBarType.fixed,
         items: const [

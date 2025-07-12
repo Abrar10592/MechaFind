@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mechfind/utils.dart';
 import 'find_mechanics.dart';
 import 'home.dart';
 import 'signup.dart';
@@ -20,6 +21,25 @@ class MechFindApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'MechFind',
+       theme: ThemeData(
+        primaryColor: AppColors.primary,
+        scaffoldBackgroundColor: AppColors.background,
+        fontFamily: 'Poppins',
+        textTheme: const TextTheme(
+          headlineLarge: AppTextStyles.heading,
+          bodyMedium: AppTextStyles.body,
+          labelLarge: AppTextStyles.label,
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      ),
       debugShowCheckedModeBanner: false,
       initialRoute: '/',
       routes: {

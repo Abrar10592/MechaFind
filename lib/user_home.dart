@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:mechfind/utils.dart';
 import 'package:mechfind/mechanic/mechanic.dart';
 import 'location_service.dart';
 import 'mechanic_card.dart';
 import 'widgets/emergency_button.dart';
 import 'widgets/bottom_navbar.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart'; // Import geocoding
 
 class UserHomePage extends StatefulWidget {
@@ -14,7 +16,7 @@ class UserHomePage extends StatefulWidget {
 }
 
 class _UserHomePageState extends State<UserHomePage> {
-  String userName = 'Bobby'; // This will come from DB later
+  String userName = 'Bobby'; // Will be replaced with actual DB data
   String currentLocation = 'Getting location...';
   bool locationPermissionGranted = false;
 
@@ -27,7 +29,7 @@ class _UserHomePageState extends State<UserHomePage> {
   @override
   void initState() {
     super.initState();
-    //fetchUserLocation();
+    fetchUserLocation();
   }
 
   Future<void> fetchUserLocation() async {
@@ -37,9 +39,7 @@ class _UserHomePageState extends State<UserHomePage> {
       final lat = double.parse(parts[0]);
       final lng = double.parse(parts[1]);
 
-      // Convert to readable address
       final address = await getAddressFromLatLng(lat, lng);
-
       setState(() {
         currentLocation = address;
         locationPermissionGranted = true;
@@ -47,7 +47,6 @@ class _UserHomePageState extends State<UserHomePage> {
     }
   }
 
-  // Function to convert coordinates to address
   Future<String> getAddressFromLatLng(double lat, double lng) async {
     try {
       List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
@@ -63,73 +62,114 @@ class _UserHomePageState extends State<UserHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Good morning, $userName!'),
+        backgroundColor: AppColors.primary,
+        title: Text(
+          'Good morning, $userName!',
+          style: AppTextStyles.heading.copyWith(
+            color: Colors.white,
+            fontFamily: AppFonts.primaryFont,
+          ),
+        ),
         centerTitle: false,
       ),
+      backgroundColor: AppColors.background,
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
             Row(
               children: [
-                Icon(Icons.location_on, size: 20, color: Colors.grey[700]),
-                SizedBox(width: 8),
-                Text(currentLocation, style: TextStyle(fontSize: 16, color: Colors.grey[700])),
+                const Icon(Icons.location_on, size: 20, color: AppColors.textSecondary),
+                const SizedBox(width: 8),
+                Text(
+                  currentLocation,
+                  style: AppTextStyles.body.copyWith(
+                    color: AppColors.textSecondary,
+                    fontFamily: AppFonts.secondaryFont,
+                  ),
+                ),
               ],
             ),
-            SizedBox(height: 20),
-            EmergencyButton(),
-            SizedBox(height: 30),
-            Text('Nearby Mechanics', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 10),
+            const SizedBox(height: 20),
+
+            const EmergencyButton(),
+            const SizedBox(height: 30),
+
+            Text(
+              'Nearby Mechanics',
+              style: AppTextStyles.heading.copyWith(
+                fontSize: FontSizes.subHeading,
+                fontFamily: AppFonts.primaryFont,
+              ),
+            ),
+            const SizedBox(height: 10),
+
             Column(
               children: nearbyMechanics.map((mechanic) {
                 return MechanicCard(mechanic: mechanic);
               }).toList(),
             ),
-            SizedBox(height: 30),
-            Text('Recent Activity', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 10),
+            const SizedBox(height: 30),
+
+            Text(
+              'Recent Activity',
+              style: AppTextStyles.heading.copyWith(
+                fontSize: FontSizes.subHeading,
+                fontFamily: AppFonts.primaryFont,
+              ),
+            ),
+            const SizedBox(height: 10),
+
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Row(
                   children: [
-                    Icon(Icons.access_time),
-                    SizedBox(width: 10),
-                    Text('No recent activity'),
+                    const Icon(Icons.access_time, color: AppColors.textSecondary),
+                    const SizedBox(width: 10),
+                    Text(
+                      'No recent activity',
+                      style: AppTextStyles.body.copyWith(
+                        fontFamily: AppFonts.secondaryFont,
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
-            TextButton(onPressed: (){
-               Navigator.push(context,
-               MaterialPageRoute(builder:(context)=>Mechanic())
-               );},
-                child: Text("Test Mechanic Page")
-                )
+
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const Mechanic()));
+              },
+              child: Text(
+                "Test Mechanic Page",
+                style: AppTextStyles.body.copyWith(
+                  color: AppColors.accent,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
           ],
         ),
       ),
       bottomNavigationBar: BottomNavBar(
-        currentIndex: 0, // Home tab index
+        currentIndex: 0,
         onTap: (index) {
-          if (index == 0) return; // Already on Home
+          if (index == 0) return;
           switch (index) {
             case 1:
               Navigator.pushNamed(context, '/find-mechanics');
               break;
             case 2:
-              // Messages - can be implemented later
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('Messages feature coming soon'),
-              ));
+              Navigator.pushReplacementNamed(context, '/messages'); // add if exists
               break;
             case 3:
-              Navigator.pushNamed(context, '/history');
+              Navigator.pushReplacementNamed(context, '/history'); // add if exists
               break;
             case 4:
-              Navigator.pushNamed(context, '/settings');
+              Navigator.pushReplacementNamed(context, '/profile'); // add if exists
               break;
           }
         },

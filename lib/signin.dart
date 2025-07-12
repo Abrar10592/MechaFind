@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mechfind/utils.dart';
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -17,7 +18,7 @@ class _SignInPageState extends State<SignInPage> {
         elevation: 0,
         backgroundColor: Colors.white,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () {
             Navigator.pop(context);
           },
@@ -25,50 +26,67 @@ class _SignInPageState extends State<SignInPage> {
       ),
       backgroundColor: Colors.white,
       body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: 24.0),
+        padding: const EdgeInsets.symmetric(horizontal: 24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const SizedBox(height: 16),
             Text(
               'Welcome Back',
               style: TextStyle(
-                fontSize: 32,
+                fontFamily: AppFonts.primaryFont,
+                fontSize: FontSizes.heading,
                 fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               'Sign in to your MechFind account',
               style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
+                fontFamily: AppFonts.primaryFont,
+                fontSize: FontSizes.body,
+                color: AppColors.textSecondary,
               ),
             ),
-            SizedBox(height: 32),
+            const SizedBox(height: 32),
 
             // Email Address
             TextField(
+              style: TextStyle(
+                fontFamily: AppFonts.primaryFont,
+                fontSize: FontSizes.body,
+              ),
               decoration: InputDecoration(
-                prefixIcon: Icon(Icons.email_outlined),
+                prefixIcon: const Icon(Icons.email_outlined),
                 hintText: 'Email address',
+                hintStyle: TextStyle(
+                  fontFamily: AppFonts.primaryFont,
+                  color: AppColors.textSecondary,
+                ),
                 filled: true,
-                fillColor: Colors.grey[200],
+                fillColor: AppColors.background,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
 
             // Password
             TextField(
               obscureText: _obscurePassword,
+              style: TextStyle(
+                fontFamily: AppFonts.primaryFont,
+                fontSize: FontSizes.body,
+              ),
               decoration: InputDecoration(
-                prefixIcon: Icon(Icons.lock_outline),
+                prefixIcon: const Icon(Icons.lock_outline),
                 suffixIcon: IconButton(
                   icon: Icon(
                     _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                    color: AppColors.textSecondary,
                   ),
                   onPressed: () {
                     setState(() {
@@ -77,8 +95,12 @@ class _SignInPageState extends State<SignInPage> {
                   },
                 ),
                 hintText: 'Password',
+                hintStyle: TextStyle(
+                  fontFamily: AppFonts.primaryFont,
+                  color: AppColors.textSecondary,
+                ),
                 filled: true,
-                fillColor: Colors.grey[200],
+                fillColor: AppColors.background,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -86,7 +108,7 @@ class _SignInPageState extends State<SignInPage> {
               ),
             ),
 
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
 
             // Forgot Password
             Align(
@@ -97,11 +119,15 @@ class _SignInPageState extends State<SignInPage> {
                 },
                 child: Text(
                   'Forgot Password?',
-                  style: TextStyle(color: Colors.blue[700]),
+                  style: TextStyle(
+                    fontFamily: AppFonts.primaryFont,
+                    fontSize: FontSizes.body,
+                    color: AppColors.primary,
+                  ),
                 ),
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
 
             // Sign In Button
             SizedBox(
@@ -109,27 +135,38 @@ class _SignInPageState extends State<SignInPage> {
               height: 50,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pushNamed(context, '/userHome'); // Handle sign in logic here
+                  Navigator.pushNamed(context, '/userHome');
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue[700],
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
                 child: Text(
                   'Sign In',
-                  style: TextStyle(fontSize: 16),
+                  style: TextStyle(
+                    fontFamily: AppFonts.primaryFont,
+                    fontSize: FontSizes.subHeading,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
 
             // Navigate to Sign Up
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('Don\'t have an account? '),
+                Text(
+                  'Don\'t have an account? ',
+                  style: TextStyle(
+                    fontFamily: AppFonts.primaryFont,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
                 GestureDetector(
                   onTap: () {
                     Navigator.pushNamed(context, '/role');
@@ -137,14 +174,15 @@ class _SignInPageState extends State<SignInPage> {
                   child: Text(
                     'Sign Up',
                     style: TextStyle(
-                      color: Colors.blue[700],
+                      fontFamily: AppFonts.primaryFont,
+                      color: AppColors.primary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
               ],
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
           ],
         ),
       ),

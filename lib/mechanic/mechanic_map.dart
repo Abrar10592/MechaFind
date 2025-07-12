@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mechfind/utils.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 
@@ -38,23 +39,19 @@ class _MechanicMapState extends State<MechanicMap> with WidgetsBindingObserver {
   }
 
   Future<void> _initLocationSetup() async {
-    // Check service
     bool serviceEnabled = await _locationController.serviceEnabled();
     if (!serviceEnabled && !_hasRequestedPermission) {
       serviceEnabled = await _locationController.requestService();
-      _hasRequestedPermission=true;
+      _hasRequestedPermission = true;
       if (!serviceEnabled) return;
     }
 
-    // Permission flow
     PermissionStatus permissionGranted = await _locationController.hasPermission();
-
     if (permissionGranted == PermissionStatus.denied && !_hasRequestedPermission) {
       _hasRequestedPermission = true;
       permissionGranted = await _locationController.requestPermission();
     }
 
-    // Only proceed if permission granted
     if (permissionGranted == PermissionStatus.granted) {
       if (!_hasListenerAttached) {
         _locationController.onLocationChanged.listen((LocationData locationData) {
@@ -63,9 +60,7 @@ class _MechanicMapState extends State<MechanicMap> with WidgetsBindingObserver {
             if (mounted) {
               setState(() {
                 _currentPosition = newPosition;
-                print(_currentPosition);
               });
-              // Optional: move camera
               _mapController.animateCamera(CameraUpdate.newLatLng(newPosition));
             }
           }
@@ -78,11 +73,32 @@ class _MechanicMapState extends State<MechanicMap> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Mechanic Map'), centerTitle: true),
-      body:_currentPosition==null? Center(
-        child: Text("Loading"),
-      ):GoogleMap(
-              initialCameraPosition: CameraPosition(
+      appBar: AppBar(
+        title: const Text(
+          'Mechanic Map',
+          style: TextStyle(
+            color: Colors.white,
+            fontFamily: AppFonts.primaryFont,
+            fontSize: FontSizes.subHeading,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
+        backgroundColor: AppColors.primary,
+      ),
+      backgroundColor: AppColors.background,
+      body: _currentPosition == null
+          ? Center(
+              child: Text(
+                "Loading...",
+                style: AppTextStyles.body.copyWith(
+                  fontFamily: AppFonts.secondaryFont,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            )
+          : GoogleMap(
+              initialCameraPosition: const CameraPosition(
                 target: _defaultLocation,
                 zoom: 13,
               ),
@@ -98,10 +114,10 @@ class _MechanicMapState extends State<MechanicMap> with WidgetsBindingObserver {
                   icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
                   infoWindow: const InfoWindow(title: "Your Location"),
                 ),
-                Marker(
-                  markerId: const MarkerId("default_location"),
+                const Marker(
+                  markerId: MarkerId("default_location"),
                   position: _defaultLocation,
-                  infoWindow: const InfoWindow(title: "Default Location"),
+                  infoWindow: InfoWindow(title: "Default Location"),
                 ),
               },
             ),

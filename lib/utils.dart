@@ -1,13 +1,33 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const Color primary = Color.fromARGB(255, 1, 144, 240);
-  static const Color primaryDark = Color.fromARGB(255, 0, 20, 34);
-  static const Color secondary = Color.fromARGB(255, 145, 209, 252);
-  static const Color background = Color(0xFFF5F5F5);
-  static const Color text = Color.fromARGB(255, 23, 23, 34);
-  static const Color accent = Color(0xFFFFC107);
+  static const primary = Color.fromARGB(255, 21, 24, 53);
+  static const accent = Color(0xFF00ACC1);
+  static const background = Color(0xFFF5F8FA);
+  static const danger = Color(0xFFE53935);
+  static const textPrimary = Color(0xFF212121);
+  static const textSecondary = Color(0xFF757575);
 }
+
+class AppTextStyles {
+  static const heading = TextStyle(
+    fontSize: 22,
+    fontWeight: FontWeight.bold,
+    color: AppColors.textPrimary,
+  );
+
+  static const body = TextStyle(
+    fontSize: 16,
+    color: AppColors.textPrimary,
+  );
+
+  static const label = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w500,
+    color: AppColors.textSecondary,
+  );
+}
+
 
 class AppFonts {
   static const String primaryFont = 'Poppins';
