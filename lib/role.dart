@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'selected_role.dart'; // Import the global variable
 
 class RoleSelectionPage extends StatelessWidget {
-  const RoleSelectionPage({Key? key}) : super(key: key);
+  const RoleSelectionPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -75,13 +75,13 @@ class RoleCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const RoleCard({
-    Key? key,
+    super.key,
     required this.icon,
     required this.title,
     required this.description,
     required this.bulletPoints,
     required this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

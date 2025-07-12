@@ -5,13 +5,14 @@ import 'location_service.dart';
 import 'mechanic_card.dart';
 import 'widgets/emergency_button.dart';
 import 'widgets/bottom_navbar.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
+//import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart'; // Import geocoding
 
 class UserHomePage extends StatefulWidget {
-  const UserHomePage({Key? key}) : super(key: key);
+  const UserHomePage({super.key});
 
   @override
+  // ignore: library_private_types_in_public_api
   _UserHomePageState createState() => _UserHomePageState();
 }
 
@@ -53,7 +54,7 @@ class _UserHomePageState extends State<UserHomePage> {
       Placemark place = placemarks[0];
       return '${place.street}, ${place.locality}, ${place.country}';
     } catch (e) {
-      print('Error in reverse geocoding: $e');
+      
       return 'Location not found';
     }
   }
@@ -157,19 +158,22 @@ class _UserHomePageState extends State<UserHomePage> {
       bottomNavigationBar: BottomNavBar(
         currentIndex: 0,
         onTap: (index) {
-          if (index == 0) return;
+          if (index == 0) return; // Already on Home
           switch (index) {
             case 1:
-              Navigator.pushReplacementNamed(context, '/find-mechanics');
+              Navigator.pushNamed(context, '/find-mechanics');
               break;
             case 2:
-              Navigator.pushReplacementNamed(context, '/messages');
+              // Messages - can be implemented later
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Messages feature coming soon'),
+              ));
               break;
             case 3:
-              Navigator.pushReplacementNamed(context, '/history');
+              Navigator.pushNamed(context, '/history');
               break;
             case 4:
-              Navigator.pushReplacementNamed(context, '/profile');
+              Navigator.pushNamed(context, '/settings');
               break;
           }
         },

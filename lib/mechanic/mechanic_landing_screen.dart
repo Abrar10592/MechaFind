@@ -17,7 +17,7 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
     with WidgetsBindingObserver {
   final Location _locationController = Location();
   LatLng? _currentPosition;
-  late GoogleMapController _mapController;
+  //late GoogleMapController _mapController;
   bool _hasListenerAttached = false;
   bool _hasRequestedPermission = false;
   // Add this:

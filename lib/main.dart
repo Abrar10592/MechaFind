@@ -7,14 +7,16 @@ import 'signin.dart';
 import 'role.dart';
 import 'user_home.dart';
 import 'landing.dart';
-
-// Suppose you will create this page
+import 'screens/history/history_page.dart';
+import 'screens/settings/settings_profile_screen.dart';
 
 void main() {
   runApp(MechFindApp());
 }
 
 class MechFindApp extends StatelessWidget {
+  const MechFindApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -48,7 +50,8 @@ class MechFindApp extends StatelessWidget {
         '/userHome': (context) => UserHomePage(),
         '/home': (context) => WelcomePage(),
         '/find-mechanics': (context) => const FindMechanicsPage(),
-
+        '/history': (context) => const HistoryPage(),
+        '/settings': (context) => const SettingsProfileScreen(),
         //'/create_account': (context) => CreateAccountPage(),
       },
     );
