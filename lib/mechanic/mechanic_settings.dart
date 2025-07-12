@@ -53,6 +53,9 @@ class _MechanicSettingsState extends State<MechanicSettings> {
           SizedBox(height: 20),
           _buildSignOutButton(context),
           SizedBox(height: 10),
+          _buildDeleteButton(context),
+          SizedBox(height: 10),
+
           _buildFooter(),
         ],
       ),
@@ -94,8 +97,8 @@ class _MechanicSettingsState extends State<MechanicSettings> {
     return Center(
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red, // Updated from primary to backgroundColor
-          foregroundColor: Colors.white, // Updated from onPrimary to foregroundColor
+          backgroundColor: Colors.red,
+          foregroundColor: Colors.white,
         ),
         onPressed: () {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -103,6 +106,46 @@ class _MechanicSettingsState extends State<MechanicSettings> {
           );
         },
         child: Text('Sign Out'),
+      ),
+    );
+  }
+
+  Widget _buildDeleteButton(BuildContext context) {
+    return Center(
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.grey[800],
+          foregroundColor: Colors.white,
+        ),
+        onPressed: () async {
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text('Delete Account'),
+              content: Text('Are you sure you want to delete your account? This action cannot be undone.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: Text('Delete'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed == true) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Account deletion confirmed (not implemented)')),
+            );
+          }
+        },
+        child: Text('Delete Account'),
       ),
     );
   }
@@ -116,3 +159,4 @@ class _MechanicSettingsState extends State<MechanicSettings> {
     );
   }
 }
+
