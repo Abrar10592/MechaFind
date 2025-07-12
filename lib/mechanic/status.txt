@@ -1,0 +1,4 @@
+1=pending
+2=canceled
+3=accepted by mechanic
+4=completed
