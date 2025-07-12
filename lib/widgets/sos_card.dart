@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class Sos_Card extends StatelessWidget {
   final Map<String, dynamic> request;
    final LatLng? current_location;
-  Sos_Card({super.key, required this.request,required this.current_location});
+   final VoidCallback? onIgnore;
+   final VoidCallback? onAccept; 
+  Sos_Card({super.key, required this.request,required this.current_location,this.onIgnore,this.onAccept,});
 
   
 
@@ -177,23 +178,19 @@ class Sos_Card extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () {
-                      // Add ignore action
-                    },
+                    onPressed: onIgnore, 
                     icon: const Icon(Icons.cancel_outlined),
                     label: const Text('Ignore'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white,
-                      backgroundColor: Colors.blueGrey,
+                      backgroundColor: const Color.fromARGB(255, 85, 119, 136),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      // Add accept action
-                    },
+                    onPressed: onAccept,
                     icon: const Icon(Icons.check_circle_outline),
                     label: const Text('Accept'),
                     style: ElevatedButton.styleFrom(
