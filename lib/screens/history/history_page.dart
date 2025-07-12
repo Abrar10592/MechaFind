@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/service_history.dart';
 import '../rating/rate_mechanic_screen.dart';
+import '../../widgets/bottom_navbar.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -79,22 +80,31 @@ class _HistoryPageState extends State<HistoryPage> {
         title: const Text('Service History'),
         backgroundColor: const Color(0xFF0D47A1),
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pushNamedAndRemoveUntil(context, '/userHome', (route) => false);
+          },
+        ),
       ),
       body: Column(
         children: [
           // Filter Tabs
           Container(
             padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                _buildFilterChip('All'),
-                const SizedBox(width: 8),
-                _buildFilterChip('Completed'),
-                const SizedBox(width: 8),
-                _buildFilterChip('Ongoing'),
-                const SizedBox(width: 8),
-                _buildFilterChip('Cancelled'),
-              ],
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildFilterChip('All'),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('Completed'),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('Ongoing'),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('Cancelled'),
+                ],
+              ),
             ),
           ),
           
@@ -112,6 +122,28 @@ class _HistoryPageState extends State<HistoryPage> {
                   ),
           ),
         ],
+      ),
+      bottomNavigationBar: BottomNavBar(
+        currentIndex: 3, // History tab index
+        onTap: (index) {
+          if (index == 3) return; // Already on History
+          switch (index) {
+            case 0:
+              Navigator.pushNamedAndRemoveUntil(context, '/userHome', (route) => false);
+              break;
+            case 1:
+              Navigator.pushNamed(context, '/find-mechanics');
+              break;
+            case 2:
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Messages feature coming soon'),
+              ));
+              break;
+            case 4:
+              Navigator.pushNamed(context, '/settings');
+              break;
+          }
+        },
       ),
     );
   }

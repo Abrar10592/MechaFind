@@ -72,7 +72,7 @@ class FindMechanicsPage extends StatelessWidget {
           if (index == 1) return; // Already on Find Mechanics
           switch (index) {
             case 0:
-              Navigator.pushNamed(context, '/userHome');
+              Navigator.pushNamedAndRemoveUntil(context, '/userHome', (route) => false);
               break;
             case 2:
               // Messages - can be implemented later

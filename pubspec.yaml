@@ -40,6 +40,18 @@ dependencies:
   cupertino_icons: ^1.0.8
   geolocator: ^10.0.0
   geocoding: ^2.1.1
+  # For tracking and maps
+  flutter_rating_bar: ^4.0.1
+  # For making phone calls
+  url_launcher: ^6.2.1
+  # For storing user data
+  shared_preferences: ^2.2.2
+  # For image handling
+  image_picker: ^1.0.4
+  # For HTTP requests
+  http: ^1.1.0
+  # For date formatting
+  intl: ^0.18.1
 
 
 

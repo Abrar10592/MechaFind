@@ -157,19 +157,22 @@ class _UserHomePageState extends State<UserHomePage> {
       bottomNavigationBar: BottomNavBar(
         currentIndex: 0,
         onTap: (index) {
-          if (index == 0) return;
+          if (index == 0) return; // Already on Home
           switch (index) {
             case 1:
               Navigator.pushNamed(context, '/find-mechanics');
               break;
             case 2:
-              Navigator.pushReplacementNamed(context, '/messages'); // add if exists
+              // Messages - can be implemented later
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Messages feature coming soon'),
+              ));
               break;
             case 3:
-              Navigator.pushReplacementNamed(context, '/history'); // add if exists
+              Navigator.pushNamed(context, '/history');
               break;
             case 4:
-              Navigator.pushReplacementNamed(context, '/profile'); // add if exists
+              Navigator.pushNamed(context, '/settings');
               break;
           }
         },
