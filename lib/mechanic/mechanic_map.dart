@@ -40,8 +40,9 @@ class _MechanicMapState extends State<MechanicMap> with WidgetsBindingObserver {
   Future<void> _initLocationSetup() async {
     // Check service
     bool serviceEnabled = await _locationController.serviceEnabled();
-    if (!serviceEnabled) {
+    if (!serviceEnabled && !_hasRequestedPermission) {
       serviceEnabled = await _locationController.requestService();
+      _hasRequestedPermission=true;
       if (!serviceEnabled) return;
     }
 
@@ -62,6 +63,7 @@ class _MechanicMapState extends State<MechanicMap> with WidgetsBindingObserver {
             if (mounted) {
               setState(() {
                 _currentPosition = newPosition;
+                print(_currentPosition);
               });
               // Optional: move camera
               _mapController.animateCamera(CameraUpdate.newLatLng(newPosition));
@@ -77,11 +79,11 @@ class _MechanicMapState extends State<MechanicMap> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Mechanic Map'), centerTitle: true),
-      body: _currentPosition == null
-          ? const Center(child: Text("Loading..."))
-          : GoogleMap(
+      body:_currentPosition==null? Center(
+        child: Text("Loading"),
+      ):GoogleMap(
               initialCameraPosition: CameraPosition(
-                target: _currentPosition!,
+                target: _defaultLocation,
                 zoom: 13,
               ),
               onMapCreated: (GoogleMapController controller) {

@@ -1,12 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class Sos_Card extends StatelessWidget {
   final Map<String, dynamic> request;
-  const Sos_Card({super.key, required this.request});
+   final LatLng? current_location;
+  Sos_Card({super.key, required this.request,required this.current_location});
+
+  
 
   @override
   Widget build(BuildContext context) {
+
+    double? distanceInKm;
+
+  // Calculate distance if coordinates are available
+  if (current_location != null &&
+      request['lat'] != null &&
+      request['lng'] != null) {
+    double distanceInMeters = Geolocator.distanceBetween(
+      current_location!.latitude,
+      current_location!.longitude,
+      request['lat'],
+      request['lng'],
+    );
+    distanceInKm = distanceInMeters / 1000;
+  }
+
     return Card(
       margin: const EdgeInsets.all(12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -124,8 +145,9 @@ class Sos_Card extends StatelessWidget {
                 const Icon(Icons.location_on, size: 18, color: Colors.grey),
                 Text(request['location'] ?? ''),
                 const Spacer(),
+                if (distanceInKm != null)
                 Text(
-                  '${request['distance_km'] ?? 0} km away',
+                  '${distanceInKm.toStringAsFixed(2)} km away',
                   style: const TextStyle(color: Colors.blue),
                 ),
               ],

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:mechfind/utils.dart';
 import 'package:mechfind/data/demo_data.dart';
 import 'package:mechfind/widgets/sos_card.dart';
+import 'package:location/location.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class MechanicLandingScreen extends StatefulWidget {
   const MechanicLandingScreen({super.key});
@@ -10,7 +12,72 @@ class MechanicLandingScreen extends StatefulWidget {
   State<MechanicLandingScreen> createState() => _MechanicLandingScreenState();
 }
 
-class _MechanicLandingScreenState extends State<MechanicLandingScreen> {
+class _MechanicLandingScreenState extends State<MechanicLandingScreen> with WidgetsBindingObserver {
+  final Location _locationController = Location();
+  LatLng? _currentPosition;
+  late GoogleMapController _mapController;
+  bool _hasListenerAttached = false;
+  bool _hasRequestedPermission = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _initLocationSetup();
+  }
+
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _initLocationSetup();
+    }
+  }
+
+    Future<void> _initLocationSetup() async {
+    // Check service
+    bool serviceEnabled = await _locationController.serviceEnabled();
+    if (!serviceEnabled && !_hasRequestedPermission) {
+      serviceEnabled = await _locationController.requestService();
+      _hasRequestedPermission=true;
+      if (!serviceEnabled) return;
+    }
+
+    // Permission flow
+    PermissionStatus permissionGranted = await _locationController.hasPermission();
+
+    if (permissionGranted == PermissionStatus.denied && !_hasRequestedPermission) {
+      _hasRequestedPermission = true;
+      permissionGranted = await _locationController.requestPermission();
+    }
+
+    // Only proceed if permission granted
+    if (permissionGranted == PermissionStatus.granted) {
+      if (!_hasListenerAttached) {
+        _locationController.onLocationChanged.listen((LocationData locationData) {
+          if (locationData.latitude != null && locationData.longitude != null) {
+            final newPosition = LatLng(locationData.latitude!, locationData.longitude!);
+            if (mounted) {
+              setState(() {
+                _currentPosition = newPosition;
+                print(_currentPosition);
+              });
+              // Optional: move camera
+              _mapController.animateCamera(CameraUpdate.newLatLng(newPosition));
+            }
+          }
+        });
+        _hasListenerAttached = true;
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -56,7 +123,7 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen> {
                 itemCount: demoData.length,
                 itemBuilder: (context, index) {
                   final request = demoData[index];
-                  return Sos_Card(request: request);
+                  return Sos_Card(request: request,current_location: _currentPosition,);
                 },
               ),
             ),
