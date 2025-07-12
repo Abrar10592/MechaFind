@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:mechfind/utils.dart';
 
 class SignInPage extends StatefulWidget {
+  const SignInPage({super.key});
+
   @override
   _SignInPageState createState() => _SignInPageState();
 }

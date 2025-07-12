@@ -3,7 +3,7 @@ import 'detailed_mechanic_card.dart';
 import 'widgets/bottom_navbar.dart';
 
 class FindMechanicsPage extends StatelessWidget {
-  const FindMechanicsPage({Key? key}) : super(key: key);
+  const FindMechanicsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +62,7 @@ class FindMechanicsPage extends StatelessWidget {
             Text('${mechanics.length} mechanics found near you',
                 style: const TextStyle(fontSize: 16)),
             const SizedBox(height: 10),
-            ...mechanics.map((mech) => DetailedMechanicCard(mechanic: mech)).toList(),
+            ...mechanics.map((mech) => DetailedMechanicCard(mechanic: mech)),
           ],
         ),
       ),
@@ -72,16 +72,19 @@ class FindMechanicsPage extends StatelessWidget {
           if (index == 1) return; // Already on Find Mechanics
           switch (index) {
             case 0:
-              Navigator.pushReplacementNamed(context, '/userHome');
+              Navigator.pushNamedAndRemoveUntil(context, '/userHome', (route) => false);
               break;
             case 2:
-              Navigator.pushReplacementNamed(context, '/messages'); // add if exists
+              // Messages - can be implemented later
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Messages feature coming soon'),
+              ));
               break;
             case 3:
-              Navigator.pushReplacementNamed(context, '/history'); // add if exists
+              Navigator.pushNamed(context, '/history');
               break;
             case 4:
-              Navigator.pushReplacementNamed(context, '/profile'); // add if exists
+              Navigator.pushNamed(context, '/settings');
               break;
           }
         },

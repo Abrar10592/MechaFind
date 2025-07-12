@@ -6,7 +6,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 class Sos_Card extends StatelessWidget {
   final Map<String, dynamic> request;
    final LatLng? current_location;
-  Sos_Card({super.key, required this.request,required this.current_location});
+  const Sos_Card({super.key, required this.request,required this.current_location});
 
   
 

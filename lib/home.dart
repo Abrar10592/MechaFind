@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:mechfind/utils.dart';
 
 class WelcomePage extends StatelessWidget {
+  const WelcomePage({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
