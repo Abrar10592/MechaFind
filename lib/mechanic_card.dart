@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class MechanicCard extends StatelessWidget {
   final Map<String, dynamic> mechanic;
 
-  const MechanicCard({Key? key, required this.mechanic}) : super(key: key);
+  const MechanicCard({super.key, required this.mechanic});
 
   @override
   Widget build(BuildContext context) {

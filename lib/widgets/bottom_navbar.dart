@@ -5,10 +5,10 @@ class BottomNavBar extends StatelessWidget {
   final ValueChanged<int>? onTap;
 
   const BottomNavBar({
-    Key? key,
+    super.key,
     this.currentIndex = 0,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -23,9 +23,26 @@ class BottomNavBar extends StatelessWidget {
         BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
       ],
       onTap: onTap ?? (index) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Navigation button tapped: $index'),
-        ));
+        switch (index) {
+          case 0:
+            Navigator.pushNamedAndRemoveUntil(context, '/userHome', (route) => false);
+            break;
+          case 1:
+            Navigator.pushNamed(context, '/find-mechanics');
+            break;
+          case 2:
+            // Messages - can be implemented later
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Messages feature coming soon'),
+            ));
+            break;
+          case 3:
+            Navigator.pushNamed(context, '/history');
+            break;
+          case 4:
+            Navigator.pushNamed(context, '/settings');
+            break;
+        }
       },
     );
   }

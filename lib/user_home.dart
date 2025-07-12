@@ -3,11 +3,10 @@ import 'location_service.dart';
 import 'mechanic_card.dart';
 import 'widgets/emergency_button.dart';
 import 'widgets/bottom_navbar.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart'; // Import geocoding
 
 class UserHomePage extends StatefulWidget {
-  const UserHomePage({Key? key}) : super(key: key);
+  const UserHomePage({super.key});
 
   @override
   _UserHomePageState createState() => _UserHomePageState();
@@ -111,16 +110,19 @@ class _UserHomePageState extends State<UserHomePage> {
           if (index == 0) return; // Already on Home
           switch (index) {
             case 1:
-              Navigator.pushReplacementNamed(context, '/find-mechanics');
+              Navigator.pushNamed(context, '/find-mechanics');
               break;
             case 2:
-              Navigator.pushReplacementNamed(context, '/messages'); // add if exists
+              // Messages - can be implemented later
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Messages feature coming soon'),
+              ));
               break;
             case 3:
-              Navigator.pushReplacementNamed(context, '/history'); // add if exists
+              Navigator.pushNamed(context, '/history');
               break;
             case 4:
-              Navigator.pushReplacementNamed(context, '/profile'); // add if exists
+              Navigator.pushNamed(context, '/settings');
               break;
           }
         },

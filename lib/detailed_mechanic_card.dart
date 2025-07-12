@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'screens/profile/mechanic_profile_page.dart';
+import 'services/mechanic_service.dart';
 
 class DetailedMechanicCard extends StatelessWidget {
   final Map<String, dynamic> mechanic;
 
-  const DetailedMechanicCard({Key? key, required this.mechanic}) : super(key: key);
+  const DetailedMechanicCard({super.key, required this.mechanic});
 
   @override
   Widget build(BuildContext context) {
@@ -67,16 +69,52 @@ class DetailedMechanicCard extends StatelessWidget {
             // Call + Message Buttons
             Row(
               children: [
-                ElevatedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.call),
-                  label: const Text('Call'),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      // Call functionality
+                    },
+                    icon: const Icon(Icons.call),
+                    label: const Text('Call'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 10),
-                OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.message),
-                  label: const Text('Message'),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      // Message functionality
+                    },
+                    icon: const Icon(Icons.message),
+                    label: const Text('Message'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF0D47A1),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      // Navigate to profile
+                      final mechanicModel = MechanicService.convertToMechanic(mechanic);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => MechanicProfilePage(mechanic: mechanicModel),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.person),
+                    label: const Text('Profile'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D47A1),
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
                 ),
               ],
             ),

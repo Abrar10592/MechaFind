@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:mechfind/signup.dart';
-import 'package:mechfind/signin.dart';// Update this to your actual signup page route
+// Update this to your actual signup page route
 
 class LandingPage extends StatelessWidget {
+  const LandingPage({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -94,7 +95,7 @@ class FeatureItem extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  FeatureItem({required this.icon, required this.text});
+  const FeatureItem({super.key, required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
