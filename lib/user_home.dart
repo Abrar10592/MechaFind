@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mechfind/mechanic/mechanic.dart';
 import 'location_service.dart';
 import 'mechanic_card.dart';
 import 'widgets/emergency_button.dart';
@@ -26,7 +27,7 @@ class _UserHomePageState extends State<UserHomePage> {
   @override
   void initState() {
     super.initState();
-    fetchUserLocation();
+    //fetchUserLocation();
   }
 
   Future<void> fetchUserLocation() async {
@@ -101,6 +102,12 @@ class _UserHomePageState extends State<UserHomePage> {
                 ),
               ),
             ),
+            TextButton(onPressed: (){
+               Navigator.push(context,
+               MaterialPageRoute(builder:(context)=>Mechanic())
+               );},
+                child: Text("Test Mechanic Page")
+                )
           ],
         ),
       ),
