@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:mechfind/utils.dart';
 
 class WelcomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.blue[700],
+      backgroundColor: AppColors.primary, // Replaces Colors.blue[700]
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -12,70 +13,89 @@ class WelcomePage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Spacer(),
+              const Spacer(),
               Text(
                 'Welcome to\nMechFind',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 32,
+                  fontFamily: AppFonts.primaryFont,
+                  fontSize: FontSizes.heading,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Text(
                 'Connect with mechanics and get roadside\nassistance when you need it most',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 16,
+                  fontFamily: AppFonts.primaryFont,
+                  fontSize: FontSizes.body,
                   color: Colors.white,
                 ),
               ),
-              Spacer(),
+              const Spacer(),
               ElevatedButton.icon(
                 onPressed: () {
                   Navigator.pushNamed(context, '/signin');
                 },
-                icon: Icon(Icons.login),
-                label: Text('Sign In'),
+                icon: const Icon(Icons.login),
+                label: const Text(
+                  'Sign In',
+                  style: TextStyle(
+                    fontFamily: AppFonts.primaryFont,
+                    fontSize: FontSizes.subHeading,
+                  ),
+                ),
                 style: ElevatedButton.styleFrom(
-                  minimumSize: Size(double.infinity, 50),
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppColors.primary,
+                  minimumSize: const Size(double.infinity, 50),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: () {
                   Navigator.pushNamed(context, '/role');
                 },
-                icon: Icon(Icons.person_add),
-                label: Text('Create Account'),
+                icon: const Icon(Icons.person_add, color: Colors.white),
+                label: const Text(
+                  'Create Account',
+                  style: TextStyle(
+                    fontFamily: AppFonts.primaryFont,
+                    fontSize: FontSizes.subHeading,
+                    color: Colors.white,
+                  ),
+                ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
-                  minimumSize: Size(double.infinity, 50),
-                  side: BorderSide(color: Colors.white),
+                  minimumSize: const Size(double.infinity, 50),
+                  side: const BorderSide(color: Colors.white),
                   backgroundColor: Colors.transparent,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               GestureDetector(
                 onTap: () {
                   // Continue as guest or navigate accordingly
                 },
-                child: Text(
+                child: const Text(
                   'Continue as Guest',
                   style: TextStyle(
+                    fontFamily: AppFonts.primaryFont,
                     color: Colors.white,
                     decoration: TextDecoration.underline,
+                    fontSize: FontSizes.body,
                   ),
                 ),
               ),
-              SizedBox(height: 40),
+              const SizedBox(height: 40),
             ],
           ),
         ),

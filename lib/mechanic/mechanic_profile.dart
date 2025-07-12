@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mechfind/utils.dart';
 
 class MechanicProfile extends StatefulWidget {
   const MechanicProfile({super.key});
@@ -14,13 +15,15 @@ class _MechanicProfileState extends State<MechanicProfile> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Dashboard'),
+        title: Text(
+          'Profile',
+          style: AppTextStyles.heading.copyWith(color: Colors.white),
+        ),
+        backgroundColor: AppColors.primary,
         actions: [
           IconButton(
-            icon: Icon(Icons.notifications),
-            onPressed: () {
-              // TODO: Open notifications
-            },
+            icon: Icon(Icons.notifications, color: Colors.white),
+            onPressed: () {},
           ),
         ],
       ),
@@ -28,36 +31,25 @@ class _MechanicProfileState extends State<MechanicProfile> {
         child: ListView(
           children: [
             UserAccountsDrawerHeader(
-              accountName: Text('John Doe'),
-              accountEmail: Text('Mechanic'),
+              accountName: Text('John Doe', style: TextStyle(fontFamily: AppFonts.primaryFont)),
+              accountEmail: Text('Mechanic', style: TextStyle(fontFamily: AppFonts.secondaryFont)),
               currentAccountPicture: CircleAvatar(
                 backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=3'),
               ),
+              decoration: BoxDecoration(color: AppColors.primary),
             ),
-            ListTile(
-              leading: Icon(Icons.person),
-              title: Text('Edit Profile'),
-              onTap: () {},
-            ),
-            ListTile(
-              leading: Icon(Icons.settings),
-              title: Text('Settings'),
-              onTap: () {},
-            ),
-            ListTile(
-              leading: Icon(Icons.logout),
-              title: Text('Logout'),
-              onTap: () {},
-            ),
+            _buildDrawerItem(Icons.person, 'Edit Profile'),
+            _buildDrawerItem(Icons.settings, 'Settings'),
+            _buildDrawerItem(Icons.logout, 'Logout'),
           ],
         ),
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header + Status Toggle
+            // Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -65,137 +57,110 @@ class _MechanicProfileState extends State<MechanicProfile> {
                   children: [
                     CircleAvatar(
                       radius: 32,
-                      backgroundImage:
-                          NetworkImage('https://i.pravatar.cc/150?img=3'),
+                      backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=3'),
                     ),
-                    SizedBox(width: 12),
+                    const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Zobaer Ali',
-                            style: TextStyle(
-                                fontSize: 20, fontWeight: FontWeight.bold)),
-                        Text('Certified Mechanic',
-                            style: TextStyle(color: Colors.grey[700])),
+                        Text('Zobaer Ali', style: AppTextStyles.heading),
+                        Text('Certified Mechanic', style: AppTextStyles.label),
                       ],
                     )
                   ],
                 ),
                 Row(
                   children: [
-                    Text(isOnline ? 'Online' : 'Offline',
-                        style: TextStyle(
-                            color: isOnline ? Colors.green : Colors.red,
-                            fontWeight: FontWeight.bold)),
+                    Text(
+                      isOnline ? 'Online' : 'Offline',
+                      style: TextStyle(
+                        color: isOnline ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     Switch(
                       value: isOnline,
-                      onChanged: (val) {
-                        setState(() {
-                          isOnline = val;
-                        });
-                      },
+                      onChanged: (val) => setState(() => isOnline = val),
                       activeColor: Colors.green,
                       inactiveThumbColor: Colors.red,
                     ),
                   ],
-                )
+                ),
               ],
             ),
-
-            SizedBox(height: 24),
-
-            // Today’s Overview Cards
+            const SizedBox(height: 24),
+            // Stats
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildStatCard('Jobs Today', '5', Icons.work_outline,
-                    Colors.blueAccent),
-                _buildStatCard('Earnings', '\$120', Icons.attach_money,
-                    Colors.orangeAccent),
-                _buildStatCard(
-                    'Next Job', '2:30 PM', Icons.schedule, Colors.purpleAccent),
+                _buildStatCard('Jobs Today', '5', Icons.work_outline, Colors.blueAccent),
+                _buildStatCard('Earnings', '\$120', Icons.attach_money, Colors.orangeAccent),
+                _buildStatCard('Next Job', '2:30 PM', Icons.schedule, Colors.purpleAccent),
               ],
             ),
+            const SizedBox(height: 32),
 
-            SizedBox(height: 32),
-
-            // Upcoming Jobs List Header
-            Text('Upcoming Jobs',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-
-            SizedBox(height: 12),
-
-            // Upcoming Jobs List
+            Text('Upcoming Jobs', style: AppTextStyles.heading),
+            const SizedBox(height: 12),
             ListView(
               shrinkWrap: true,
-              physics: NeverScrollableScrollPhysics(),
+              physics: const NeverScrollableScrollPhysics(),
               children: [
-                _buildJobCard(
-                    clientName: 'Alice Smith',
-                    carModel: 'Toyota Camry 2019',
-                    jobType: 'Brake Repair',
-                    time: 'Today 3:00 PM'),
-                _buildJobCard(
-                    clientName: 'Bob Johnson',
-                    carModel: 'Honda Accord 2018',
-                    jobType: 'Oil Change',
-                    time: 'Today 5:00 PM'),
+                _buildJobCard('Alice Smith', 'Toyota Camry 2019', 'Brake Repair', 'Today 3:00 PM'),
+                _buildJobCard('Bob Johnson', 'Honda Accord 2018', 'Oil Change', 'Today 5:00 PM'),
               ],
             ),
+            const SizedBox(height: 32),
 
-            SizedBox(height: 32),
-
-            // Earnings Summary
-            Text('Earnings Summary',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-
-            SizedBox(height: 12),
-
+            Text('Earnings Summary', style: AppTextStyles.heading),
+            const SizedBox(height: 12),
             Container(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.blueGrey[50],
+                color: AppColors.background,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
                 children: [
-                  Text('Total Earnings (This Month):',
-                      style: TextStyle(fontSize: 16)),
-                  SizedBox(height: 8),
+                  Text('Total Earnings (This Month):', style: AppTextStyles.body),
+                  const SizedBox(height: 8),
                   Text('\$1,250',
-                      style:
-                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 16),
+                      style: TextStyle(
+                        fontSize: FontSizes.heading,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: AppFonts.primaryFont,
+                        color: AppColors.textPrimary,
+                      )),
+                  const SizedBox(height: 16),
                   ElevatedButton.icon(
-                    onPressed: () {
-                      // TODO: Withdraw balance action
-                    },
-                    icon: Icon(Icons.account_balance_wallet),
-                    label: Text('Withdraw Balance'),
+                    onPressed: () {},
+                    icon: const Icon(Icons.account_balance_wallet),
+                    label: const Text('Withdraw Balance'),
                     style: ElevatedButton.styleFrom(
-                      minimumSize: Size(double.infinity, 48),
+                      minimumSize: const Size(double.infinity, 48),
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
                     ),
                   )
                 ],
               ),
             ),
 
-            SizedBox(height: 32),
-
-            // Availability Schedule Section (Simple)
-            Text('Manage Availability',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 12),
+            const SizedBox(height: 32),
+            Text('Manage Availability', style: AppTextStyles.heading),
+            const SizedBox(height: 12),
             Text(
               'Available Hours: Mon - Sat, 9:00 AM - 6:00 PM',
-              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+              style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             ElevatedButton(
-              onPressed: () {
-                // TODO: Open availability settings
-              },
-              child: Text('Edit Availability'),
+              onPressed: () {},
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Edit Availability'),
             ),
           ],
         ),
@@ -203,10 +168,18 @@ class _MechanicProfileState extends State<MechanicProfile> {
     );
   }
 
+  Widget _buildDrawerItem(IconData icon, String title) {
+    return ListTile(
+      leading: Icon(icon, color: AppColors.primary),
+      title: Text(title, style: TextStyle(fontFamily: AppFonts.secondaryFont)),
+      onTap: () {},
+    );
+  }
+
   Widget _buildStatCard(String title, String value, IconData icon, Color color) {
     return Container(
       width: 100,
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: color.withOpacity(0.15),
         borderRadius: BorderRadius.circular(12),
@@ -214,13 +187,13 @@ class _MechanicProfileState extends State<MechanicProfile> {
       child: Column(
         children: [
           Icon(icon, size: 28, color: color),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(value,
               style: TextStyle(
-                  fontSize: 20,
+                  fontSize: FontSizes.subHeading,
                   fontWeight: FontWeight.bold,
                   color: color)),
-          SizedBox(height: 4),
+          const SizedBox(height: 4),
           Text(title,
               textAlign: TextAlign.center,
               style: TextStyle(color: color, fontWeight: FontWeight.w600)),
@@ -229,42 +202,33 @@ class _MechanicProfileState extends State<MechanicProfile> {
     );
   }
 
-  Widget _buildJobCard(
-      {required String clientName,
-      required String carModel,
-      required String jobType,
-      required String time}) {
+  Widget _buildJobCard(String clientName, String carModel, String jobType, String time) {
     return Card(
-      margin: EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(clientName,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            Text(carModel, style: TextStyle(color: Colors.grey[700])),
-            SizedBox(height: 4),
-            Text('Job: $jobType'),
-            SizedBox(height: 8),
+            Text(clientName, style: AppTextStyles.heading.copyWith(fontSize: 18)),
+            Text(carModel, style: AppTextStyles.label),
+            const SizedBox(height: 4),
+            Text('Job: $jobType', style: AppTextStyles.body),
+            const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(time, style: TextStyle(color: Colors.grey[600])),
+                Text(time, style: AppTextStyles.label),
                 Row(
                   children: [
                     TextButton(
-                      onPressed: () {
-                        // Accept job logic
-                      },
-                      child: Text('Accept'),
+                      onPressed: () {},
+                      child: const Text('Accept'),
                     ),
                     TextButton(
-                      onPressed: () {
-                        // Cancel job logic
-                      },
-                      child: Text('Cancel', style: TextStyle(color: Colors.red)),
+                      onPressed: () {},
+                      child: const Text('Cancel', style: TextStyle(color: AppColors.danger)),
                     ),
                   ],
                 )

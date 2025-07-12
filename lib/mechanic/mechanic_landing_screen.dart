@@ -26,38 +26,33 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen> with Widg
     _initLocationSetup();
   }
 
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
-   @override
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _initLocationSetup();
     }
   }
 
-    Future<void> _initLocationSetup() async {
-    // Check service
+  Future<void> _initLocationSetup() async {
     bool serviceEnabled = await _locationController.serviceEnabled();
     if (!serviceEnabled && !_hasRequestedPermission) {
       serviceEnabled = await _locationController.requestService();
-      _hasRequestedPermission=true;
+      _hasRequestedPermission = true;
       if (!serviceEnabled) return;
     }
 
-    // Permission flow
     PermissionStatus permissionGranted = await _locationController.hasPermission();
-
     if (permissionGranted == PermissionStatus.denied && !_hasRequestedPermission) {
       _hasRequestedPermission = true;
       permissionGranted = await _locationController.requestPermission();
     }
 
-    // Only proceed if permission granted
     if (permissionGranted == PermissionStatus.granted) {
       if (!_hasListenerAttached) {
         _locationController.onLocationChanged.listen((LocationData locationData) {
@@ -66,9 +61,7 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen> with Widg
             if (mounted) {
               setState(() {
                 _currentPosition = newPosition;
-                print(_currentPosition);
               });
-              // Optional: move camera
               _mapController.animateCamera(CameraUpdate.newLatLng(newPosition));
             }
           }
@@ -83,9 +76,9 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen> with Widg
     return Scaffold(
       appBar: AppBar(
         elevation: 2.0,
-        title: const Text(
+        title: Text(
           'Mechanic Dashboard',
-          style: TextStyle(
+          style: AppTextStyles.heading.copyWith(
             color: Colors.white,
             fontSize: FontSizes.heading,
             fontFamily: AppFonts.primaryFont,
@@ -94,6 +87,7 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen> with Widg
         centerTitle: true,
         backgroundColor: AppColors.primary,
       ),
+      backgroundColor: AppColors.background,
       body: Padding(
         padding: const EdgeInsets.all(15),
         child: Column(
@@ -102,28 +96,31 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen> with Widg
             Row(
               children: [
                 Expanded(child: _buildStatCard("12", "Completed Today")),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(child: _buildStatCard("2", "Active Request")),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(child: _buildStatCard("4.8", "Rating")),
               ],
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             Text(
               "Active SOS Signals",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 43, 46, 48),
-                fontSize: 20,
+              style: AppTextStyles.heading.copyWith(
+                fontSize: FontSizes.subHeading,
                 fontFamily: AppFonts.primaryFont,
+                color: AppColors.textPrimary,
               ),
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             Expanded(
               child: ListView.builder(
                 itemCount: demoData.length,
                 itemBuilder: (context, index) {
                   final request = demoData[index];
-                  return Sos_Card(request: request,current_location: _currentPosition,);
+                  return Sos_Card(
+                    request: request,
+                    current_location: _currentPosition,
+                  );
                 },
               ),
             ),
@@ -139,7 +136,7 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen> with Widg
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      color: const Color.fromARGB(255, 249, 250, 250),
+      color: Colors.white,
       child: SizedBox(
         height: 120,
         child: Padding(
@@ -149,19 +146,20 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen> with Widg
             children: [
               Text(
                 number,
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 0, 99, 180),
-                  fontSize: 30,
-                  fontWeight: FontWeight.bold,
+                style: AppTextStyles.heading.copyWith(
+                  fontSize: 28,
+                  color: AppColors.primary,
+                  fontFamily: AppFonts.primaryFont,
                 ),
               ),
+              const SizedBox(height: 4),
               Text(
                 label,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 60, 62, 65),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w400,
+                style: AppTextStyles.label.copyWith(
+                  fontSize: FontSizes.body,
+                  fontFamily: AppFonts.secondaryFont,
+                  color: AppColors.textSecondary,
                 ),
               ),
             ],
