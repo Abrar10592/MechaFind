@@ -40,7 +40,7 @@ class RoleSelectionPage extends StatelessWidget {
                 'Real-time tracking',
               ],
               onTap: () {
-                selectedRole = 'vehicle_owner';
+                selectedRole = 'user';
                 Navigator.pushNamed(context, '/signup');
               },
             ),
