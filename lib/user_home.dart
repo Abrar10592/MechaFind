@@ -3,9 +3,9 @@ import 'package:mechfind/utils.dart';
 import 'package:mechfind/mechanic/mechanic.dart';
 import 'location_service.dart';
 import 'mechanic_card.dart';
-import 'widgets/emergency_button.dart';
+import 'widgets/emergency_button.dart'; // Updated import
 import 'widgets/bottom_navbar.dart';
-import 'package:geocoding/geocoding.dart'; // Import geocoding
+import 'package:geocoding/geocoding.dart';
 
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
@@ -37,7 +37,6 @@ class _UserHomePageState extends State<UserHomePage> {
       final parts = location.split(', ');
       final lat = double.parse(parts[0]);
       final lng = double.parse(parts[1]);
-
       final address = await getAddressFromLatLng(lat, lng);
       setState(() {
         currentLocation = address;
@@ -91,9 +90,10 @@ class _UserHomePageState extends State<UserHomePage> {
             ),
             const SizedBox(height: 20),
 
+            // Emergency button triggers popup form
             const EmergencyButton(),
-            const SizedBox(height: 30),
 
+            const SizedBox(height: 30),
             Text(
               'Nearby Mechanics',
               style: AppTextStyles.heading.copyWith(
@@ -102,14 +102,12 @@ class _UserHomePageState extends State<UserHomePage> {
               ),
             ),
             const SizedBox(height: 10),
-
             Column(
               children: nearbyMechanics.map((mechanic) {
                 return MechanicCard(mechanic: mechanic);
               }).toList(),
             ),
             const SizedBox(height: 30),
-
             Text(
               'Recent Activity',
               style: AppTextStyles.heading.copyWith(
@@ -118,7 +116,6 @@ class _UserHomePageState extends State<UserHomePage> {
               ),
             ),
             const SizedBox(height: 10),
-
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -136,7 +133,6 @@ class _UserHomePageState extends State<UserHomePage> {
                 ),
               ),
             ),
-
             const SizedBox(height: 10),
             TextButton(
               onPressed: () {
@@ -162,7 +158,6 @@ class _UserHomePageState extends State<UserHomePage> {
               Navigator.pushNamed(context, '/find-mechanics');
               break;
             case 2:
-              // Messages - can be implemented later
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                 content: Text('Messages feature coming soon'),
               ));
