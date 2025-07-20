@@ -34,6 +34,52 @@ final List<Map<String, String>> achievements = [
   },
 ];
 
+// Dummy reviews data
+final List<Map<String, dynamic>> dummyReviews = [
+  {
+    'customerName': 'Alice Johnson',
+    'rating': 5,
+    'comment': 'Excellent service! Fixed my car quickly and professionally. Highly recommended!',
+    'date': '2025-01-15',
+    'jobType': 'Brake Repair',
+  },
+  {
+    'customerName': 'Bob Smith',
+    'rating': 4,
+    'comment': 'Good work on my oil change. Arrived on time and explained everything clearly.',
+    'date': '2025-01-10',
+    'jobType': 'Oil Change',
+  },
+  {
+    'customerName': 'Sarah Wilson',
+    'rating': 5,
+    'comment': 'Amazing mechanic! Diagnosed the problem immediately and fixed it at a fair price.',
+    'date': '2025-01-08',
+    'jobType': 'Engine Diagnostic',
+  },
+  {
+    'customerName': 'Mike Davis',
+    'rating': 4,
+    'comment': 'Professional service. Fixed my transmission issue efficiently.',
+    'date': '2025-01-05',
+    'jobType': 'Transmission Repair',
+  },
+  {
+    'customerName': 'Emma Brown',
+    'rating': 5,
+    'comment': 'Very knowledgeable and honest. Saved me money by suggesting a simple fix.',
+    'date': '2025-01-03',
+    'jobType': 'Battery Replacement',
+  },
+  {
+    'customerName': 'David Lee',
+    'rating': 3,
+    'comment': 'Service was okay, but took longer than expected. Work quality was good though.',
+    'date': '2024-12-28',
+    'jobType': 'Tire Change',
+  },
+];
+
 class MechanicProfile extends StatefulWidget {
   const MechanicProfile({super.key});
 
@@ -44,155 +90,7 @@ class MechanicProfile extends StatefulWidget {
 class _MechanicProfileState extends State<MechanicProfile> {
   bool isOnline = true;
   File? _profileImage;
-  Future<void> _pickProfileImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() {
-        _profileImage = File(pickedFile.path);
-      });
-    }
-  }
-
   double availableBalance = 1250; // Simulated balance
-
-void _showWithdrawDialog() {
-  final TextEditingController amountController = TextEditingController();
-  String selectedMethod = 'Bank';
-  final List<String> methods = ['Bank', 'Bkash', 'Credit Card'];
-
-  showDialog(
-    context: context,
-    builder: (context) {
-      return AlertDialog(
-        title: const Text('Withdraw Funds'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: amountController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Amount (৳)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: selectedMethod,
-              items: methods
-                  .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                  .toList(),
-              onChanged: (val) {
-                if (val != null) {
-                  selectedMethod = val;
-                }
-              },
-              decoration: const InputDecoration(
-                labelText: 'Withdraw Method',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final amountText = amountController.text.trim();
-              final amount = double.tryParse(amountText);
-
-              if (amount == null || amount <= 0) {
-                _showBanner('Enter a valid amount.');
-                return;
-              }
-
-              if (amount > availableBalance) {
-                _showBanner('Insufficient balance.');
-                return;
-              }
-
-              Navigator.pop(context);
-              _startOtpVerification(amount, selectedMethod);
-            },
-            child: const Text('Continue'),
-          ),
-        ],
-      );
-    },
-  );
-}
-
-void _startOtpVerification(double amount, String method) {
-  final otp = (100000 + (DateTime.now().millisecondsSinceEpoch % 900000)).toString();
-  final TextEditingController otpController = TextEditingController();
-
-  // Simulate receiving OTP via banner
-  _showBanner('Your OTP for withdrawing ৳${amount.toStringAsFixed(0)} is $otp');
-
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (context) {
-      return AlertDialog(
-        title: const Text('Enter OTP'),
-        content: TextField(
-          controller: otpController,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Enter 6-digit OTP',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (otpController.text.trim() == otp) {
-                setState(() {
-                  availableBalance -= amount;
-                });
-                Navigator.pop(context);
-                _showBanner('৳${amount.toStringAsFixed(0)} withdrawn from MechFind Account via $method.');
-              } else {
-                _showBanner('Incorrect OTP. Please try again.');
-              }
-            },
-            child: const Text('Verify'),
-          ),
-        ],
-      );
-    },
-  );
-}
-
-void _showBanner(String message) {
-  ScaffoldMessenger.of(context).hideCurrentMaterialBanner(); // <-- Auto-dismiss previous banner
-
-  ScaffoldMessenger.of(context).showMaterialBanner(
-    MaterialBanner(
-      content: Text(message),
-      backgroundColor: AppColors.primary.withOpacity(0.95),
-      contentTextStyle: const TextStyle(color: Colors.white),
-      actions: [
-        TextButton(
-          onPressed: () {
-            ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
-          },
-          child: const Text('Dismiss', style: TextStyle(color: Colors.white)),
-        ),
-      ],
-    ),
-  );
-}
-
-
 
   // Dummy data for earnings and jobs
   final List<double> weeklyEarnings = [120, 150, 90, 200, 170, 80, 130];
@@ -207,6 +105,153 @@ void _showBanner(String message) {
     '12:00 PM', '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM',
     '06:00 PM', '07:00 PM', '08:00 PM', '09:00 PM', '10:00 PM'
   ];
+
+  Future<void> _pickProfileImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        _profileImage = File(pickedFile.path);
+      });
+    }
+  }
+
+  void _showWithdrawDialog() {
+    final TextEditingController amountController = TextEditingController();
+    String selectedMethod = 'Bank';
+    final List<String> methods = ['Bank', 'Bkash', 'Credit Card'];
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Withdraw Funds'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: amountController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Amount (৳)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: selectedMethod,
+                items: methods
+                    .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                    .toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    selectedMethod = val;
+                  }
+                },
+                decoration: const InputDecoration(
+                  labelText: 'Withdraw Method',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final amountText = amountController.text.trim();
+                final amount = double.tryParse(amountText);
+
+                if (amount == null || amount <= 0) {
+                  _showBanner('Enter a valid amount.');
+                  return;
+                }
+
+                if (amount > availableBalance) {
+                  _showBanner('Insufficient balance.');
+                  return;
+                }
+
+                Navigator.pop(context);
+                _startOtpVerification(amount, selectedMethod);
+              },
+              child: const Text('Continue'),
+            ),
+          ],
+        );
+      },
+    );
+    // Close the method
+  }
+
+  void _startOtpVerification(double amount, String method) {
+    final otp = (100000 + (DateTime.now().millisecondsSinceEpoch % 900000)).toString();
+    final TextEditingController otpController = TextEditingController();
+
+    // Simulate receiving OTP via banner
+    _showBanner('Your OTP for withdrawing ৳${amount.toStringAsFixed(0)} is $otp');
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Enter OTP'),
+          content: TextField(
+            controller: otpController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Enter 6-digit OTP',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (otpController.text.trim() == otp) {
+                  setState(() {
+                    availableBalance -= amount;
+                  });
+                  Navigator.pop(context);
+                  _showBanner('৳${amount.toStringAsFixed(0)} withdrawn from MechFind Account via $method.');
+                } else {
+                  _showBanner('Incorrect OTP. Please try again.');
+                }
+              },
+              child: const Text('Verify'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showBanner(String message) {
+    ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+
+    ScaffoldMessenger.of(context).showMaterialBanner(
+      MaterialBanner(
+        content: Text(message),
+        backgroundColor: AppColors.primary.withOpacity(0.95),
+        contentTextStyle: const TextStyle(color: Colors.white),
+        actions: [
+          TextButton(
+            onPressed: () {
+              ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+            },
+            child: const Text('Dismiss', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
 
   void _showAvailabilityDialog() {
     String tempStart = availableStart;
@@ -301,11 +346,15 @@ void _showBanner(String message) {
               accountName: Text('Zobaer Ali', style: TextStyle(fontFamily: AppFonts.primaryFont)),
               accountEmail: Text('Certified Mechanic', style: TextStyle(fontFamily: AppFonts.secondaryFont)),
               currentAccountPicture: CircleAvatar(
-                backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=3'),
+                backgroundColor: Colors.white,
+                child: Icon(
+                  Icons.person,
+                  size: 40,
+                  color: AppColors.primary,
+                ),
               ),
               decoration: BoxDecoration(color: AppColors.primary),
             ),
-            _buildDrawerItem(Icons.person, 'Edit Profile'),
             _buildDrawerItem(Icons.star, 'Reviews'),
             _buildDrawerItem(Icons.language, 'Translate'),
             _buildDrawerItem(Icons.logout, 'Logout'),
@@ -675,12 +724,21 @@ void _showBanner(String message) {
   }
 
   Widget _buildDrawerItem(IconData icon, String title) {
-    return ListTile(
-      leading: Icon(icon, color: AppColors.primary),
-      title: Text(title, style: TextStyle(fontFamily: AppFonts.secondaryFont)),
-      onTap: () {},
-    );
-  }
+  return ListTile(
+    leading: Icon(icon, color: AppColors.primary),
+    title: Text(title, style: TextStyle(fontFamily: AppFonts.secondaryFont)),
+    onTap: () {
+      Navigator.pop(context); // Close drawer first
+      if (title == 'Reviews') {
+        _showReviewsDialog();
+      } else if (title == 'Translate') {
+        _showTranslateDialog();
+      } else if (title == 'Logout') {
+        _showLogoutDialog();
+      }
+    },
+  );
+}
 
   Widget _buildStatCard(String title, String value, IconData icon, Color color) {
     return Container(
@@ -745,4 +803,463 @@ void _showBanner(String message) {
       ),
     );
   }
+
+  void _showReviewsDialog() {
+  // Calculate average rating
+  double averageRating = dummyReviews.fold(0.0, (sum, review) => sum + review['rating']) / dummyReviews.length;
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.9,
+          height: MediaQuery.of(context).size.height * 0.8,
+          child: Column(
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(16),
+                    topRight: Radius.circular(16),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Customer Reviews',
+                      style: AppTextStyles.heading.copyWith(
+                        color: Colors.white,
+                        fontSize: 20,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(Icons.close, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Summary Section
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    Column(
+                      children: [
+                        Text(
+                          averageRating.toStringAsFixed(1),
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        Row(
+                          children: List.generate(5, (index) {
+                            return Icon(
+                              index < averageRating.floor() ? Icons.star : 
+                              (index < averageRating ? Icons.star_half : Icons.star_border),
+                              color: Colors.amber,
+                              size: 20,
+                            );
+                          }),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      children: [
+                        Text(
+                          '${dummyReviews.length}',
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        Text(
+                          'Total Reviews',
+                          style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Reviews List
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: dummyReviews.length,
+                  itemBuilder: (context, index) {
+                    final review = dummyReviews[index];
+                    return _buildReviewCard(review);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }
+
+Widget _buildReviewCard(Map<String, dynamic> review) {
+  return Card(
+    margin: const EdgeInsets.only(bottom: 12),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    elevation: 2,
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with name and rating
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                review['customerName'],
+                style: AppTextStyles.heading.copyWith(fontSize: 16),
+              ),
+              Row(
+                children: List.generate(5, (index) {
+                  return Icon(
+                    index < review['rating'] ? Icons.star : Icons.star_border,
+                    color: Colors.amber,
+                    size: 16,
+                  );
+                }),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          
+          // Job type
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              review['jobType'],
+              style: TextStyle(
+                color: AppColors.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          
+          // Review comment
+          Text(
+            review['comment'],
+            style: AppTextStyles.body.copyWith(fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          
+          // Date
+          Text(
+            review['date'],
+            style: AppTextStyles.label.copyWith(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    ));
+  }
+
+  void _showTranslateDialog() {
+    String selectedLanguage = 'English'; // Current language
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.85,
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Language Settings',
+                          style: AppTextStyles.heading.copyWith(
+                            fontSize: 20,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: Icon(Icons.close, color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // Current Language Display
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(Icons.language, size: 40, color: AppColors.primary),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Current Language',
+                            style: AppTextStyles.label.copyWith(color: AppColors.textSecondary),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            selectedLanguage,
+                            style: AppTextStyles.heading.copyWith(
+                              fontSize: 18,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Language Options
+                    Text(
+                      'Select Language',
+                      style: AppTextStyles.heading.copyWith(fontSize: 16),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // English Option
+                    _buildLanguageOption(
+                      'English',
+                      '🇺🇸',
+                      'Switch to English',
+                      selectedLanguage == 'English',
+                      () {
+                        setState(() {
+                          selectedLanguage = 'English';
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Bangla Option
+                    _buildLanguageOption(
+                      'বাংলা (Bangla)',
+                      '🇧🇩',
+                      'বাংলায় পরিবর্তন করুন',
+                      selectedLanguage == 'বাংলা (Bangla)',
+                      () {
+                        setState(() {
+                          selectedLanguage = 'বাংলা (Bangla)';
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Action Buttons
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(color: AppColors.textSecondary),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _showBanner(
+                              selectedLanguage == 'English' 
+                                ? 'Language changed to English' 
+                                : 'ভাষা বাংলায় পরিবর্তিত হয়েছে (Language changed to Bangla)'
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          ),
+                          child: Text('Apply Changes'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildLanguageOption(String language, String flag, String description, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : Colors.grey.shade300,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Text(flag, style: TextStyle(fontSize: 24)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    language,
+                    style: AppTextStyles.heading.copyWith(
+                      fontSize: 16,
+                      color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    description,
+                    style: AppTextStyles.body.copyWith(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              Icon(Icons.check_circle, color: AppColors.primary, size: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.logout, color: AppColors.primary, size: 28),
+              const SizedBox(width: 12),
+              Text(
+                'Logout',
+                style: AppTextStyles.heading.copyWith(
+                  fontSize: 20,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Are you sure you want to logout?',
+                style: AppTextStyles.body.copyWith(fontSize: 16),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'You will need to login again to access your account.',
+                style: AppTextStyles.body.copyWith(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context); // Close dialog
+                _performLogout();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.logout, size: 18),
+                  const SizedBox(width: 8),
+                  Text('Logout'),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _performLogout() {
+    // Show logout banner
+    _showBanner('Logged out successfully');
+    
+    // Navigate to login page and clear all previous routes
+    Future.delayed(Duration(milliseconds: 1500), () {
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        '/login', // Make sure this route exists in your main.dart
+        (route) => false, // Remove all previous routes
+      );
+    });
+  }
+
+} // This closes the _MechanicProfileState class
