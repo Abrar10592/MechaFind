@@ -7,31 +7,53 @@ class EmergencyButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 60,
-      child: ElevatedButton.icon(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          elevation: 3,
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.red,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
         ),
-        icon: const Icon(Icons.warning, color: Colors.white, size: 30),
-        label: const Text(
-          "Need Emergency Help?",
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+        elevation: 6,
+        minimumSize: const Size.fromHeight(90), // optional
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+      ),
+      onPressed: () {
+        HapticFeedback.heavyImpact();
+        showDialog(
+          context: context,
+          builder: (context) => const EmergencyFormDialog(),
+        );
+      },
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Icon(Icons.warning, color: Colors.white, size: 38),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Need Emergency Help?',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 7),
+                Text(
+                  'Press this button to send an urgent request to nearby mechanics.\nUse only in real roadside emergencies.',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        onPressed: () {
-          HapticFeedback.heavyImpact();
-          showDialog(
-            context: context,
-            builder: (context) => const EmergencyFormDialog(),
-          );
-        },
+        ],
       ),
     );
   }
