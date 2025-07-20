@@ -37,3 +37,4 @@ flutter:
   assets:
     - assets/google_logo.png
     - zob_assets/
+    - assets/landing_bg.png

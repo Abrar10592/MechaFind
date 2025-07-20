@@ -22,7 +22,6 @@ class _SignUpPageState extends State<SignUpPage> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _loading = false;
-  String? userImageUrl;
 
   @override
   void dispose() {
@@ -62,7 +61,7 @@ class _SignUpPageState extends State<SignUpPage> {
       final signUpRes = await supabase.auth.signUp(
         email: email,
         password: password,
-        emailRedirectTo: 'YOUR_REDIRECT_URL', // <-- Change to your app URL here
+        emailRedirectTo: 'YOUR_REDIRECT_URL',
       );
 
       final user = signUpRes.user;
@@ -73,7 +72,6 @@ class _SignUpPageState extends State<SignUpPage> {
         return;
       }
 
-      // Show dialog telling user to check email for verification
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -112,17 +110,24 @@ class _SignUpPageState extends State<SignUpPage> {
     return TextField(
       controller: controller,
       decoration: InputDecoration(
-        prefixIcon: Icon(icon, color: AppColors.textSecondary),
+        prefixIcon: Icon(icon, color: Colors.white70),
         hintText: hintText,
-        hintStyle: AppTextStyles.label.copyWith(fontFamily: AppFonts.secondaryFont),
+        hintStyle: AppTextStyles.label.copyWith(
+          fontFamily: AppFonts.secondaryFont,
+          color: Colors.white60,
+        ),
         filled: true,
-        fillColor: Colors.grey[200],
+        fillColor: AppColors.primary.withOpacity(0.25),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
         ),
       ),
-      style: AppTextStyles.body.copyWith(fontFamily: AppFonts.secondaryFont),
+      style: AppTextStyles.body.copyWith(
+        fontFamily: AppFonts.secondaryFont,
+        color: Colors.white,
+      ),
+      cursorColor: AppColors.accent,
     );
   }
 
@@ -136,48 +141,69 @@ class _SignUpPageState extends State<SignUpPage> {
       controller: controller,
       obscureText: obscureText,
       decoration: InputDecoration(
-        prefixIcon: const Icon(Icons.lock_outline, color: AppColors.textSecondary),
+        prefixIcon: const Icon(Icons.lock_outline, color: Colors.white70),
         suffixIcon: IconButton(
           icon: Icon(
             obscureText ? Icons.visibility_off : Icons.visibility,
-            color: AppColors.textSecondary,
+            color: Colors.white70,
           ),
           onPressed: onToggle,
         ),
         hintText: label,
-        hintStyle: AppTextStyles.label.copyWith(fontFamily: AppFonts.secondaryFont),
+        hintStyle: AppTextStyles.label.copyWith(
+          fontFamily: AppFonts.secondaryFont,
+          color: Colors.white60,
+        ),
         filled: true,
-        fillColor: Colors.grey[200],
+        fillColor: AppColors.primary.withOpacity(0.25),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
         ),
       ),
-      style: AppTextStyles.body.copyWith(fontFamily: AppFonts.secondaryFont),
+      style: AppTextStyles.body.copyWith(
+        fontFamily: AppFonts.secondaryFont,
+        color: Colors.white,
+      ),
+      cursorColor: AppColors.accent,
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.primary,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: AppColors.background,
+        backgroundColor: AppColors.primary,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      backgroundColor: AppColors.background,
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Create Account', style: AppTextStyles.heading.copyWith(fontSize: FontSizes.heading)),
+            const SizedBox(height: 24),
+            Text(
+              'Create Account',
+              style: AppTextStyles.heading.copyWith(
+                fontSize: FontSizes.heading,
+                color: Colors.white,
+                fontFamily: AppFonts.primaryFont,
+              ),
+            ),
             const SizedBox(height: 8),
-            Text('Join MechFind and get instant roadside assistance',
-                style: AppTextStyles.body.copyWith(fontSize: FontSizes.subHeading, color: AppColors.textSecondary)),
+            Text(
+              'Join MechFind and get instant roadside assistance',
+              style: AppTextStyles.body.copyWith(
+                fontSize: FontSizes.subHeading,
+                color: Colors.white70,
+                fontFamily: AppFonts.secondaryFont,
+              ),
+            ),
             const SizedBox(height: 32),
             _buildTextField(Icons.person_outline, 'Full Name', _fullNameController),
             const SizedBox(height: 16),
@@ -205,7 +231,7 @@ class _SignUpPageState extends State<SignUpPage> {
               child: ElevatedButton(
                 onPressed: _loading ? null : _signUp,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: AppColors.accent,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: _loading
@@ -223,14 +249,24 @@ class _SignUpPageState extends State<SignUpPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('Already have an account? ', style: AppTextStyles.body.copyWith(fontSize: FontSizes.body)),
+                Text(
+                  'Already have an account? ',
+                  style: AppTextStyles.body.copyWith(
+                    fontSize: FontSizes.body,
+                    color: Colors.white70,
+                  ),
+                ),
                 GestureDetector(
                   onTap: () => Navigator.pushNamed(context, '/signin'),
-                  child: Text('Sign In',
-                      style: AppTextStyles.body.copyWith(
-                        color: AppColors.accent,
-                        fontWeight: FontWeight.bold,
-                      )),
+                  child: Text(
+                    'Sign In',
+                    style: AppTextStyles.body.copyWith(
+                      color: AppColors.accent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: FontSizes.body,
+                      fontFamily: AppFonts.primaryFont,
+                    ),
+                  ),
                 ),
               ],
             ),

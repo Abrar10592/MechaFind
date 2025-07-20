@@ -85,7 +85,7 @@ class WelcomePage extends StatelessWidget {
               const SizedBox(height: 20),
               GestureDetector(
                 onTap: () {
-                  // Continue as guest or navigate accordingly
+                  Navigator.pushNamed(context, '/userHome');
                 },
                 child: const Text(
                   'Continue as Guest',

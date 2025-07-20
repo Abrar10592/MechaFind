@@ -29,6 +29,7 @@ class _SignInPageState extends State<SignInPage> {
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
+      Navigator.pushReplacementNamed(context, '/userHome');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter email and password')),
       );
@@ -72,7 +73,7 @@ class _SignInPageState extends State<SignInPage> {
           'id': userId,
           'full_name': user.userMetadata?['full_name'] ?? '',
           'phone': user.userMetadata?['phone'] ?? '',
-          'role': selectedRole ?? 'user', // or handle appropriately
+          'role': selectedRole ?? 'user',
           'image_url': null,
           'created_at': DateTime.now().toUtc().toIso8601String(),
         });
@@ -127,86 +128,103 @@ class _SignInPageState extends State<SignInPage> {
     }
   }
 
+  Widget _buildTextField({
+    required IconData icon,
+    required String hintText,
+    required TextEditingController controller,
+    bool obscureText = false,
+    Widget? suffixIcon,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscureText,
+      decoration: InputDecoration(
+        prefixIcon: Icon(icon, color: Colors.white70),
+        suffixIcon: suffixIcon,
+        hintText: hintText,
+        hintStyle: AppTextStyles.label.copyWith(
+          fontFamily: AppFonts.secondaryFont,
+          color: Colors.white60,
+        ),
+        filled: true,
+        fillColor: AppColors.primary.withOpacity(0.22),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      style: AppTextStyles.body.copyWith(
+        color: Colors.white,
+        fontFamily: AppFonts.secondaryFont,
+      ),
+      cursorColor: AppColors.accent,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.primary,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.primary,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      backgroundColor: Colors.white,
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Text(
               'Welcome Back',
-              style: TextStyle(
-                fontFamily: AppFonts.primaryFont,
+              style: AppTextStyles.heading.copyWith(
                 fontSize: FontSizes.heading,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                fontFamily: AppFonts.primaryFont,
+                color: Colors.white,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Sign in to your MechFind account',
-              style: TextStyle(
-                fontFamily: AppFonts.primaryFont,
+              style: AppTextStyles.body.copyWith(
                 fontSize: FontSizes.body,
-                color: AppColors.textSecondary,
+                color: Colors.white70,
+                fontFamily: AppFonts.primaryFont,
               ),
             ),
             const SizedBox(height: 32),
-            TextField(
+            _buildTextField(
+              icon: Icons.email_outlined,
+              hintText: 'Email address',
               controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.email_outlined),
-                hintText: 'Email address',
-                filled: true,
-                fillColor: AppColors.background,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
             ),
             const SizedBox(height: 16),
-            TextField(
+            _buildTextField(
+              icon: Icons.lock_outline,
+              hintText: 'Password',
               controller: _passwordController,
               obscureText: _obscurePassword,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.lock_outline),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                  ),
-                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  color: Colors.white70,
                 ),
-                hintText: 'Password',
-                filled: true,
-                fillColor: AppColors.background,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
+                onPressed: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
               ),
             ),
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-                onPressed: () {},
+                onPressed: () {}, // Implement forgot password as needed
                 child: Text(
                   'Forgot Password?',
-                  style: TextStyle(color: AppColors.primary),
+                  style: TextStyle(color: AppColors.accent),
                 ),
               ),
             ),
@@ -217,11 +235,20 @@ class _SignInPageState extends State<SignInPage> {
               child: ElevatedButton(
                 onPressed: _loading ? null : _signInWithEmail,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: AppColors.accent,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: _loading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Sign In'),
+                    : Text(
+                  'Sign In',
+                  style: AppTextStyles.body.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: FontSizes.subHeading,
+                    color: Colors.white,
+                    fontFamily: AppFonts.primaryFont,
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -229,12 +256,23 @@ class _SignInPageState extends State<SignInPage> {
               width: double.infinity,
               height: 50,
               child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: Colors.white60),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.primary.withOpacity(0.12),
+                ),
                 icon: Image.asset(
                   'assets/google_logo.png',
                   height: 24,
                   width: 24,
                 ),
-                label: const Text('Sign in with Google'),
+                label: Text(
+                  'Sign in with Google',
+                  style: AppTextStyles.body.copyWith(
+                    color: Colors.white,
+                  ),
+                ),
                 onPressed: _loading ? null : _signInWithGoogle,
               ),
             ),
@@ -242,19 +280,27 @@ class _SignInPageState extends State<SignInPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text('Don\'t have an account?'),
+                Text(
+                  'Don\'t have an account?',
+                  style: AppTextStyles.body.copyWith(
+                    color: Colors.white70,
+                    fontSize: FontSizes.body,
+                  ),
+                ),
                 GestureDetector(
                   onTap: () => Navigator.pushNamed(context, '/role'),
                   child: Text(
                     ' Sign Up',
-                    style: TextStyle(
-                      color: AppColors.primary,
+                    style: AppTextStyles.body.copyWith(
+                      color: AppColors.accent,
                       fontWeight: FontWeight.bold,
+                      fontFamily: AppFonts.primaryFont,
                     ),
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 24),
           ],
         ),
       ),
