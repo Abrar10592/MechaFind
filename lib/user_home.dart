@@ -5,7 +5,6 @@ import 'location_service.dart';
 import 'mechanic_card.dart';
 import 'widgets/emergency_button.dart';
 import 'widgets/bottom_navbar.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart'; // Import geocoding
 
 class UserHomePage extends StatefulWidget {
