@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:mechfind/utils.dart';
 import 'package:mechfind/data/demo_data.dart';
+import 'package:mechfind/widgets/direction_popup.dart';
 import 'package:mechfind/widgets/sos_card.dart';
 import 'package:location/location.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart' as latlng;
 
 class MechanicLandingScreen extends StatefulWidget {
   const MechanicLandingScreen({super.key});
@@ -12,18 +14,22 @@ class MechanicLandingScreen extends StatefulWidget {
   State<MechanicLandingScreen> createState() => _MechanicLandingScreenState();
 }
 
-class _MechanicLandingScreenState extends State<MechanicLandingScreen> with WidgetsBindingObserver {
+class _MechanicLandingScreenState extends State<MechanicLandingScreen>
+    with WidgetsBindingObserver {
   final Location _locationController = Location();
   LatLng? _currentPosition;
-  late GoogleMapController _mapController;
+  //late GoogleMapController _mapController;
   bool _hasListenerAttached = false;
   bool _hasRequestedPermission = false;
+  // Add this:
+  late List<Map<String, dynamic>> _sosRequests;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initLocationSetup();
+    _sosRequests = List<Map<String, dynamic>>.from(demoData);
   }
 
   @override
@@ -47,22 +53,28 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen> with Widg
       if (!serviceEnabled) return;
     }
 
-    PermissionStatus permissionGranted = await _locationController.hasPermission();
-    if (permissionGranted == PermissionStatus.denied && !_hasRequestedPermission) {
+    PermissionStatus permissionGranted = await _locationController
+        .hasPermission();
+    if (permissionGranted == PermissionStatus.denied &&
+        !_hasRequestedPermission) {
       _hasRequestedPermission = true;
       permissionGranted = await _locationController.requestPermission();
     }
 
     if (permissionGranted == PermissionStatus.granted) {
       if (!_hasListenerAttached) {
-        _locationController.onLocationChanged.listen((LocationData locationData) {
+        _locationController.onLocationChanged.listen((
+          LocationData locationData,
+        ) {
           if (locationData.latitude != null && locationData.longitude != null) {
-            final newPosition = LatLng(locationData.latitude!, locationData.longitude!);
+            final newPosition = LatLng(
+              locationData.latitude!,
+              locationData.longitude!,
+            );
             if (mounted) {
               setState(() {
                 _currentPosition = newPosition;
               });
-              _mapController.animateCamera(CameraUpdate.newLatLng(newPosition));
             }
           }
         });
@@ -114,12 +126,49 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen> with Widg
             const SizedBox(height: 10),
             Expanded(
               child: ListView.builder(
-                itemCount: demoData.length,
+                itemCount: _sosRequests.length,
                 itemBuilder: (context, index) {
-                  final request = demoData[index];
+                  final request = _sosRequests[index];
                   return Sos_Card(
                     request: request,
                     current_location: _currentPosition,
+                    onIgnore: () {
+                      setState(() {
+                        _sosRequests.removeAt(index);
+                      });
+                    },
+                    onAccept: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        isDismissible: false, 
+                        enableDrag: true,
+                        builder: (_) => DraggableScrollableSheet(
+                          initialChildSize: 0.95,
+                          minChildSize:
+                              0.3, // 👈 Allows user to drag it down to 30% height
+                          maxChildSize: 0.95, // 👈 Full height when expanded
+                          builder: (context, scrollController) {
+                            return DirectionPopup(
+                              requestLocation: latlng.LatLng(
+                                request['lat'],
+                                request['lng'],
+                              ),
+                              
+                              phone: request['phone'],
+                              name: request['user_name'],
+                              onReject: () {
+                                setState(() {
+                                  _sosRequests.removeAt(index);
+                                });
+                              },
+                               
+                            );
+                          },
+                        ),
+                      );
+                    },
                   );
                 },
               ),
@@ -133,9 +182,7 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen> with Widg
   Widget _buildStatCard(String number, String label) {
     return Card(
       elevation: 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       color: Colors.white,
       child: SizedBox(
         height: 120,

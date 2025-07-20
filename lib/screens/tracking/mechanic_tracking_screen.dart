@@ -90,7 +90,7 @@ class _MechanicTrackingScreenState extends State<MechanicTrackingScreen> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
+                  color: Colors.grey.withValues(alpha: .2),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
@@ -349,7 +349,7 @@ class _MechanicTrackingScreenState extends State<MechanicTrackingScreen> {
                   return Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0D47A1).withOpacity(0.1),
+                      color: const Color(0xFF0D47A1)..withValues(alpha: .1),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(

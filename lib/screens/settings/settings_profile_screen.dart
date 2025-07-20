@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:mechfind/utils.dart'; // <-- make sure this path is correct
 
 class SettingsProfileScreen extends StatefulWidget {
   const SettingsProfileScreen({super.key});
@@ -11,17 +12,17 @@ class SettingsProfileScreen extends StatefulWidget {
 
 class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _addressController = TextEditingController();
-  final TextEditingController _emergencyContactController = TextEditingController();
-  
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _emergencyContactController = TextEditingController();
+  final _vehicleController = TextEditingController();
+
   File? _profileImage;
   final ImagePicker _picker = ImagePicker();
   DateTime? _selectedDate;
   List<String> _vehicleModels = [];
-  final TextEditingController _vehicleController = TextEditingController();
 
   @override
   void initState() {
@@ -30,7 +31,6 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
   }
 
   void _loadUserProfile() {
-    // Mock user profile data
     _nameController.text = 'John Doe';
     _emailController.text = 'john.doe@example.com';
     _phoneController.text = '+1234567890';
@@ -44,8 +44,8 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile & Settings'),
-        backgroundColor: const Color(0xFF0D47A1),
+        title: Text('Profile & Settings', style: TextStyle(fontSize: 22,color: AppColors.textlight)),
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         actions: [
           IconButton(
@@ -61,7 +61,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Profile Picture Section
+              // Profile Picture
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -74,276 +74,175 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
                             CircleAvatar(
                               radius: 60,
                               backgroundColor: Colors.grey[300],
-                              backgroundImage: _profileImage != null
-                                  ? FileImage(_profileImage!)
-                                  : null,
-                              child: _profileImage == null
-                                  ? const Icon(Icons.person, size: 60)
-                                  : null,
+                              backgroundImage: _profileImage != null ? FileImage(_profileImage!) : null,
+                              child: _profileImage == null ? const Icon(Icons.person, size: 60) : null,
                             ),
                             Positioned(
                               bottom: 0,
                               right: 0,
                               child: CircleAvatar(
                                 radius: 18,
-                                backgroundColor: const Color(0xFF0D47A1),
-                                child: const Icon(
-                                  Icons.camera_alt,
-                                  size: 18,
-                                  color: Colors.white,
-                                ),
+                                backgroundColor: AppColors.primary,
+                                child: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
                               ),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 16),
-                      const Text(
+                      Text(
                         'Tap to change profile picture',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
+                        style: AppTextStyles.label,
                       ),
                     ],
                   ),
                 ),
               ),
-              
               const SizedBox(height: 16),
-              
-              // Personal Information
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+
+              // Personal Info
+              _buildSectionCard(
+                title: 'Personal Information',
+                children: [
+                  _buildInput(_nameController, 'Full Name', Icons.person),
+                  _buildInput(_emailController, 'Email Address', Icons.email),
+                  _buildInput(_phoneController, 'Phone Number', Icons.phone),
+                  _buildInput(_addressController, 'Address', Icons.location_on, maxLines: 2),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.calendar_today),
+                    title: Text(
+                      _selectedDate != null
+                          ? 'Date of Birth: ${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}'
+                          : 'Select Date of Birth',
+                      style: AppTextStyles.body,
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_ios),
+                    onTap: _selectDate,
+                  ),
+                  _buildInput(_emergencyContactController, 'Emergency Contact', Icons.contact_emergency),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
+              // Vehicle Info
+              _buildSectionCard(
+                title: 'Vehicle Information',
+                children: [
+                  Row(
                     children: [
-                      const Text(
-                        'Personal Information',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _nameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Full Name',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.person),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your full name';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _emailController,
-                        decoration: const InputDecoration(
-                          labelText: 'Email Address',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.email),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your email';
-                          }
-                          if (!value.contains('@')) {
-                            return 'Please enter a valid email';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _phoneController,
-                        decoration: const InputDecoration(
-                          labelText: 'Phone Number',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.phone),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your phone number';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _addressController,
-                        decoration: const InputDecoration(
-                          labelText: 'Address',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.location_on),
-                        ),
-                        maxLines: 2,
-                      ),
-                      const SizedBox(height: 16),
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.calendar_today),
-                        title: Text(
-                          _selectedDate != null
-                              ? 'Date of Birth: ${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}'
-                              : 'Select Date of Birth',
-                        ),
-                        trailing: const Icon(Icons.arrow_forward_ios),
-                        onTap: _selectDate,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _emergencyContactController,
-                        decoration: const InputDecoration(
-                          labelText: 'Emergency Contact',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.contact_emergency),
+                      Expanded(child: _buildInput(_vehicleController, 'Vehicle Model', Icons.directions_car)),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: _addVehicle,
+                        icon: const Icon(Icons.add),
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
                         ),
                       ),
                     ],
                   ),
-                ),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Vehicle Information
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Vehicle Information',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _vehicleController,
-                              decoration: const InputDecoration(
-                                labelText: 'Vehicle Model',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.directions_car),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            onPressed: _addVehicle,
-                            icon: const Icon(Icons.add),
-                            style: IconButton.styleFrom(
-                              backgroundColor: const Color(0xFF0D47A1),
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      if (_vehicleModels.isNotEmpty) ...[
-                        const Text(
-                          'Your Vehicles:',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        ..._vehicleModels.map((vehicle) => Card(
+                  const SizedBox(height: 16),
+                  if (_vehicleModels.isNotEmpty)
+                    ...[
+                      Text('Your Vehicles:', style: AppTextStyles.label),
+                      const SizedBox(height: 8),
+                      ..._vehicleModels.map(
+                        (vehicle) => Card(
                           child: ListTile(
                             leading: const Icon(Icons.directions_car),
-                            title: Text(vehicle),
+                            title: Text(vehicle, style: AppTextStyles.body),
                             trailing: IconButton(
                               icon: const Icon(Icons.delete),
                               onPressed: () => _removeVehicle(vehicle),
                             ),
                           ),
-                        )),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // App Settings
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'App Settings',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Push Notifications'),
-                        subtitle: const Text('Receive notifications about services'),
-                        value: true,
-                        onChanged: (value) {
-                          // Handle notification toggle
-                        },
-                      ),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Location Services'),
-                        subtitle: const Text('Allow app to access your location'),
-                        value: true,
-                        onChanged: (value) {
-                          // Handle location toggle
-                        },
-                      ),
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.privacy_tip),
-                        title: const Text('Privacy Policy'),
-                        trailing: const Icon(Icons.arrow_forward_ios),
-                        onTap: () {
-                          // Navigate to privacy policy
-                        },
-                      ),
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.help),
-                        title: const Text('Help & Support'),
-                        trailing: const Icon(Icons.arrow_forward_ios),
-                        onTap: () {
-                          // Navigate to help
-                        },
-                      ),
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.logout),
-                        title: const Text('Logout'),
-                        trailing: const Icon(Icons.arrow_forward_ios),
-                        onTap: _logout,
-                      ),
-                    ],
+                    ]
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
+              // App Settings
+              _buildSectionCard(
+                title: 'App Settings',
+                children: [
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('Push Notifications', style: AppTextStyles.body),
+                    subtitle: Text('Receive notifications about services', style: AppTextStyles.label),
+                    value: true,
+                    onChanged: (value) {},
                   ),
-                ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('Location Services', style: AppTextStyles.body),
+                    subtitle: Text('Allow app to access your location', style: AppTextStyles.label),
+                    value: true,
+                    onChanged: (value) {},
+                  ),
+                  _buildNavTile('Privacy Policy', Icons.privacy_tip),
+                  _buildNavTile('Help & Support', Icons.help),
+                  _buildNavTile('Logout', Icons.logout, onTap: _logout),
+                ],
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildInput(TextEditingController controller, String label, IconData icon, {int maxLines = 1}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: TextFormField(
+        controller: controller,
+        maxLines: maxLines,
+        style: AppTextStyles.body,
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: AppTextStyles.label,
+          border: const OutlineInputBorder(),
+          prefixIcon: Icon(icon),
+        ),
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Please enter $label';
+          }
+          return null;
+        },
+      ),
+    );
+  }
+
+  Widget _buildSectionCard({required String title, required List<Widget> children}) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: AppTextStyles.heading),
+            const SizedBox(height: 16),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavTile(String title, IconData icon, {VoidCallback? onTap}) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: AppColors.primary),
+      title: Text(title, style: AppTextStyles.body),
+      trailing: const Icon(Icons.arrow_forward_ios),
+      onTap: onTap,
     );
   }
 
@@ -387,7 +286,6 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
 
   void _saveProfile() {
     if (_formKey.currentState!.validate()) {
-      // Save profile logic
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Profile updated successfully!'),
@@ -401,13 +299,10 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
+        title: Text('Logout', style: AppTextStyles.heading),
+        content: Text('Are you sure you want to logout?', style: AppTextStyles.body),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
             onPressed: () {
               Navigator.pop(context);

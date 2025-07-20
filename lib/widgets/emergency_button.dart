@@ -1,58 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'emergency_form_dialog.dart';
 
 class EmergencyButton extends StatelessWidget {
   const EmergencyButton({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        // 🔔 Trigger light vibration
-        HapticFeedback.heavyImpact();
-
-        // 🚨 Show snackbar as before
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Emergency help requested!'),
-        ));
-      }
-      ,
-      child: Container(
-        padding: EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.red,
-          borderRadius: BorderRadius.circular(12),
+    return SizedBox(
+      width: double.infinity,
+      height: 60,
+      child: ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.red,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 3,
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(Icons.warning, color: Colors.white, size: 30),
-            SizedBox(width: 12),
-            Expanded( // ✅ This prevents overflow
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Need Emergency Help?',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Tap to send help signal to nearby mechanics',
-                    style: TextStyle(
-                      color: Colors.white70,
-                    ),
-                    softWrap: true, // ✅ Ensures the text wraps nicely
-                  ),
-                ],
-              ),
-            ),
-          ],
+        icon: const Icon(Icons.warning, color: Colors.white, size: 30),
+        label: const Text(
+          "Need Emergency Help?",
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
         ),
+        onPressed: () {
+          HapticFeedback.heavyImpact();
+          showDialog(
+            context: context,
+            builder: (context) => const EmergencyFormDialog(),
+          );
+        },
       ),
     );
   }
