@@ -1,183 +1,300 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mechfind/utils.dart';
+import '../selected_role.dart';
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
 
   @override
-  // ignore: library_private_types_in_public_api
   _SignInPageState createState() => _SignInPageState();
 }
 
 class _SignInPageState extends State<SignInPage> {
+  final SupabaseClient supabase = Supabase.instance.client;
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _signInWithEmail() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      Navigator.pushReplacementNamed(context, '/userHome');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter email and password')),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    try {
+      final AuthResponse res = await supabase.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+
+      final user = res.user;
+
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login failed. Please try again.')),
+        );
+        setState(() => _loading = false);
+        return;
+      }
+
+      if (user.emailConfirmedAt == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please verify your email before signing in.')),
+        );
+        await supabase.auth.signOut();
+        setState(() => _loading = false);
+        return;
+      }
+
+      final userId = user.id;
+
+      final userRecord = await supabase.from('users').select('role').eq('id', userId).maybeSingle();
+
+      if (userRecord == null) {
+        // Insert new user data if missing (optional)
+        await supabase.from('users').insert({
+          'id': userId,
+          'full_name': user.userMetadata?['full_name'] ?? '',
+          'phone': user.userMetadata?['phone'] ?? '',
+          'role': selectedRole ?? 'user',
+          'image_url': null,
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+        });
+      }
+
+      final String role = userRecord != null ? userRecord['role'] : (selectedRole ?? 'user');
+
+      if (role == 'mechanic') {
+        final mechanicRecord = await supabase.from('mechanics').select().eq('id', userId).maybeSingle();
+        if (mechanicRecord == null) {
+          await supabase.from('mechanics').insert({
+            'id': userId,
+            'location_x': null,
+            'location_y': null,
+            'expertise': [],
+            'rating': 0.0,
+            'image_url': null,
+          });
+        }
+        Navigator.pushReplacementNamed(context, '/mechanicHome');
+      } else {
+        Navigator.pushReplacementNamed(context, '/userHome');
+      }
+    } on AuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Auth Error: ${e.message}')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unexpected error: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _loading = true);
+
+    try {
+      await supabase.auth.signInWithOAuth(OAuthProvider.google);
+    } on AuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Google Sign-In failed: ${e.message}')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Widget _buildTextField({
+    required IconData icon,
+    required String hintText,
+    required TextEditingController controller,
+    bool obscureText = false,
+    Widget? suffixIcon,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscureText,
+      decoration: InputDecoration(
+        prefixIcon: Icon(icon, color: Colors.white70),
+        suffixIcon: suffixIcon,
+        hintText: hintText,
+        hintStyle: AppTextStyles.label.copyWith(
+          fontFamily: AppFonts.secondaryFont,
+          color: Colors.white60,
+        ),
+        filled: true,
+        fillColor: AppColors.primary.withOpacity(0.22),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      style: AppTextStyles.body.copyWith(
+        color: Colors.white,
+        fontFamily: AppFonts.secondaryFont,
+      ),
+      cursorColor: AppColors.accent,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.primary,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.primary,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () {
-            Navigator.pop(context);
-          },
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
         ),
       ),
-      backgroundColor: Colors.white,
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+        padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Text(
               'Welcome Back',
-              style: TextStyle(
-                fontFamily: AppFonts.primaryFont,
+              style: AppTextStyles.heading.copyWith(
                 fontSize: FontSizes.heading,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                fontFamily: AppFonts.primaryFont,
+                color: Colors.white,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Sign in to your MechFind account',
-              style: TextStyle(
-                fontFamily: AppFonts.primaryFont,
+              style: AppTextStyles.body.copyWith(
                 fontSize: FontSizes.body,
-                color: AppColors.textSecondary,
+                color: Colors.white70,
+                fontFamily: AppFonts.primaryFont,
               ),
             ),
             const SizedBox(height: 32),
-
-            // Email Address
-            TextField(
-              style: TextStyle(
-                fontFamily: AppFonts.primaryFont,
-                fontSize: FontSizes.body,
-              ),
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.email_outlined),
-                hintText: 'Email address',
-                hintStyle: TextStyle(
-                  fontFamily: AppFonts.primaryFont,
-                  color: AppColors.textSecondary,
-                ),
-                filled: true,
-                fillColor: AppColors.background,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
+            _buildTextField(
+              icon: Icons.email_outlined,
+              hintText: 'Email address',
+              controller: _emailController,
             ),
             const SizedBox(height: 16),
-
-            // Password
-            TextField(
+            _buildTextField(
+              icon: Icons.lock_outline,
+              hintText: 'Password',
+              controller: _passwordController,
               obscureText: _obscurePassword,
-              style: TextStyle(
-                fontFamily: AppFonts.primaryFont,
-                fontSize: FontSizes.body,
-              ),
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.lock_outline),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                    color: AppColors.textSecondary,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _obscurePassword = !_obscurePassword;
-                    });
-                  },
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  color: Colors.white70,
                 ),
-                hintText: 'Password',
-                hintStyle: TextStyle(
-                  fontFamily: AppFonts.primaryFont,
-                  color: AppColors.textSecondary,
-                ),
-                filled: true,
-                fillColor: AppColors.background,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
+                onPressed: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
               ),
             ),
-
             const SizedBox(height: 8),
-
-            // Forgot Password
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-                onPressed: () {
-                  // Implement forgot password navigation
-                },
+                onPressed: () {}, // Implement forgot password as needed
                 child: Text(
                   'Forgot Password?',
-                  style: TextStyle(
-                    fontFamily: AppFonts.primaryFont,
-                    fontSize: FontSizes.body,
-                    color: AppColors.primary,
-                  ),
+                  style: TextStyle(color: AppColors.accent),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-
-            // Sign In Button
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pushNamed(context, '/userHome');
-                },
+                onPressed: _loading ? null : _signInWithEmail,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  backgroundColor: AppColors.accent,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: Text(
+                child: _loading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : Text(
                   'Sign In',
-                  style: TextStyle(
-                    fontFamily: AppFonts.primaryFont,
-                    fontSize: FontSizes.subHeading,
+                  style: AppTextStyles.body.copyWith(
                     fontWeight: FontWeight.bold,
+                    fontSize: FontSizes.subHeading,
+                    color: Colors.white,
+                    fontFamily: AppFonts.primaryFont,
                   ),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-
-            // Navigate to Sign Up
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: Colors.white60),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.primary.withOpacity(0.12),
+                ),
+                icon: Image.asset(
+                  'assets/google_logo.png',
+                  height: 24,
+                  width: 24,
+                ),
+                label: Text(
+                  'Sign in with Google',
+                  style: AppTextStyles.body.copyWith(
+                    color: Colors.white,
+                  ),
+                ),
+                onPressed: _loading ? null : _signInWithGoogle,
+              ),
+            ),
+            const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  'Don\'t have an account? ',
-                  style: TextStyle(
-                    fontFamily: AppFonts.primaryFont,
-                    color: AppColors.textSecondary,
+                  'Don\'t have an account?',
+                  style: AppTextStyles.body.copyWith(
+                    color: Colors.white70,
+                    fontSize: FontSizes.body,
                   ),
                 ),
                 GestureDetector(
-                  onTap: () {
-                    Navigator.pushNamed(context, '/role');
-                  },
+                  onTap: () => Navigator.pushNamed(context, '/role'),
                   child: Text(
-                    'Sign Up',
-                    style: TextStyle(
-                      fontFamily: AppFonts.primaryFont,
-                      color: AppColors.primary,
+                    ' Sign Up',
+                    style: AppTextStyles.body.copyWith(
+                      color: AppColors.accent,
                       fontWeight: FontWeight.bold,
+                      fontFamily: AppFonts.primaryFont,
                     ),
                   ),
                 ),
