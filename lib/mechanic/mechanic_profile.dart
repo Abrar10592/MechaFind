@@ -687,7 +687,7 @@ void _showBanner(String message) {
       width: 100,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color..withValues(alpha: .5),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(

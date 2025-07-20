@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:mechfind/signup.dart';
-import 'package:mechfind/signin.dart';
+//import 'package:mechfind/signup.dart';
+//import 'package:mechfind/signin.dart';
 import 'package:mechfind/utils.dart';// Update this to your actual signup page route
 
 class LandingPage extends StatelessWidget {

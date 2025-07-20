@@ -6,7 +6,8 @@ class AppColors {
   static const background = Color(0xFFF5F8FA);
   static const danger = Color(0xFFE53935);
   static const textPrimary = Color(0xFF212121);
-  static const textSecondary = Color(0xFF757575);
+  static const textSecondary = Color.fromARGB(255, 121, 120, 120);
+  static const textlight= Color.fromARGB(255, 255, 255, 255);
 }
 
 class AppTextStyles {

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../models/service_history.dart';
 import '../rating/rate_mechanic_screen.dart';
 import '../../widgets/bottom_navbar.dart';
+import 'package:mechfind/utils.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -22,7 +23,6 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   void _loadServiceHistory() {
-    // Mock service history data
     _serviceHistory = [
       ServiceHistory(
         id: '1',
@@ -59,7 +59,7 @@ class _HistoryPageState extends State<HistoryPage> {
         status: 'completed',
         cost: 200.0,
         description: 'Brake pad replacement',
-        rating: 0.0, // Not rated yet
+        rating: 0.0,
         userReview: '',
         mechanicLocation: '789 Pine Rd, Uptown',
       ),
@@ -67,29 +67,35 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   List<ServiceHistory> get filteredHistory {
-    if (_selectedFilter == 'All') {
-      return _serviceHistory;
-    }
-    return _serviceHistory.where((history) => history.status == _selectedFilter.toLowerCase()).toList();
+    if (_selectedFilter == 'All') return _serviceHistory;
+    return _serviceHistory
+        .where((history) => history.status == _selectedFilter.toLowerCase())
+        .toList();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Service History'),
-        backgroundColor: const Color(0xFF0D47A1),
+        title: const Text(
+          'Service History',
+          style: TextStyle(
+            fontFamily: AppFonts.primaryFont,
+            color: Colors.white,
+          ),
+        ),
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            Navigator.pushNamedAndRemoveUntil(context, '/userHome', (route) => false);
+            Navigator.pushNamedAndRemoveUntil(
+                context, '/userHome', (route) => false);
           },
         ),
       ),
       body: Column(
         children: [
-          // Filter Tabs
           Container(
             padding: const EdgeInsets.all(16),
             child: SingleChildScrollView(
@@ -107,8 +113,6 @@ class _HistoryPageState extends State<HistoryPage> {
               ),
             ),
           ),
-          
-          // History List
           Expanded(
             child: filteredHistory.isEmpty
                 ? _buildEmptyState()
@@ -124,12 +128,13 @@ class _HistoryPageState extends State<HistoryPage> {
         ],
       ),
       bottomNavigationBar: BottomNavBar(
-        currentIndex: 3, // History tab index
+        currentIndex: 3,
         onTap: (index) {
-          if (index == 3) return; // Already on History
+          if (index == 3) return;
           switch (index) {
             case 0:
-              Navigator.pushNamedAndRemoveUntil(context, '/userHome', (route) => false);
+              Navigator.pushNamedAndRemoveUntil(
+                  context, '/userHome', (route) => false);
               break;
             case 1:
               Navigator.pushNamed(context, '/find-mechanics');
@@ -151,18 +156,22 @@ class _HistoryPageState extends State<HistoryPage> {
   Widget _buildFilterChip(String filter) {
     final isSelected = _selectedFilter == filter;
     return FilterChip(
-      label: Text(filter),
+      label: Text(
+        filter,
+        style: TextStyle(
+          fontFamily: AppFonts.primaryFont,
+          fontSize: FontSizes.body,
+          color: isSelected ? Colors.white : AppColors.textPrimary,
+        ),
+      ),
       selected: isSelected,
       onSelected: (selected) {
         setState(() {
           _selectedFilter = filter;
         });
       },
-      backgroundColor: Colors.grey[200],
-      selectedColor: const Color(0xFF0D47A1),
-      labelStyle: TextStyle(
-        color: isSelected ? Colors.white : Colors.black,
-      ),
+      backgroundColor: AppColors.background,
+      selectedColor: AppColors.primary,
     );
   }
 
@@ -182,18 +191,14 @@ class _HistoryPageState extends State<HistoryPage> {
                     children: [
                       Text(
                         history.mechanicName,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                        style: AppTextStyles.heading.copyWith(
+                          fontSize: FontSizes.subHeading,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         history.serviceName,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
+                        style: AppTextStyles.label,
                       ),
                     ],
                   ),
@@ -204,19 +209,21 @@ class _HistoryPageState extends State<HistoryPage> {
             const SizedBox(height: 12),
             Row(
               children: [
-                Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
+                const Icon(Icons.calendar_today,
+                    size: 16, color: AppColors.textSecondary),
                 const SizedBox(width: 4),
                 Text(
                   DateFormat('MMM dd, yyyy').format(history.serviceDate),
-                  style: TextStyle(color: Colors.grey[600]),
+                  style: AppTextStyles.label,
                 ),
                 const SizedBox(width: 16),
-                Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
+                const Icon(Icons.location_on,
+                    size: 16, color: AppColors.textSecondary),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     history.mechanicLocation,
-                    style: TextStyle(color: Colors.grey[600]),
+                    style: AppTextStyles.label,
                   ),
                 ),
               ],
@@ -224,20 +231,18 @@ class _HistoryPageState extends State<HistoryPage> {
             const SizedBox(height: 8),
             Text(
               history.description,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[700],
-              ),
+              style: AppTextStyles.body.copyWith(fontSize: FontSizes.body),
             ),
             const SizedBox(height: 12),
             Row(
               children: [
                 Text(
                   '\$${history.cost.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontSize: 18,
+                  style: TextStyle(
+                    fontFamily: AppFonts.primaryFont,
+                    fontSize: FontSizes.subHeading,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0D47A1),
+                    color: AppColors.primary,
                   ),
                 ),
                 const Spacer(),
@@ -245,7 +250,7 @@ class _HistoryPageState extends State<HistoryPage> {
                   ElevatedButton(
                     onPressed: () => _rateService(history),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0D47A1),
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                     ),
                     child: const Text('Rate Service'),
@@ -253,15 +258,20 @@ class _HistoryPageState extends State<HistoryPage> {
                 else if (history.rating > 0.0)
                   Row(
                     children: [
-                      ...List.generate(5, (index) => Icon(
-                        index < history.rating ? Icons.star : Icons.star_border,
-                        size: 16,
-                        color: Colors.amber,
-                      )),
+                      ...List.generate(
+                        5,
+                        (index) => Icon(
+                          index < history.rating
+                              ? Icons.star
+                              : Icons.star_border,
+                          size: 16,
+                          color: Colors.amber,
+                        ),
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         history.rating.toString(),
-                        style: TextStyle(color: Colors.grey[600]),
+                        style: AppTextStyles.label,
                       ),
                     ],
                   ),
@@ -272,23 +282,20 @@ class _HistoryPageState extends State<HistoryPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: AppColors.background,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Your Review:',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: AppTextStyles.label,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       history.userReview,
-                      style: const TextStyle(fontSize: 14),
+                      style: AppTextStyles.body,
                     ),
                   ],
                 ),
@@ -328,6 +335,7 @@ class _HistoryPageState extends State<HistoryPage> {
           color: Colors.white,
           fontSize: 12,
           fontWeight: FontWeight.bold,
+          fontFamily: AppFonts.primaryFont,
         ),
       ),
     );
@@ -338,25 +346,27 @@ class _HistoryPageState extends State<HistoryPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
+          const Icon(
             Icons.history,
             size: 64,
-            color: Colors.grey[400],
+            color: AppColors.textSecondary,
           ),
           const SizedBox(height: 16),
           Text(
             'No service history found',
             style: TextStyle(
-              fontSize: 18,
-              color: Colors.grey[600],
+              fontSize: FontSizes.subHeading,
+              fontFamily: AppFonts.primaryFont,
+              color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Your service history will appear here',
             style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
+              fontSize: FontSizes.body,
+              fontFamily: AppFonts.primaryFont,
+              color: AppColors.textSecondary,
             ),
           ),
         ],
@@ -374,7 +384,8 @@ class _HistoryPageState extends State<HistoryPage> {
           serviceId: history.id,
           onRatingSubmitted: (rating, review) {
             setState(() {
-              final index = _serviceHistory.indexWhere((h) => h.id == history.id);
+              final index =
+                  _serviceHistory.indexWhere((h) => h.id == history.id);
               if (index != -1) {
                 _serviceHistory[index] = ServiceHistory(
                   id: history.id,
