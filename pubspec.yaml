@@ -32,20 +32,23 @@ dependencies:
     sdk: flutter
 
   google_maps_flutter: ^2.12.3
-  location: ^5.0.0
+  location: ^8.0.1
   cached_network_image: ^3.3.1
 
   url_launcher: ^6.3.2
   flutter_polyline_points: ^2.0.0
+  flutter_map: ^8.2.1
+  flutter_map_location_marker: ^10.1.0
 
   fl_chart: ^0.66.0
   image_picker: ^1.0.7
+  latlong2: ^0.9.1
 
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  geolocator: ^10.0.0
+  geolocator: 14.0.2
   geocoding: ^2.1.1
   # For tracking and maps
   flutter_rating_bar: ^4.0.1
@@ -56,7 +59,7 @@ dependencies:
   # For image handling
   
   # For HTTP requests
-  http: ^1.1.0
+  http: ^1.4.0
   # For date formatting
   intl: ^0.18.1
 

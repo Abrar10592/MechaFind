@@ -5,6 +5,7 @@ import 'package:mechfind/widgets/direction_popup.dart';
 import 'package:mechfind/widgets/sos_card.dart';
 import 'package:location/location.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart' as latlng;
 
 class MechanicLandingScreen extends StatefulWidget {
   const MechanicLandingScreen({super.key});
@@ -140,13 +141,31 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
                       showModalBottomSheet(
                         context: context,
                         isScrollControlled: true,
-                        builder: (_) => DirectionPopup(
-                          mechanicLocation: _currentPosition,
-                          requestLocation: LatLng(
-                            request['lat'],
-                            request['lng'],
-                          ),
-                          phone: request['phone'],
+                        backgroundColor: Colors.transparent,
+                        isDismissible: false, 
+                        enableDrag: true,
+                        builder: (_) => DraggableScrollableSheet(
+                          initialChildSize: 0.95,
+                          minChildSize:
+                              0.3, // 👈 Allows user to drag it down to 30% height
+                          maxChildSize: 0.95, // 👈 Full height when expanded
+                          builder: (context, scrollController) {
+                            return DirectionPopup(
+                              requestLocation: latlng.LatLng(
+                                request['lat'],
+                                request['lng'],
+                              ),
+                              
+                              phone: request['phone'],
+                              name: request['user_name'],
+                              onReject: () {
+                                setState(() {
+                                  _sosRequests.removeAt(index);
+                                });
+                              },
+                               
+                            );
+                          },
                         ),
                       );
                     },
