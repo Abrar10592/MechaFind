@@ -54,6 +54,146 @@ class _MechanicProfileState extends State<MechanicProfile> {
     }
   }
 
+  double availableBalance = 1250; // Simulated balance
+
+void _showWithdrawDialog() {
+  final TextEditingController amountController = TextEditingController();
+  String selectedMethod = 'Bank';
+  final List<String> methods = ['Bank', 'Bkash', 'Credit Card'];
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Withdraw Funds'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: amountController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Amount (৳)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: selectedMethod,
+              items: methods
+                  .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                  .toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  selectedMethod = val;
+                }
+              },
+              decoration: const InputDecoration(
+                labelText: 'Withdraw Method',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final amountText = amountController.text.trim();
+              final amount = double.tryParse(amountText);
+
+              if (amount == null || amount <= 0) {
+                _showBanner('Enter a valid amount.');
+                return;
+              }
+
+              if (amount > availableBalance) {
+                _showBanner('Insufficient balance.');
+                return;
+              }
+
+              Navigator.pop(context);
+              _startOtpVerification(amount, selectedMethod);
+            },
+            child: const Text('Continue'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+void _startOtpVerification(double amount, String method) {
+  final otp = (100000 + (DateTime.now().millisecondsSinceEpoch % 900000)).toString();
+  final TextEditingController otpController = TextEditingController();
+
+  // Simulate receiving OTP via banner
+  _showBanner('Your OTP for withdrawing ৳${amount.toStringAsFixed(0)} is $otp');
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Enter OTP'),
+        content: TextField(
+          controller: otpController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Enter 6-digit OTP',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (otpController.text.trim() == otp) {
+                setState(() {
+                  availableBalance -= amount;
+                });
+                Navigator.pop(context);
+                _showBanner('৳${amount.toStringAsFixed(0)} withdrawn from MechFind Account via $method.');
+              } else {
+                _showBanner('Incorrect OTP. Please try again.');
+              }
+            },
+            child: const Text('Verify'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+void _showBanner(String message) {
+  ScaffoldMessenger.of(context).hideCurrentMaterialBanner(); // <-- Auto-dismiss previous banner
+
+  ScaffoldMessenger.of(context).showMaterialBanner(
+    MaterialBanner(
+      content: Text(message),
+      backgroundColor: AppColors.primary.withOpacity(0.95),
+      contentTextStyle: const TextStyle(color: Colors.white),
+      actions: [
+        TextButton(
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+          },
+          child: const Text('Dismiss', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
+
+
+
   // Dummy data for earnings and jobs
   final List<double> weeklyEarnings = [120, 150, 90, 200, 170, 80, 130];
   final List<int> weeklyJobs = [2, 3, 1, 4, 3, 1, 2];
@@ -135,19 +275,25 @@ class _MechanicProfileState extends State<MechanicProfile> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Profile',
-          style: AppTextStyles.heading.copyWith(color: Colors.white),
-        ),
-        backgroundColor: AppColors.primary,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.notifications, color: Colors.white),
-            onPressed: () {},
-          ),
-        ],
-      ),
+  appBar: AppBar(
+  leading: Builder(
+    builder: (context) => IconButton(
+      icon: const Icon(Icons.menu, color: Colors.white),
+      onPressed: () => Scaffold.of(context).openDrawer(),
+    ),
+  ),
+  title: Text(
+    'Profile',
+    style: AppTextStyles.heading.copyWith(color: Colors.white),
+  ),
+  backgroundColor: AppColors.primary,
+  actions: [
+    IconButton(
+      icon: Icon(Icons.notifications, color: Colors.white),
+      onPressed: () {},
+    ),
+  ],
+),
       drawer: Drawer(
         child: ListView(
           children: [
@@ -307,9 +453,17 @@ class _MechanicProfileState extends State<MechanicProfile> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildStatCard('Jobs Today', '5', Icons.work_outline, Colors.blueAccent),
-                _buildStatCard('Earnings', '৳120', Icons.attach_money, Colors.orangeAccent),
-                _buildStatCard('Next Job', '2:30 PM', Icons.schedule, Colors.purpleAccent),
+               Expanded(
+      child: _buildStatCard('Jobs Today', '5', Icons.work_outline, Colors.blueAccent),
+    ),
+    SizedBox(width: 12),
+    Expanded(
+      child: _buildStatCard('Earnings', '৳120', Icons.attach_money, Colors.orangeAccent),
+    ),
+    SizedBox(width: 12),
+    Expanded(
+      child: _buildStatCard('Next Job', '2:30 PM', Icons.schedule, Colors.purpleAccent),
+    ),
               ],
             ),
             const SizedBox(height: 32),
@@ -346,16 +500,16 @@ class _MechanicProfileState extends State<MechanicProfile> {
                         color: AppColors.textPrimary,
                       )),
                   const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.account_balance_wallet),
-                    label: const Text('Withdraw Balance'),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 48),
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                    ),
-                  )
+                 ElevatedButton.icon(
+  onPressed: _showWithdrawDialog,
+  icon: const Icon(Icons.account_balance_wallet),
+  label: const Text('Withdraw Balance'),
+  style: ElevatedButton.styleFrom(
+    minimumSize: const Size(double.infinity, 48),
+    backgroundColor: AppColors.primary,
+    foregroundColor: Colors.white,
+  ),
+)
                 ],
               ),
             ),
