@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:mechfind/utils.dart';
-import 'package:mechfind/mechanic/mechanic.dart';
 import 'location_service.dart';
 import 'mechanic_card.dart';
-import 'widgets/emergency_button.dart'; // Updated import
+import 'widgets/emergency_button.dart';
 import 'widgets/bottom_navbar.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:mechfind/mechanic/mechanic.dart';
 
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
@@ -20,9 +20,30 @@ class _UserHomePageState extends State<UserHomePage> {
   bool locationPermissionGranted = false;
 
   List<Map<String, dynamic>> nearbyMechanics = [
-    {'name': "Mike's Auto Repair", 'distance': '0.5 km', 'rating': 4.8, 'status': 'Online'},
-    {'name': "QuickFix Motors", 'distance': '1.2 km', 'rating': 4.6, 'status': 'Online'},
-    {'name': "City Garage", 'distance': '2.1 km', 'rating': 4.9, 'status': 'Offline'},
+    {
+      'name': "MIKE auto shop",
+      'distance': '0.5 km',
+      'rating': 4.8,
+      'status': 'Online',
+      'photoUrl': 'assets/mike.png', // use your demo asset path
+      'services': ['Battery Jumpstart', 'Tyre Change', 'Oil Top-up'],
+    },
+    {
+      'name': "QuickFix Motors",
+      'distance': '1.2 km',
+      'rating': 4.6,
+      'status': 'Online',
+      'photoUrl': 'assets/quickfix.png',
+      'services': ['Engine Diagnostics', 'Towing', 'Brake Repair'],
+    },
+    {
+      'name': "City Garage",
+      'distance': '2.1 km',
+      'rating': 4.9,
+      'status': 'Offline',
+      'photoUrl': 'assets/citygarage.png',
+      'services': ['AC Service', 'Suspension', 'Battery Replacement'],
+    },
   ];
 
   @override
@@ -89,10 +110,7 @@ class _UserHomePageState extends State<UserHomePage> {
               ],
             ),
             const SizedBox(height: 20),
-
-            // Emergency button triggers popup form
             const EmergencyButton(),
-
             const SizedBox(height: 30),
             Text(
               'Nearby Mechanics',
