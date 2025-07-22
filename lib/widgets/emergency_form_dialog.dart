@@ -3,7 +3,10 @@ import 'package:mechfind/utils.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart';
 import 'dart:io';
+
+import '../active_emergency_route_page.dart'; // Make sure path is correct
 
 class EmergencyFormDialog extends StatefulWidget {
   const EmergencyFormDialog({super.key});
@@ -17,8 +20,8 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
   final _descriptionController = TextEditingController();
   File? _capturedImage;
 
-  String? _location;   // Human-readable address
-  Position? _coords;   // Raw coordinates, for database (future)
+  String? _location;          // Human-readable address
+  Position? _coords;          // Actual user coordinates
   bool _loading = false;
 
   @override
@@ -35,41 +38,34 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
   }
 
   Future<void> _fetchLocation() async {
-    if (!mounted) return;
     setState(() => _loading = true);
 
     try {
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+          setState(() => _location = 'Location denied');
+          return;
+        }
       }
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        if (!mounted) return;
-        setState(() => _location = 'Location denied');
-        return;
-      }
+
       final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
       _coords = pos;
 
-      // Try reverse geocoding
       List<Placemark> placemarks = [];
       try {
         placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
       } catch (_) {}
 
       final address = placemarks.isNotEmpty
-          ? '${placemarks.first.street?.isNotEmpty == true ? placemarks.first.street! + ', ' : ''}'
-          '${placemarks.first.locality?.isNotEmpty == true ? placemarks.first.locality! + ', ' : ''}'
-          '${placemarks.first.country ?? ''}'
+          ? '${placemarks.first.street ?? ''}, ${placemarks.first.locality ?? ''}, ${placemarks.first.country ?? ''}'
           : 'No address found';
 
-      if (!mounted) return;
       setState(() => _location = address.trim().isEmpty ? "Unknown location" : address);
     } catch (e) {
-      if (!mounted) return;
       setState(() => _location = 'Location error');
     } finally {
-      if (!mounted) return;
       setState(() => _loading = false);
     }
   }
@@ -78,7 +74,6 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.camera, imageQuality: 60);
     if (pickedFile != null) {
-      if (!mounted) return;
       setState(() => _capturedImage = File(pickedFile.path));
     }
   }
@@ -91,21 +86,46 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
       _showMessage('Please fill all fields and take a picture.');
       return;
     }
-    // Commented out DB logic:
+
+    if (_coords == null) {
+      _showMessage("Location not available.");
+      return;
+    }
+
+    // Simulated mechanic info
+    final demoMechanic = {
+      'name': "MIKE auto shop",
+      'distance': '0.5 km',
+      'rating': 4.8,
+      'status': 'Online',
+      'photoUrl': 'assets/mike.png',
+      'services': ['Battery Jumpstart', 'Tyre Change', 'Oil Top-up'],
+    };
+
+    // Comment out backend for now
     /*
     final supabase = Supabase.instance.client;
     await supabase.from('emergencies').insert({
       'vehicle_model': vehicle,
       'description': desc,
       'location_address': _location,
-      'location_lat': _coords?.latitude,
-      'location_lng': _coords?.longitude,
-      // (image upload logic goes here)
+      'location_lat': _coords!.latitude,
+      'location_lng': _coords!.longitude,
+      // Upload image to storage and save URL
     });
     */
+
     if (!mounted) return;
-    Navigator.of(context).pop(); // Dismiss the dialog
-    _showMessage('Emergency request submitted successfully.');
+    Navigator.of(context).pop(); // Close the modal
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ActiveEmergencyRoutePage(
+          userLocation: LatLng(_coords!.latitude, _coords!.longitude),
+          mechanic: demoMechanic,
+        ),
+      ),
+    );
   }
 
   void _showMessage(String msg) {
@@ -186,10 +206,7 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
                 icon: const Icon(Icons.camera_alt, color: Colors.white),
                 label: Text(
                   _capturedImage == null ? "Take a Photo" : "Retake Photo",
-                  style: AppTextStyles.body.copyWith(
-                    color: Colors.white,
-                    fontFamily: AppFonts.primaryFont,
-                  ),
+                  style: AppTextStyles.body.copyWith(color: Colors.white),
                 ),
                 onPressed: _takePicture,
               ),
