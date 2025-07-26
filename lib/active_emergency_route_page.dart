@@ -174,7 +174,7 @@ class ActiveEmergencyRoutePage extends StatelessWidget {
                 TileLayer(
                   urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
                   subdomains: ['a', 'b', 'c'],
-                  userAgentPackageName: 'com.example.app',
+                  userAgentPackageName: 'com.example.mechfind',
                 ),
                 PolylineLayer(
                   polylines: [
