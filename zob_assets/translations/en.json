@@ -44,7 +44,11 @@
   "yes": "Yes",
   "call": "Call",
   "message": "Message",
-  "nearby_sos_requests": "Nearby SOS Requests"
+  "nearby_sos_requests": "Nearby SOS Requests",
+  "home": "Home",
+  "map": "Map",
+  "profile": "Profile"
+  
   
   
 }
