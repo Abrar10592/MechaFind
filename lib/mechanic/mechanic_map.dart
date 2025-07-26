@@ -7,6 +7,7 @@ import 'package:mechfind/data/demo_data.dart';
 import 'package:mechfind/utils.dart';
 import 'package:easy_localization/easy_localization.dart';
 
+
 class MechanicMap extends StatefulWidget {
   const MechanicMap({super.key});
 
@@ -145,11 +146,16 @@ class _MechanicMapState extends State<MechanicMap> {
 
   @override
   Widget build(BuildContext context) {
+    final currentLang = EasyLocalization.of(context)?.locale.languageCode ?? 'en';
+    final isEnglish = currentLang == 'en';
+    
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(
+
           'nearby_sos_requests'.tr(),
+
           style: TextStyle(
             color: Colors.white,
             fontFamily: AppFonts.primaryFont,
