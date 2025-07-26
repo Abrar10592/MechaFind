@@ -38,6 +38,13 @@
   "issue_description": "Issue Description",
   "km_away": "km away",
   "ignore": "Ignore",
-  "accept": "Accept"
+  "accept": "Accept",
+  "reject_request": "Reject Request",
+  "reject_request_confirm": "Are you sure you want to reject this request?",
+  "yes": "Yes",
+  "call": "Call",
+  "message": "Message",
+  "nearby_sos_requests": "Nearby SOS Requests"
+  
   
 }

@@ -38,6 +38,12 @@
   "issue_description": "সমস্যার বিবরণ",
   "km_away": "কিমি দূরে",
   "ignore": "অগ্রাহ্য করুন",
-  "accept": "গ্রহণ করুন"
+  "accept": "গ্রহণ করুন",
+  "reject_request": "অনুরোধ বাতিল করুন",
+  "reject_request_confirm": "আপনি কি নিশ্চিত যে আপনি এই অনুরোধটি বাতিল করতে চান?",
+  "yes": "হ্যাঁ",
+  "call": "কল",
+  "message": "বার্তা",
+  "nearby_sos_requests": "নিকটবর্তী এসওএস অনুরোধসমূহ"
   
 }

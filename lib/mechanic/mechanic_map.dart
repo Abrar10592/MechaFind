@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' as latlng;
 import 'package:mechfind/data/demo_data.dart';
 import 'package:mechfind/utils.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class MechanicMap extends StatefulWidget {
   const MechanicMap({super.key});
@@ -147,8 +148,8 @@ class _MechanicMapState extends State<MechanicMap> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(
-          'Nearby SOS Requests',
+        title: Text(
+          'nearby_sos_requests'.tr(),
           style: TextStyle(
             color: Colors.white,
             fontFamily: AppFonts.primaryFont,
@@ -172,10 +173,10 @@ class _MechanicMapState extends State<MechanicMap> {
             children: [
               TileLayer(
                 urlTemplate:
-                    "https://api.mapbox.com/styles/v1/adil420/cmdj97xhm005z01s8gos7f5m1/tiles/256/{z}/{x}/{y}@2x?access_token=pk.eyJ1IjoiYWRpbDQyMCIsImEiOiJjbWRqNWI5Z3QwanI3Mm1wemhsdWRwejNnIn0.rt01emLkip-tPmEJbN3C4g",
+                    "https://api.mapbox.com/styles/v1/adil420/cmdkaqq33007y01sj85a2gpa5/tiles/256/{z}/{x}/{y}@2x?access_token=pk.eyJ1IjoiYWRpbDQyMCIsImEiOiJjbWRrN3dhb2wwdXRnMmxvZ2dhNmY2Nzc3In0.yrzJJ09yyfdT4Zg4Y_CJhQ",
                 additionalOptions: {
-                  'accessToken': 'pk.eyJ1IjoiYWRpbDQyMCIsImEiOiJjbWRqNWI5Z3QwanI3Mm1wemhsdWRwejNnIn0.rt01emLkip-tPmEJbN3C4g',
-                  'id': 'mapbox.mapbox-traffic-v1', // or mapbox/satellite-v9, etc.
+                  'accessToken': 'pk.eyJ1IjoiYWRpbDQyMCIsImEiOiJjbWRrN3dhb2wwdXRnMmxvZ2dhNmY2Nzc3In0.yrzJJ09yyfdT4Zg4Y_CJhQ',
+                  'id': 'mapbox.mapbox-traffic-v1', 
                 },
                 
               ),
