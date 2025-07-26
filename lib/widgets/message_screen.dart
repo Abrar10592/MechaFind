@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mechfind/utils.dart'; // Importing your utility file
 
 class MessageScreen extends StatefulWidget {
   final String name;
@@ -34,7 +35,7 @@ class _MessageScreenState extends State<MessageScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F5F9),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         elevation: 2,
         leading: IconButton(
@@ -42,8 +43,16 @@ class _MessageScreenState extends State<MessageScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         centerTitle: true,
-        title: Text('${widget.name}',style: TextStyle(color: Colors.white,fontFamily:'Poppins',fontSize: 25),),
-        backgroundColor: Colors.blue.shade700,
+        title: Text(
+          widget.name,
+          style: TextStyle(
+            color: AppColors.textlight,
+            fontFamily: AppFonts.primaryFont,
+            fontSize: FontSizes.heading,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        backgroundColor: AppColors.primary,
       ),
       body: SafeArea(
         child: Column(
@@ -61,15 +70,19 @@ class _MessageScreenState extends State<MessageScreen> {
                     child: Container(
                       margin: const EdgeInsets.symmetric(vertical: 5),
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.75,
+                      ),
                       decoration: BoxDecoration(
-                        color: isMe ? Colors.blue.shade600 : Colors.grey.shade300,
+                        color: isMe ? AppColors.accent : Colors.grey.shade300,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         message['text'],
                         style: TextStyle(
-                          color: isMe ? Colors.white : Colors.black87,
+                          color: isMe ? Colors.white : AppColors.textPrimary,
+                          fontFamily: AppFonts.primaryFont,
+                          fontSize: FontSizes.body,
                         ),
                       ),
                     ),
@@ -85,8 +98,13 @@ class _MessageScreenState extends State<MessageScreen> {
                   Expanded(
                     child: TextField(
                       controller: _controller,
+                      style: const TextStyle(
+                        fontFamily: AppFonts.primaryFont,
+                        fontSize: FontSizes.body,
+                      ),
                       decoration: InputDecoration(
                         hintText: "Type a message",
+                        hintStyle: AppTextStyles.label.copyWith(fontFamily: AppFonts.primaryFont),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(25),
                           borderSide: BorderSide.none,
@@ -99,7 +117,7 @@ class _MessageScreenState extends State<MessageScreen> {
                   ),
                   const SizedBox(width: 8),
                   CircleAvatar(
-                    backgroundColor: Colors.blue.shade600,
+                    backgroundColor: AppColors.accent,
                     child: IconButton(
                       icon: const Icon(Icons.send, color: Colors.white),
                       onPressed: _sendMessage,
