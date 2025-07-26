@@ -69,3 +69,10 @@ flutter:
     - assets/google_logo.png
     - zob_assets/
     - assets/landing_bg.png
+    - zob_assets/translations/en.json
+    - zob_assets/translations/bn.json
+    - assets/mike.png
+    - assets/citygarage.png
+    - assets/quickfix.png
+
+
