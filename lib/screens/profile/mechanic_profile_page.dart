@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/mechanic.dart';
+import '../chat/chat_screen.dart';
+import '../../utils/page_transitions.dart';
 
 class MechanicProfilePage extends StatefulWidget {
   final Mechanic mechanic;
@@ -407,6 +409,13 @@ class _MechanicProfilePageState extends State<MechanicProfilePage>
   }
 
   void _startChat() {
-    Navigator.pushNamed(context, '/chat', arguments: widget.mechanic);
+    // Navigate to chat screen with modal transition
+    NavigationHelper.modalToPage(
+      context,
+      ChatScreen(
+        mechanicName: widget.mechanic.name,
+        isOnline: widget.mechanic.isOnline,
+      ),
+    );
   }
 }

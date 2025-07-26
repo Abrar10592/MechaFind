@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'screens/profile/mechanic_profile_page.dart';
+import 'screens/chat/chat_screen.dart';
 import 'services/mechanic_service.dart';
+import 'utils/page_transitions.dart';
 
 class DetailedMechanicCard extends StatelessWidget {
   final Map<String, dynamic> mechanic;
@@ -66,7 +68,7 @@ class DetailedMechanicCard extends StatelessWidget {
 
             const SizedBox(height: 10),
 
-            // Call + Message Buttons
+            // Call + Message + Profile Buttons
             Row(
               children: [
                 Expanded(
@@ -74,45 +76,72 @@ class DetailedMechanicCard extends StatelessWidget {
                     onPressed: () {
                       // Call functionality
                     },
-                    icon: const Icon(Icons.call),
-                    label: const Text('Call'),
+                    icon: const Icon(Icons.call, size: 18),
+                    label: const Text(
+                      'Call',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () {
-                      // Message functionality
-                    },
-                    icon: const Icon(Icons.message),
-                    label: const Text('Message'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF0D47A1),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      // Navigate to profile
-                      final mechanicModel = MechanicService.convertToMechanic(mechanic);
-                      Navigator.push(
+                      // Navigate to chat screen with modal transition
+                      NavigationHelper.modalToPage(
                         context,
-                        MaterialPageRoute(
-                          builder: (context) => MechanicProfilePage(mechanic: mechanicModel),
+                        ChatScreen(
+                          mechanicName: mechanic['name'],
+                          isOnline: mechanic['online'] ?? false,
                         ),
                       );
                     },
-                    icon: const Icon(Icons.person),
-                    label: const Text('Profile'),
+                    icon: const Icon(Icons.message, size: 18),
+                    label: const Text(
+                      'Chat',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF0D47A1),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      side: const BorderSide(color: Color(0xFF0D47A1)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      // Navigate to profile with hero transition
+                      final mechanicModel = MechanicService.convertToMechanic(mechanic);
+                      NavigationHelper.heroToPage(
+                        context,
+                        MechanicProfilePage(mechanic: mechanicModel),
+                      );
+                    },
+                    icon: const Icon(Icons.person, size: 18),
+                    label: const Text(
+                      'Profile',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0D47A1),
                       foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                 ),

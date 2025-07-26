@@ -239,6 +239,7 @@ class _MechanicProfileState extends State<MechanicProfile> {
     ScaffoldMessenger.of(context).showMaterialBanner(
       MaterialBanner(
         content: Text(message),
+        // ignore: deprecated_member_use
         backgroundColor: AppColors.primary.withOpacity(0.95),
         contentTextStyle: const TextStyle(color: Colors.white),
         actions: [
