@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class Sos_Card extends StatelessWidget {
   final Map<String, dynamic> request;
-   final LatLng? current_location;
-
+  final LatLng? current_location;
   final VoidCallback? onIgnore;
-  final VoidCallback? onAccept; 
+  final VoidCallback? onAccept;
 
   const Sos_Card({
     super.key,
@@ -17,25 +17,21 @@ class Sos_Card extends StatelessWidget {
     this.onAccept,
   });
 
-  
-
   @override
   Widget build(BuildContext context) {
-
     double? distanceInKm;
 
-  // Calculate distance if coordinates are available
-  if (current_location != null &&
-      request['lat'] != null &&
-      request['lng'] != null) {
-    double distanceInMeters = Geolocator.distanceBetween(
-      current_location!.latitude,
-      current_location!.longitude,
-      request['lat'],
-      request['lng'],
-    );
-    distanceInKm = distanceInMeters / 1000;
-  }
+    if (current_location != null &&
+        request['lat'] != null &&
+        request['lng'] != null) {
+      double distanceInMeters = Geolocator.distanceBetween(
+        current_location!.latitude,
+        current_location!.longitude,
+        request['lat'],
+        request['lng'],
+      );
+      distanceInKm = distanceInMeters / 1000;
+    }
 
     return Card(
       margin: const EdgeInsets.all(12),
@@ -46,19 +42,12 @@ class Sos_Card extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top row with profile and name
+            // Top row
             Row(
               children: [
-               CircleAvatar(
-                backgroundImage: NetworkImage(request['photo_url']),
-               ),
-                // CircleAvatar(
-                //   backgroundImage: request['profile_url'] != null &&
-                //           request['profile_url'].toString().startsWith('http')
-                //       ? CachedNetworkImageProvider(request['profile_url'])
-                //       : const AssetImage('zob_assets/profile.png') as ImageProvider,
-                //   radius: 25,
-                // ),
+                CircleAvatar(
+                  backgroundImage: NetworkImage(request['photo_url']),
+                ),
                 const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -79,17 +68,15 @@ class Sos_Card extends StatelessWidget {
                 const Spacer(),
                 if (request['is_urgent'] == true)
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.red[400],
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: const Text(
-                      'URGENT',
-                      style: TextStyle(color: Colors.white, fontSize: 12),
+                    child: Text(
+                      'urgent'.tr(),
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
                     ),
                   ),
               ],
@@ -102,43 +89,16 @@ class Sos_Card extends StatelessWidget {
                 Image.network(
                   request['profile_url'],
                   height: 80,
-                  fit:BoxFit.cover ,
-                  
+                  fit: BoxFit.cover,
                 ),
-                
-                // request['photo_url'] != null &&
-                //         request['photo_url'].toString().startsWith('http')
-                //     ? CachedNetworkImage(
-                //         imageUrl: request['photo_url'],
-                //         width: 80,
-                //         height: 80,
-                //         fit: BoxFit.cover,
-                //         placeholder: (context, url) => const SizedBox(
-                //           width: 80,
-                //           height: 80,
-                //           child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                //         ),
-                //         errorWidget: (context, url, error) => Image.asset(
-                //           'zob_assets/dplaceholder.png',
-                //           width: 80,
-                //           height: 80,
-                //           fit: BoxFit.cover,
-                //         ),
-                //       )
-                //     : Image.asset(
-                //         'zob_assets/dplaceholder.png',
-                //         width: 80,
-                //         height: 80,
-                //         fit: BoxFit.cover,
-                //       ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Issue Description',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                      Text(
+                        'issue_description'.tr(),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       Text(request['issue_description'] ?? ''),
                     ],
@@ -148,22 +108,22 @@ class Sos_Card extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Location row
+            // Location
             Row(
               children: [
                 const Icon(Icons.location_on, size: 18, color: Colors.grey),
                 Text(request['location'] ?? ''),
                 const Spacer(),
                 if (distanceInKm != null)
-                Text(
-                  '${distanceInKm.toStringAsFixed(2)} km away',
-                  style: const TextStyle(color: Colors.blue),
-                ),
+                  Text(
+                    '${distanceInKm.toStringAsFixed(2)} ${'km_away'.tr()}',
+                    style: const TextStyle(color: Colors.blue),
+                  ),
               ],
             ),
             const SizedBox(height: 12),
 
-            // Phone container
+            // Phone
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
@@ -186,12 +146,13 @@ class Sos_Card extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: onIgnore, 
+                    onPressed: onIgnore,
                     icon: const Icon(Icons.cancel_outlined),
-                    label: const Text('Ignore'),
+                    label: Text('ignore'.tr()),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white,
-                      backgroundColor: const Color.fromARGB(255, 85, 119, 136),
+                      backgroundColor:
+                          const Color.fromARGB(255, 85, 119, 136),
                     ),
                   ),
                 ),
@@ -200,7 +161,7 @@ class Sos_Card extends StatelessWidget {
                   child: ElevatedButton.icon(
                     onPressed: onAccept,
                     icon: const Icon(Icons.check_circle_outline),
-                    label: const Text('Accept'),
+                    label: Text('accept'.tr()),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,

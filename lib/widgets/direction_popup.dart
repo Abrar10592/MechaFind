@@ -170,14 +170,21 @@ class _DirectionPopupState extends State<DirectionPopup> {
                   initialZoom: _currentZoom,
                   onPositionChanged: (MapCamera camera, bool hasGesture) {
                     setState(() {
-                      _currentZoom = camera.zoom!;
+                      _currentZoom = camera.zoom;
                     });
                   },
                 ),
                 children: [
-                  TileLayer(urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-              userAgentPackageName: 'com.example.mechfind'
-              ),
+                  TileLayer(
+                    urlTemplate:
+                        "https://api.mapbox.com/styles/v1/adil420/cmdj97xhm005z01s8gos7f5m1/tiles/256/{z}/{x}/{y}@2x?access_token=pk.eyJ1IjoiYWRpbDQyMCIsImEiOiJjbWRqNWI5Z3QwanI3Mm1wemhsdWRwejNnIn0.rt01emLkip-tPmEJbN3C4g",
+                    additionalOptions: {
+                      'accessToken':
+                          'pk.eyJ1IjoiYWRpbDQyMCIsImEiOiJjbWRqNWI5Z3QwanI3Mm1wemhsdWRwejNnIn0.rt01emLkip-tPmEJbN3C4g',
+                      'id':
+                          'mapbox.mapbox-traffic-v1', // or mapbox/satellite-v9, etc.
+                    },
+                  ),
                   MarkerLayer(
                     markers: [
                       Marker(
@@ -185,11 +192,11 @@ class _DirectionPopupState extends State<DirectionPopup> {
                         width: 40,
                         height: 40,
                         child: Image.asset(
-        'zob_assets/mechanic_icon.png',
-        width: 50,
-        height: 50,
-        color: const Color.fromARGB(255, 91, 79, 20),
-      ),
+                          'zob_assets/mechanic_icon.png',
+                          width: 50,
+                          height: 50,
+                          color: const Color.fromARGB(255, 91, 79, 20),
+                        ),
                       ),
                       if (_mechanicLocation != null)
                         Marker(
@@ -197,11 +204,11 @@ class _DirectionPopupState extends State<DirectionPopup> {
                           width: 40,
                           height: 40,
                           child: Image.asset(
-        'zob_assets/user_icon.png',
-        width: 50,
-        height: 50,
-        color: const Color.fromARGB(255, 40, 97, 240),
-      ),
+                            'zob_assets/user_icon.png',
+                            width: 50,
+                            height: 50,
+                            color: const Color.fromARGB(255, 40, 97, 240),
+                          ),
                         ),
                     ],
                   ),

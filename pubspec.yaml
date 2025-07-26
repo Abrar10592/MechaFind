@@ -20,10 +20,9 @@ dependencies:
   flutter_polyline_points: ^2.0.0
   flutter_map: ^8.2.1
   flutter_map_location_marker: ^10.1.0
-
-  
-
+  easy_localization: ^3.0.8
   latlong2: ^0.9.1
+  shared_preferences: ^2.5.3
 
 
   # The following adds the Cupertino Icons font to your application.
@@ -36,13 +35,13 @@ dependencies:
   # For making phone calls
   
   # For storing user data
-  shared_preferences: ^2.2.2
+  
   # For image handling
   
   # For HTTP requests
   http: ^1.4.0
   # For date formatting
-  intl: ^0.18.1
+  intl: 0.20.2
 
 
 
@@ -70,3 +69,5 @@ flutter:
     - assets/google_logo.png
     - zob_assets/
     - assets/landing_bg.png
+    - zob_assets/translations/en.json
+    - zob_assets/translations/bn.json

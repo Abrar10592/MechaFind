@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:mechfind/utils.dart';
 import 'package:mechfind/data/demo_data.dart';
@@ -18,10 +19,8 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
     with WidgetsBindingObserver {
   final Location _locationController = Location();
   LatLng? _currentPosition;
-  //late GoogleMapController _mapController;
   bool _hasListenerAttached = false;
   bool _hasRequestedPermission = false;
-  // Add this:
   late List<Map<String, dynamic>> _sosRequests;
 
   @override
@@ -53,19 +52,15 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
       if (!serviceEnabled) return;
     }
 
-    PermissionStatus permissionGranted = await _locationController
-        .hasPermission();
-    if (permissionGranted == PermissionStatus.denied &&
-        !_hasRequestedPermission) {
+    PermissionStatus permissionGranted = await _locationController.hasPermission();
+    if (permissionGranted == PermissionStatus.denied && !_hasRequestedPermission) {
       _hasRequestedPermission = true;
       permissionGranted = await _locationController.requestPermission();
     }
 
     if (permissionGranted == PermissionStatus.granted) {
       if (!_hasListenerAttached) {
-        _locationController.onLocationChanged.listen((
-          LocationData locationData,
-        ) {
+        _locationController.onLocationChanged.listen((locationData) {
           if (locationData.latitude != null && locationData.longitude != null) {
             final newPosition = LatLng(
               locationData.latitude!,
@@ -89,7 +84,7 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
       appBar: AppBar(
         elevation: 2.0,
         title: Text(
-          'Mechanic Dashboard',
+          "mechanic_dashboard".tr(),
           style: AppTextStyles.heading.copyWith(
             color: Colors.white,
             fontSize: FontSizes.heading,
@@ -107,16 +102,16 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
           children: [
             Row(
               children: [
-                Expanded(child: _buildStatCard("12", "Completed Today")),
+                Expanded(child: _buildStatCard("12", "completed_today".tr())),
                 const SizedBox(width: 10),
-                Expanded(child: _buildStatCard("2", "Active Request")),
+                Expanded(child: _buildStatCard("2", "active_request".tr())),
                 const SizedBox(width: 10),
-                Expanded(child: _buildStatCard("4.8", "Rating")),
+                Expanded(child: _buildStatCard("4.8", "rating".tr())),
               ],
             ),
             const SizedBox(height: 20),
             Text(
-              "Active SOS Signals",
+              "active_sos_signals".tr(),
               style: AppTextStyles.heading.copyWith(
                 fontSize: FontSizes.subHeading,
                 fontFamily: AppFonts.primaryFont,
@@ -142,20 +137,18 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
                         context: context,
                         isScrollControlled: true,
                         backgroundColor: Colors.transparent,
-                        isDismissible: false, 
+                        isDismissible: false,
                         enableDrag: true,
                         builder: (_) => DraggableScrollableSheet(
                           initialChildSize: 0.95,
-                          minChildSize:
-                              0.3, // 👈 Allows user to drag it down to 30% height
-                          maxChildSize: 0.95, // 👈 Full height when expanded
+                          minChildSize: 0.3,
+                          maxChildSize: 0.95,
                           builder: (context, scrollController) {
                             return DirectionPopup(
                               requestLocation: latlng.LatLng(
                                 request['lat'],
                                 request['lng'],
                               ),
-                              
                               phone: request['phone'],
                               name: request['user_name'],
                               onReject: () {
@@ -163,7 +156,6 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
                                   _sosRequests.removeAt(index);
                                 });
                               },
-                               
                             );
                           },
                         ),
