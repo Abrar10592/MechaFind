@@ -207,10 +207,8 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
               Navigator.pushNamed(context, '/find-mechanics');
               break;
             case 2:
-              // Messages - can be implemented later
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('Messages feature coming soon'),
-              ));
+              // Navigate to messages
+              Navigator.pushNamed(context, '/messages');
               break;
             case 3:
               Navigator.pushNamed(context, '/history');

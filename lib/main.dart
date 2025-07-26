@@ -10,6 +10,7 @@ import 'user_home.dart';
 import 'find_mechanics.dart';
 import 'home.dart';
 import 'screens/history/history_page.dart';
+import 'screens/messages/messages_page.dart';
 import 'screens/settings/settings_profile_screen.dart';
 import 'utils.dart';
 
@@ -62,6 +63,7 @@ class MechFindApp extends StatelessWidget {
         '/mechanicHome': (context) => Mechanic(),
         '/home': (context) => WelcomePage(),
         '/find-mechanics': (context) => const FindMechanicsPage(),
+        '/messages': (context) => const MessagesPage(),
         '/history': (context) => const HistoryPage(),
         '/settings': (context) => const SettingsProfileScreen(),
       },

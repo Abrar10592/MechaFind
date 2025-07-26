@@ -140,9 +140,7 @@ class _HistoryPageState extends State<HistoryPage> {
               Navigator.pushNamed(context, '/find-mechanics');
               break;
             case 2:
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('Messages feature coming soon'),
-              ));
+              Navigator.pushNamed(context, '/messages');
               break;
             case 4:
               Navigator.pushNamed(context, '/settings');

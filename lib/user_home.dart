@@ -176,9 +176,7 @@ class _UserHomePageState extends State<UserHomePage> {
               Navigator.pushNamed(context, '/find-mechanics');
               break;
             case 2:
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('Messages feature coming soon'),
-              ));
+              Navigator.pushNamed(context, '/messages');
               break;
             case 3:
               Navigator.pushNamed(context, '/history');

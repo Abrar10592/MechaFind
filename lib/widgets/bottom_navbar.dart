@@ -134,12 +134,8 @@ class BottomNavBar extends StatelessWidget {
         Navigator.pushNamed(context, '/find-mechanics');
         break;
       case 2:
-        // Messages - can be implemented later with modal transition
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Messages feature coming soon'),
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 2),
-        ));
+        // Navigate to messages with slide transition
+        Navigator.pushNamed(context, '/messages');
         break;
       case 3:
         // Navigate to history with slide transition

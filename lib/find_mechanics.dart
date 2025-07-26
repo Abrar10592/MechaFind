@@ -76,10 +76,8 @@ class FindMechanicsPage extends StatelessWidget {
               Navigator.pushNamedAndRemoveUntil(context, '/userHome', (route) => false);
               break;
             case 2:
-              // Messages - can be implemented later
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('Messages feature coming soon'),
-              ));
+              // Navigate to messages
+              Navigator.pushNamed(context, '/messages');
               break;
             case 3:
               // Navigate to history with slide transition
