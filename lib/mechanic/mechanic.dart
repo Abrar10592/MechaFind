@@ -4,7 +4,6 @@ import 'package:mechfind/mechanic/mechanic_landing_screen.dart';
 import 'package:mechfind/mechanic/mechanic_map.dart';
 import 'package:mechfind/mechanic/mechanic_profile.dart';
 import 'package:mechfind/mechanic/mechanic_settings.dart';
-import 'package:easy_localization/easy_localization.dart';
 
 class Mechanic extends StatefulWidget {
   const Mechanic({super.key});
@@ -39,9 +38,6 @@ class _MechanicState extends State<Mechanic> {
 
   @override
   Widget build(BuildContext context) {
-    final currentLang = context.locale.languageCode;
-    final isEnglish = currentLang == 'en';
-
     return Scaffold(
       body: _getPage(_selectedIndex),
       bottomNavigationBar: BottomNavigationBar(
@@ -58,22 +54,22 @@ class _MechanicState extends State<Mechanic> {
         ),
         onTap: _onTabTapped,
         type: BottomNavigationBarType.fixed,
-        items: [
+        items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
-            label: isEnglish ? 'Home' : 'হোম',
+            label: 'Home',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.map),
-            label: isEnglish ? 'Map' : 'ম্যাপ',
+            label: 'Map',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
-            label: isEnglish ? 'Profile' : 'প্রোফাইল',
+            label: 'Profile',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),
-            label: isEnglish ? 'Settings' : 'সেটিংস',
+            label: 'Settings',
           ),
         ],
       ),
