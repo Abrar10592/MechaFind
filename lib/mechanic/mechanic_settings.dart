@@ -37,61 +37,105 @@ class _MechanicSettingsState extends State<MechanicSettings> {
     setState(() {
       _selectedLanguage = langCode;
     });
+
+    // Show confirmation message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(langCode == 'en' ? 'Language changed to English' : 'ভাষা বাংলায় পরিবর্তিত হয়েছে'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+
+    // Remove the navigation reset - this was causing the jump to landing page
+    // if (mounted) {
+    //   Navigator.of(context).popUntil((route) => route.isFirst);
+    // }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('settings'.tr()), centerTitle: true),
+      appBar: AppBar(
+        title: Text(context.locale.languageCode == 'en' ? 'Settings' : 'সেটিংস'), 
+        centerTitle: true
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          _buildSectionTitle('settings'.tr()),
-          _buildToggleItem('push_notifications'.tr(), pushNotifications, (
-            value,
-          ) {
-            setState(() {
-              pushNotifications = value;
-            });
-          }),
-          _buildToggleItem('location_access'.tr(), locationAccess, (value) {
-            setState(() {
-              locationAccess = value;
-            });
-          }),
+          _buildSectionTitle(context.locale.languageCode == 'en' ? 'Settings' : 'সেটিংস'),
+          _buildToggleItem(
+            context.locale.languageCode == 'en' ? 'Push Notifications' : 'পুশ নোটিফিকেশন', 
+            pushNotifications, 
+            (value) {
+              setState(() {
+                pushNotifications = value;
+              });
+            }
+          ),
+          _buildToggleItem(
+            context.locale.languageCode == 'en' ? 'Location Access' : 'অবস্থান অ্যাক্সেস', 
+            locationAccess, 
+            (value) {
+              setState(() {
+                locationAccess = value;
+              });
+            }
+          ),
           Text(
-            'language'.tr(),
+            context.locale.languageCode == 'en' ? 'Language' : 'ভাষা',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           RadioListTile(
-            title: Text('english'.tr()),
+            title: Text('English'),
             value: 'en',
             groupValue: _selectedLanguage,
             onChanged: (value) => _changeLanguage(value as String),
           ),
           RadioListTile(
-            title: Text('bangla'.tr()),
+            title: Text('বাংলা (Bangla)'),
             value: 'bn',
             groupValue: _selectedLanguage,
             onChanged: (value) => _changeLanguage(value as String),
           ),
           const SizedBox(height: 20),
-          _buildSectionTitle('work_preferences'.tr()),
-          _buildToggleItem('auto_accept'.tr(), autoAcceptRequests, (value) {
-            setState(() {
-              autoAcceptRequests = value;
-            });
-          }),
-          _buildListItem('service_area'.tr(), 'update_work_area'.tr()),
+          _buildSectionTitle(context.locale.languageCode == 'en' ? 'Work Preferences' : 'কাজের পছন্দ'),
+          _buildToggleItem(
+            context.locale.languageCode == 'en' ? 'Auto Accept Requests' : 'স্বয়ংক্রিয় অনুরোধ গ্রহণ', 
+            autoAcceptRequests, 
+            (value) {
+              setState(() {
+                autoAcceptRequests = value;
+              });
+            }
+          ),
+          _buildListItem(
+            context.locale.languageCode == 'en' ? 'Service Area' : 'সেবা এলাকা', 
+            context.locale.languageCode == 'en' ? 'Update work area' : 'কাজের এলাকা আপডেট করুন'
+          ),
           const SizedBox(height: 20),
-          _buildSectionTitle('account'.tr()),
-          _buildListItem('profile_info'.tr(), 'update_personal_details'.tr()),
-          _buildListItem('contact_info'.tr(), 'update_contact'.tr()),
-          _buildListItem('privacy_security'.tr(), 'manage_privacy'.tr()),
+          _buildSectionTitle(context.locale.languageCode == 'en' ? 'Account' : 'অ্যাকাউন্ট'),
+          _buildListItem(
+            context.locale.languageCode == 'en' ? 'Profile Information' : 'প্রোফাইল তথ্য', 
+            context.locale.languageCode == 'en' ? 'Update personal details' : 'ব্যক্তিগত বিবরণ আপডেট করুন'
+          ),
+          _buildListItem(
+            context.locale.languageCode == 'en' ? 'Contact Information' : 'যোগাযোগের তথ্য', 
+            context.locale.languageCode == 'en' ? 'Update contact' : 'যোগাযোগ আপডেট করুন'
+          ),
+          _buildListItem(
+            context.locale.languageCode == 'en' ? 'Privacy & Security' : 'গোপনীয়তা ও নিরাপত্তা', 
+            context.locale.languageCode == 'en' ? 'Manage privacy' : 'গোপনীয়তা পরিচালনা করুন'
+          ),
           const SizedBox(height: 20),
-          _buildSectionTitle('support'.tr()),
-          _buildListItem('help_support'.tr(), 'get_help'.tr()),
-          _buildListItem('contact_support'.tr(), 'reach_team'.tr()),
+          _buildSectionTitle(context.locale.languageCode == 'en' ? 'Support' : 'সহায়তা'),
+          _buildListItem(
+            context.locale.languageCode == 'en' ? 'Help & Support' : 'সাহায্য ও সহায়তা', 
+            context.locale.languageCode == 'en' ? 'Get help' : 'সাহায্য পান'
+          ),
+          _buildListItem(
+            context.locale.languageCode == 'en' ? 'Contact Support' : 'সহায়তা যোগাযোগ', 
+            context.locale.languageCode == 'en' ? 'Reach team' : 'টিমের সাথে যোগাযোগ করুন'
+          ),
           const SizedBox(height: 20),
           _buildSignOutButton(context),
           const SizedBox(height: 10),
@@ -148,11 +192,13 @@ class _MechanicSettingsState extends State<MechanicSettings> {
           foregroundColor: Colors.white,
         ),
         onPressed: () {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('signed_out'.tr())));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(context.locale.languageCode == 'en' ? 'Signed out' : 'সাইন আউট হয়েছে')
+            )
+          );
         },
-        child: Text('sign_out'.tr()),
+        child: Text(context.locale.languageCode == 'en' ? 'Sign Out' : 'সাইন আউট'),
       ),
     );
   }
@@ -168,12 +214,12 @@ class _MechanicSettingsState extends State<MechanicSettings> {
           final confirmed = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
-              title: Text('delete_account'.tr()),
-              content: Text('delete_warning'.tr()),
+              title: Text(context.locale.languageCode == 'en' ? 'Delete Account' : 'অ্যাকাউন্ট মুছুন'),
+              content: Text(context.locale.languageCode == 'en' ? 'Are you sure you want to delete your account? This action cannot be undone.' : 'আপনি কি নিশ্চিত যে আপনি আপনার অ্যাকাউন্ট মুছতে চান? এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না।'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
-                  child: Text('cancel'.tr()),
+                  child: Text(context.locale.languageCode == 'en' ? 'Cancel' : 'বাতিল'),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -181,18 +227,20 @@ class _MechanicSettingsState extends State<MechanicSettings> {
                     foregroundColor: Colors.white,
                   ),
                   onPressed: () => Navigator.of(context).pop(true),
-                  child: Text('delete'.tr()),
+                  child: Text(context.locale.languageCode == 'en' ? 'Delete' : 'মুছুন'),
                 ),
               ],
             ),
           );
           if (confirmed == true) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text('account_deleted'.tr())));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(context.locale.languageCode == 'en' ? 'Account deleted' : 'অ্যাকাউন্ট মুছে ফেলা হয়েছে')
+              )
+            );
           }
         },
-        child: Text('delete_account'.tr()),
+        child: Text(context.locale.languageCode == 'en' ? 'Delete Account' : 'অ্যাকাউন্ট মুছুন'),
       ),
     );
   }

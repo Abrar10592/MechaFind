@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' as latlng;
 import 'package:mechfind/data/demo_data.dart';
 import 'package:mechfind/utils.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class MechanicMap extends StatefulWidget {
   const MechanicMap({super.key});
@@ -144,11 +145,14 @@ class _MechanicMapState extends State<MechanicMap> {
 
   @override
   Widget build(BuildContext context) {
+    final currentLang = context.locale.languageCode;
+    final isEnglish = currentLang == 'en';
+    
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(
-          'Nearby SOS Requests',
+        title: Text(
+          isEnglish ? 'Nearby SOS Requests' : 'কাছাকাছি এসওএস অনুরোধ',
           style: TextStyle(
             color: Colors.white,
             fontFamily: AppFonts.primaryFont,

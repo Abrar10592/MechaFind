@@ -80,11 +80,14 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
 
   @override
   Widget build(BuildContext context) {
+    final currentLang = context.locale.languageCode;
+    final isEnglish = currentLang == 'en';
+    
     return Scaffold(
       appBar: AppBar(
         elevation: 2.0,
         title: Text(
-          "mechanic_dashboard".tr(),
+          isEnglish ? "Mechanic Dashboard" : "মেকানিক ড্যাশবোর্ড",
           style: AppTextStyles.heading.copyWith(
             color: Colors.white,
             fontSize: FontSizes.heading,
@@ -102,16 +105,16 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
           children: [
             Row(
               children: [
-                Expanded(child: _buildStatCard("12", "completed_today".tr())),
+                Expanded(child: _buildStatCard("12", isEnglish ? "Completed Today" : "আজ সম্পন্ন")),
                 const SizedBox(width: 10),
-                Expanded(child: _buildStatCard("2", "active_request".tr())),
+                Expanded(child: _buildStatCard("2", isEnglish ? "Active Request" : "সক্রিয় অনুরোধ")),
                 const SizedBox(width: 10),
-                Expanded(child: _buildStatCard("4.8", "rating".tr())),
+                Expanded(child: _buildStatCard("4.8", isEnglish ? "Rating" : "রেটিং")),
               ],
             ),
             const SizedBox(height: 20),
             Text(
-              "active_sos_signals".tr(),
+              isEnglish ? "Active SOS Signals" : "সক্রিয় এসওএস সংকেত",
               style: AppTextStyles.heading.copyWith(
                 fontSize: FontSizes.subHeading,
                 fontFamily: AppFonts.primaryFont,

@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:mechfind/utils.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 // Dummy contact info
 final String phoneNumber = '+1 234 567 8901';
@@ -433,6 +434,9 @@ class _MechanicProfileState extends State<MechanicProfile> {
   }
 
   void _showEditContactsDialog() {
+    final currentLang = context.locale.languageCode;
+    final isEnglish = currentLang == 'en';
+    
     final TextEditingController phoneController = TextEditingController(text: editablePhoneNumber);
     final TextEditingController emailController = TextEditingController(text: editableEmail);
     final TextEditingController addressController = TextEditingController(text: editableAddress);
@@ -453,7 +457,7 @@ class _MechanicProfileState extends State<MechanicProfile> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Edit Contact Information',
+                      isEnglish ? 'Edit Contact Information' : 'যোগাযোগের তথ্য সম্পাদনা',
                       style: AppTextStyles.heading.copyWith(
                         fontSize: 18,
                         color: AppColors.primary,
@@ -472,7 +476,7 @@ class _MechanicProfileState extends State<MechanicProfile> {
                   controller: phoneController,
                   keyboardType: TextInputType.phone,
                   decoration: InputDecoration(
-                    labelText: 'Phone Number',
+                    labelText: isEnglish ? 'Phone Number' : 'ফোন নম্বর',
                     prefixIcon: Icon(Icons.phone, color: AppColors.primary),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -490,7 +494,7 @@ class _MechanicProfileState extends State<MechanicProfile> {
                   controller: emailController,
                   keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(
-                    labelText: 'Email Address',
+                    labelText: isEnglish ? 'Email Address' : 'ইমেইল ঠিকানা',
                     prefixIcon: Icon(Icons.email, color: AppColors.primary),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -508,7 +512,7 @@ class _MechanicProfileState extends State<MechanicProfile> {
                   controller: addressController,
                   maxLines: 2,
                   decoration: InputDecoration(
-                    labelText: 'Address',
+                    labelText: isEnglish ? 'Address' : 'ঠিকানা',
                     prefixIcon: Icon(Icons.location_on, color: AppColors.primary),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -528,7 +532,7 @@ class _MechanicProfileState extends State<MechanicProfile> {
                     TextButton(
                       onPressed: () => Navigator.pop(context),
                       child: Text(
-                        'Cancel',
+                        isEnglish ? 'Cancel' : 'বাতিল',
                         style: TextStyle(
                           color: AppColors.textSecondary,
                           fontWeight: FontWeight.w600,
@@ -543,17 +547,16 @@ class _MechanicProfileState extends State<MechanicProfile> {
                         final address = addressController.text.trim();
                         
                         if (phone.isEmpty || email.isEmpty || address.isEmpty) {
-                          _showBanner('Please fill in all fields');
+                          _showBanner(isEnglish ? 'Please fill in all fields' : 'সব ক্ষেত্র পূরণ করুন');
                           return;
                         }
                         
                         // Basic email validation
                         if (!email.contains('@') || !email.contains('.')) {
-                          _showBanner('Please enter a valid email address');
+                          _showBanner(isEnglish ? 'Please enter a valid email address' : 'একটি বৈধ ইমেইল ঠিকানা লিখুন');
                           return;
                         }
                         
-                        // Update the contact information
                         // Update the contact information
                         setState(() {
                           editablePhoneNumber = phone;
@@ -562,7 +565,7 @@ class _MechanicProfileState extends State<MechanicProfile> {
                         });
                         
                         Navigator.pop(context);
-                        _showBanner('Contact information updated successfully!');
+                        _showBanner(isEnglish ? 'Contact information updated successfully!' : 'যোগাযোগের তথ্য সফলভাবে আপডেট হয়েছে!');
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
@@ -577,7 +580,7 @@ class _MechanicProfileState extends State<MechanicProfile> {
                         children: [
                           Icon(Icons.save, size: 18),
                           const SizedBox(width: 8),
-                          Text('Save Changes'),
+                          Text(isEnglish ? 'Save Changes' : 'পরিবর্তন সংরক্ষণ'),
                         ],
                       ),
                     ),
@@ -588,544 +591,6 @@ class _MechanicProfileState extends State<MechanicProfile> {
           ),
         );
       },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-  appBar: AppBar(
-  leading: Builder(
-    builder: (context) => IconButton(
-      icon: const Icon(Icons.menu, color: Colors.white),
-      onPressed: () => Scaffold.of(context).openDrawer(),
-    ),
-  ),
-  title: Text(
-    'Profile',
-    style: AppTextStyles.heading.copyWith(color: Colors.white),
-  ),
-  backgroundColor: AppColors.primary,
-  actions: [
-    Stack(
-      children: [
-        IconButton(
-          icon: Icon(Icons.notifications, color: Colors.white),
-          onPressed: _showNotificationsDialog,
-        ),
-        // Unread notification badge
-        if (hasUnreadNotifications)
-          Positioned(
-            right: 8,
-            top: 8,
-            child: Container(
-              padding: EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: Colors.red,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              constraints: BoxConstraints(
-                minWidth: 16,
-                minHeight: 16,
-              ),
-              child: Text(
-                '${notifications.where((n) => !n['isRead']).length}',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-      ],
-    ),
-  ],
-),
-      drawer: Drawer(
-        child: ListView(
-          children: [
-            UserAccountsDrawerHeader(
-              accountName: Text('Zobaer Ali', style: TextStyle(fontFamily: AppFonts.primaryFont)),
-              accountEmail: Text('Certified Mechanic', style: TextStyle(fontFamily: AppFonts.secondaryFont)),
-              currentAccountPicture: CircleAvatar(
-                backgroundColor: AppColors.primary.withOpacity(0.1),
-                backgroundImage: _getProfileImage(),
-                child: _hasProfileImage() ? null : Icon(
-                  Icons.person,
-                  size: 40,
-                  color: AppColors.primary,
-                ),
-              ),
-              decoration: BoxDecoration(color: AppColors.primary),
-            ),
-            _buildDrawerItem(Icons.star, 'Reviews'),
-            _buildDrawerItem(Icons.language, 'Translate'),
-            _buildDrawerItem(Icons.logout, 'Logout'),
-          ],
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: _pickProfileImage,
-                      child: Stack(
-                        children: [
-                          CircleAvatar(
-                            radius: 32,
-                            backgroundColor: AppColors.primary.withOpacity(0.1),
-                            backgroundImage: _getProfileImage(),
-                            child: _hasProfileImage() ? null : Icon(
-                              Icons.person,
-                              size: 40,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                          // Camera icon overlay
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2),
-                              ),
-                              padding: const EdgeInsets.all(6),
-                              child: Icon(
-                                Icons.camera_alt,
-                                color: Colors.white,
-                                size: 16,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Zobaer Ali', style: AppTextStyles.heading),
-                        Text('Certified Mechanic', style: AppTextStyles.label),
-                      ],
-                    )
-                  ],
-                ),
-                Row(
-                  children: [
-                    Text(
-                      isOnline ? 'Online' : 'Offline',
-                      style: TextStyle(
-                        color: isOnline ? Colors.green : Colors.red,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Switch(
-                      value: isOnline,
-                      onChanged: (val) => setState(() => isOnline = val),
-                      activeColor: Colors.green,
-                      inactiveThumbColor: Colors.red,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            // Contacts Section
-            Row(
-  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-  children: [
-    Text('Contacts', style: AppTextStyles.heading),
-    IconButton(
-      onPressed: _showEditContactsDialog,
-      icon: Icon(Icons.edit, color: AppColors.primary),
-      tooltip: 'Edit Contacts',
-    ),
-  ],
-),
-const SizedBox(height: 12),
-Container(
-  padding: const EdgeInsets.all(16),
-  decoration: BoxDecoration(
-    color: AppColors.background,
-    borderRadius: BorderRadius.circular(12),
-  ),
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        children: [
-          Icon(Icons.phone, color: AppColors.primary),
-          const SizedBox(width: 8),
-          Text(editablePhoneNumber, style: AppTextStyles.body),
-        ],
-      ),
-      const SizedBox(height: 8),
-      Row(
-        children: [
-          Icon(Icons.email, color: AppColors.primary),
-          const SizedBox(width: 8),
-          Text(editableEmail, style: AppTextStyles.body),
-        ],
-      ),
-      const SizedBox(height: 8),
-      Row(
-        children: [
-          Icon(Icons.location_on, color: AppColors.primary),
-          const SizedBox(width: 8),
-          Expanded(child: Text(editableAddress, style: AppTextStyles.body)),
-        ],
-      ),
-    ],
-  ),
-),
-            const SizedBox(height: 32),
-
-            // Achievements Section
-            Text('Achievements', style: AppTextStyles.heading),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: achievements.map((ach) => Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.verified, color: AppColors.accent, size: 28),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(ach['title'] ?? '', style: AppTextStyles.heading.copyWith(fontSize: 16)),
-                            Text(ach['desc'] ?? '', style: AppTextStyles.body),
-                            Text('Achieved on: ${ach['date']}', style: AppTextStyles.label.copyWith(color: AppColors.textSecondary)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                )).toList(),
-              ),
-            ),
-            const SizedBox(height: 32),
-
-            Text('Upcoming Jobs', style: AppTextStyles.heading),
-            const SizedBox(height: 12),
-            ListView(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _buildJobCard('Alice Smith', 'Toyota Camry 2019', 'Brake Repair', 'Today 3:00 PM'),
-                _buildJobCard('Bob Johnson', 'Honda Accord 2018', 'Oil Change', 'Today 5:00 PM'),
-              ],
-            ),
-            const SizedBox(height: 32),
-
-            Text('Earnings Summary', style: AppTextStyles.heading),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  // Total Earnings Row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Total Earnings (This Month):', style: AppTextStyles.body),
-                      Text('৳1,250',
-                          style: TextStyle(
-                            fontSize: FontSizes.subHeading,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: AppFonts.primaryFont,
-                            color: AppColors.textPrimary,
-                          )),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Available Balance Row
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.account_balance_wallet, 
-                                 color: AppColors.primary, size: 20),
-                            const SizedBox(width: 8),
-                            Text('Available Balance:', 
-                                 style: AppTextStyles.body.copyWith(
-                                   fontWeight: FontWeight.w600,
-                                   color: AppColors.primary,
-                                 )),
-                          ],
-                        ),
-                        Text('৳${availableBalance.toStringAsFixed(0)}',
-                            style: TextStyle(
-                              fontSize: FontSizes.subHeading,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: AppFonts.primaryFont,
-                              color: AppColors.primary,
-                            )),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  ElevatedButton.icon(
-                    onPressed: availableBalance > 0 ? _showWithdrawDialog : null,
-                    icon: const Icon(Icons.account_balance_wallet),
-                    label: Text(availableBalance > 0 ? 'Withdraw Balance' : 'No Balance Available'),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 48),
-                      backgroundColor: availableBalance > 0 ? AppColors.primary : Colors.grey,
-                      foregroundColor: Colors.white,
-                    ),
-                  )
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Earnings Analytics Section
-            Text('Earnings Analytics', style: AppTextStyles.heading),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Weekly Earnings', style: AppTextStyles.body),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    height: 180,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 24, right: 12, bottom: 8),
-                      child: BarChart(
-                        BarChartData(
-                          alignment: BarChartAlignment.spaceAround,
-                          maxY: (weeklyEarnings.reduce((a, b) => a > b ? a : b)) + 50,
-                          barTouchData: BarTouchData(enabled: false),
-                          titlesData: FlTitlesData(
-                            leftTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: true,
-                                reservedSize: 56,
-                                getTitlesWidget: (value, meta) {
-                                  return Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: Text(
-                                      value % 50 == 0 ? value.toInt().toString() : '',
-                                      style: TextStyle(fontSize: 13, color: Colors.grey[700]),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                            bottomTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: true,
-                                reservedSize: 28,
-                                getTitlesWidget: (value, meta) {
-                                  int idx = value.toInt();
-                                  return Text(idx >= 0 && idx < weekDays.length ? weekDays[idx] : '', style: TextStyle(fontSize: 12));
-                                },
-                              ),
-                            ),
-                            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          ),
-                          borderData: FlBorderData(show: false),
-                          barGroups: List.generate(weeklyEarnings.length, (i) => BarChartGroupData(
-                            x: i,
-                            barRods: [
-                              BarChartRodData(
-                                toY: weeklyEarnings[i],
-                                color: AppColors.primary,
-                                width: 18,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                            ],
-                          )),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text('Jobs Completed (This Week)', style: AppTextStyles.body),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 140,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 12, right: 12, bottom: 16),
-                      child: LineChart(
-                        LineChartData(
-                          lineBarsData: [
-                            LineChartBarData(
-                              spots: List.generate(weeklyJobs.length, (i) => FlSpot(i.toDouble(), weeklyJobs[i].toDouble())),
-                              isCurved: true,
-                              color: AppColors.accent,
-                              barWidth: 3,
-                              dotData: FlDotData(show: true),
-                            ),
-                          ],
-                          titlesData: FlTitlesData(
-                            leftTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: true,
-                                reservedSize: 32,
-                                getTitlesWidget: (value, meta) {
-                                  return Padding(
-                                    padding: const EdgeInsets.only(right: 4),
-                                    child: Text(
-                                      value % 1 == 0 ? value.toInt().toString() : '',
-                                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                            bottomTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: true,
-                                reservedSize: 36,
-                                getTitlesWidget: (value, meta) {
-                                  int idx = value.toInt();
-                                  return Transform.rotate(
-                                    angle: -0.5,
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(top: 8),
-                                      child: Text(
-                                        idx >= 0 && idx < weekDays.length ? weekDays[idx] : '',
-                                        style: TextStyle(fontSize: 13, color: Colors.grey[800]),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          ),
-                          borderData: FlBorderData(show: false),
-                          gridData: FlGridData(show: false),
-                          minY: 0,
-                          maxY: (weeklyJobs.reduce((a, b) => a > b ? a : b)).toDouble() + 1,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 32),
-            Text('Manage Availability', style: AppTextStyles.heading),
-            const SizedBox(height: 12),
-            Text(
-              'Available Hours: Mon - Sat, $availableStart - $availableEnd',
-              style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton(
-              onPressed: _showAvailabilityDialog,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Edit Availability'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDrawerItem(IconData icon, String title) {
-  return ListTile(
-    leading: Icon(icon, color: AppColors.primary),
-    title: Text(title, style: TextStyle(fontFamily: AppFonts.secondaryFont)),
-    onTap: () {
-      Navigator.pop(context); // Close drawer first
-      if (title == 'Reviews') {
-        _showReviewsDialog();
-      } else if (title == 'Translate') {
-        _showTranslateDialog();
-      } else if (title == 'Logout') {
-        _showLogoutDialog();
-      }
-    },
-  );
-}
-
-  Widget _buildJobCard(String clientName, String carModel, String jobType, String time) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(clientName, style: AppTextStyles.heading.copyWith(fontSize: 18)),
-            Text(carModel, style: AppTextStyles.label),
-            const SizedBox(height: 4),
-            Text('Job: $jobType', style: AppTextStyles.body),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(time, style: AppTextStyles.label),
-                Row(
-                  children: [
-                    TextButton(
-                      onPressed: () {},
-                      child: const Text('Accept'),
-                    ),
-                    TextButton(
-                      onPressed: () {},
-                      child: const Text('Cancel', style: TextStyle(color: AppColors.danger)),
-                    ),
-                  ],
-                )
-              ],
-            )
-          ],
-        ),
-      ),
     );
   }
 
@@ -1583,7 +1048,586 @@ Container(
     });
   }
 
-// Helper methods
+  @override
+  Widget build(BuildContext context) {
+    // Get current language dynamically
+    final currentLang = context.locale.languageCode;
+    final isEnglish = currentLang == 'en';
+    
+    return Scaffold(
+      appBar: AppBar(
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu, color: Colors.white),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
+        title: Text(
+          isEnglish ? 'Profile' : 'প্রোফাইল',
+          style: AppTextStyles.heading.copyWith(color: Colors.white),
+        ),
+        backgroundColor: AppColors.primary,
+        actions: [
+          Stack(
+            children: [
+              IconButton(
+                icon: Icon(Icons.notifications, color: Colors.white),
+                onPressed: _showNotificationsDialog,
+              ),
+              // Unread notification badge
+              if (hasUnreadNotifications)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      '${notifications.where((n) => !n['isRead']).length}',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+      drawer: Drawer(
+        child: ListView(
+          children: [
+            UserAccountsDrawerHeader(
+              accountName: Text('Zobaer Ali', style: TextStyle(fontFamily: AppFonts.primaryFont)),
+              accountEmail: Text('Certified Mechanic', style: TextStyle(fontFamily: AppFonts.secondaryFont)),
+              currentAccountPicture: CircleAvatar(
+                backgroundColor: AppColors.primary.withOpacity(0.1),
+                backgroundImage: _getProfileImage(),
+                child: _hasProfileImage() ? null : Icon(
+                  Icons.person,
+                  size: 40,
+                  color: AppColors.primary,
+                ),
+              ),
+              decoration: BoxDecoration(color: AppColors.primary),
+            ),
+            _buildDrawerItem(Icons.star, isEnglish ? 'Reviews' : 'পর্যালোচনা'),
+            _buildDrawerItem(Icons.logout, isEnglish ? 'Logout' : 'লগআউট'),
+          ],
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: _pickProfileImage,
+                      child: Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 32,
+                            backgroundColor: AppColors.primary.withOpacity(0.1),
+                            backgroundImage: _getProfileImage(),
+                            child: _hasProfileImage() ? null : Icon(
+                              Icons.person,
+                              size: 40,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          // Camera icon overlay
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              padding: const EdgeInsets.all(6),
+                              child: Icon(
+                                Icons.camera_alt,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Zobaer Ali', style: AppTextStyles.heading),
+                        Text('Certified Mechanic', style: AppTextStyles.label),
+                      ],
+                    )
+                  ],
+                ),
+                Row(
+                  children: [
+                    Text(
+                      isOnline ? 'Online' : 'Offline',
+                      style: TextStyle(
+                        color: isOnline ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Switch(
+                      value: isOnline,
+                      onChanged: (val) => setState(() => isOnline = val),
+                      activeColor: Colors.green,
+                      inactiveThumbColor: Colors.red,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            // Contacts Section
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  isEnglish ? 'Contacts' : 'যোগাযোগ', 
+                  style: AppTextStyles.heading
+                ),
+                IconButton(
+                  onPressed: _showEditContactsDialog,
+                  icon: Icon(Icons.edit, color: AppColors.primary),
+                  tooltip: isEnglish ? 'Edit Contacts' : 'যোগাযোগ সম্পাদনা',
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.phone, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Text(editablePhoneNumber, style: AppTextStyles.body),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.email, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Text(editableEmail, style: AppTextStyles.body),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.location_on, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(editableAddress, style: AppTextStyles.body)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // Achievements Section
+            Text(
+              isEnglish ? 'Achievements' : 'অর্জনসমূহ', 
+              style: AppTextStyles.heading
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: achievements.map((ach) => Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.verified, color: AppColors.accent, size: 28),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(ach['title'] ?? '', style: AppTextStyles.heading.copyWith(fontSize: 16)),
+                            Text(ach['desc'] ?? '', style: AppTextStyles.body),
+                            Text('Achieved on: ${ach['date']}', style: AppTextStyles.label.copyWith(color: AppColors.textSecondary)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                )).toList(),
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            Text(
+              isEnglish ? 'Upcoming Jobs' : 'আসন্ন কাজ', 
+              style: AppTextStyles.heading
+            ),
+            const SizedBox(height: 12),
+            ListView(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _buildJobCard('Alice Smith', 'Toyota Camry 2019', 'Brake Repair', 'Today 3:00 PM'),
+                _buildJobCard('Bob Johnson', 'Honda Accord 2018', 'Oil Change', 'Today 5:00 PM'),
+              ],
+            ),
+            const SizedBox(height: 32),
+
+            Text(
+              isEnglish ? 'Earnings Summary' : 'আয়ের সারসংক্ষেপ', 
+              style: AppTextStyles.heading
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  // Total Earnings Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        isEnglish ? 'Total Earnings (This Month)' : 'মোট আয় (এই মাস)', 
+                        style: AppTextStyles.body
+                      ),
+                      Text('৳1,250',
+                          style: TextStyle(
+                            fontSize: FontSizes.subHeading,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: AppFonts.primaryFont,
+                            color: AppColors.textPrimary,
+                          )),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Available Balance Row
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.account_balance_wallet, 
+                                 color: AppColors.primary, size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              isEnglish ? 'Available Balance' : 'উপলব্ধ ব্যালেন্স',
+                              style: AppTextStyles.body.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primary,
+                              )
+                            ),
+                          ],
+                        ),
+                        Text('৳${availableBalance.toStringAsFixed(0)}',
+                            style: TextStyle(
+                              fontSize: FontSizes.subHeading,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: AppFonts.primaryFont,
+                              color: AppColors.primary,
+                            )),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  ElevatedButton.icon(
+                    onPressed: availableBalance > 0 ? _showWithdrawDialog : null,
+                    icon: const Icon(Icons.account_balance_wallet),
+                    label: Text(
+                      availableBalance > 0 
+                        ? (isEnglish ? 'Withdraw Balance' : 'ব্যালেন্স উত্তোলন')
+                        : (isEnglish ? 'No Balance Available' : 'কোন ব্যালেন্স নেই')
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 48),
+                      backgroundColor: availableBalance > 0 ? AppColors.primary : Colors.grey,
+                      foregroundColor: Colors.white,
+                    ),
+                  )
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 32),
+
+            // Earnings Analytics Section
+            Text(
+              isEnglish ? 'Earnings Analytics' : 'আয়ের বিশ্লেষণ', 
+              style: AppTextStyles.heading
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isEnglish ? 'Weekly Earnings' : 'সাপ্তাহিক আয়', 
+                    style: AppTextStyles.body
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    height: 180,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 24, right: 12, bottom: 8),
+                      child: BarChart(
+                        BarChartData(
+                          alignment: BarChartAlignment.spaceAround,
+                          maxY: (weeklyEarnings.reduce((a, b) => a > b ? a : b)) + 50,
+                          barTouchData: BarTouchData(enabled: false),
+                          titlesData: FlTitlesData(
+                            leftTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 56,
+                                getTitlesWidget: (value, meta) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: Text(
+                                      value % 50 == 0 ? value.toInt().toString() : '',
+                                      style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            bottomTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 28,
+                                getTitlesWidget: (value, meta) {
+                                  int idx = value.toInt();
+                                  return Text(idx >= 0 && idx < weekDays.length ? weekDays[idx] : '', style: TextStyle(fontSize: 12));
+                                },
+                              ),
+                            ),
+                            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          ),
+                          borderData: FlBorderData(show: false),
+                          barGroups: List.generate(weeklyEarnings.length, (i) => BarChartGroupData(
+                            x: i,
+                            barRods: [
+                              BarChartRodData(
+                                toY: weeklyEarnings[i],
+                                color: AppColors.primary,
+                                width: 18,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                            ],
+                          )),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    isEnglish ? 'Jobs Completed This Week' : 'এই সপ্তাহে সম্পন্ন কাজ', 
+                    style: AppTextStyles.body
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 140,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 12, right: 12, bottom: 16),
+                      child: LineChart(
+                        LineChartData(
+                          lineBarsData: [
+                            LineChartBarData(
+                              spots: List.generate(weeklyJobs.length, (i) => FlSpot(i.toDouble(), weeklyJobs[i].toDouble())),
+                              isCurved: true,
+                              color: AppColors.accent,
+                              barWidth: 3,
+                              dotData: FlDotData(show: true),
+                            ),
+                          ],
+                          titlesData: FlTitlesData(
+                            leftTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 32,
+                                getTitlesWidget: (value, meta) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 4),
+                                    child: Text(
+                                      value % 1 == 0 ? value.toInt().toString() : '',
+                                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            bottomTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 36,
+                                getTitlesWidget: (value, meta) {
+                                  int idx = value.toInt();
+                                  return Transform.rotate(
+                                    angle: -0.5,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(top: 8),
+                                      child: Text(
+                                        idx >= 0 && idx < weekDays.length ? weekDays[idx] : '',
+                                        style: TextStyle(fontSize: 13, color: Colors.grey[800]),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          ),
+                          borderData: FlBorderData(show: false),
+                          gridData: FlGridData(show: false),
+                          minY: 0,
+                          maxY: (weeklyJobs.reduce((a, b) => a > b ? a : b)).toDouble() + 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 32),
+            Text(
+              isEnglish ? 'Manage Availability' : 'উপলব্ধতা পরিচালনা', 
+              style: AppTextStyles.heading
+            ),
+            const SizedBox(height: 12),
+            Text(
+              isEnglish 
+                ? 'Available Hours: $availableStart - $availableEnd'
+                : 'উপলব্ধ সময়: $availableStart - $availableEnd',
+              style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: _showAvailabilityDialog,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(
+                isEnglish ? 'Edit Availability' : 'উপলব্ধতা সম্পাদনা'
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem(IconData icon, String title) {
+    final currentLang = context.locale.languageCode;
+    final isEnglish = currentLang == 'en';
+    
+    return ListTile(
+      leading: Icon(icon, color: AppColors.primary),
+      title: Text(title, style: TextStyle(fontFamily: AppFonts.secondaryFont)),
+      onTap: () {
+        Navigator.pop(context); // Close drawer first
+        if (title == (isEnglish ? 'Reviews' : 'পর্যালোচনা')) {
+          _showReviewsDialog();
+        } else if (title == (isEnglish ? 'Logout' : 'লগআউট')) {
+          _showLogoutDialog();
+        }
+      },
+    );
+  }
+
+  Widget _buildJobCard(String clientName, String carModel, String jobType, String time) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(clientName, style: AppTextStyles.heading.copyWith(fontSize: 18)),
+            Text(carModel, style: AppTextStyles.label),
+            const SizedBox(height: 4),
+            Text('Job: $jobType', style: AppTextStyles.body),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(time, style: AppTextStyles.label),
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: () {},
+                      child: const Text('Accept'),
+                    ),
+                    TextButton(
+                      onPressed: () {},
+                      child: const Text('Cancel', style: TextStyle(color: AppColors.danger)),
+                    ),
+                  ],
+                )
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Helper methods
   ImageProvider? _getProfileImage() {
     if (kIsWeb && _webImage != null) {
       return MemoryImage(_webImage!);
@@ -1597,7 +1641,44 @@ Container(
     return (kIsWeb && _webImage != null) || (!kIsWeb && _profileImage != null);
   }
 
-// Notification methods
+  // Notification methods
+  void _markNotificationAsRead(int index) {
+    setState(() {
+      notifications[index]['isRead'] = true;
+      hasUnreadNotifications = notifications.any((n) => !n['isRead']);
+    });
+    
+    _showBanner('Notification marked as read');
+  }
+
+  void _markAllNotificationsAsRead() {
+    setState(() {
+      for (var notification in notifications) {
+        notification['isRead'] = true;
+      }
+      hasUnreadNotifications = false;
+    });
+    
+    Navigator.pop(context);
+    _showBanner('All notifications marked as read');
+  }
+
+  void _addNewNotification(String title, String message, String type, IconData icon, String priority) {
+    setState(() {
+      notifications.insert(0, {
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'title': title,
+        'message': message,
+        'type': type,
+        'time': 'Just now',
+        'isRead': false,
+        'icon': icon,
+        'priority': priority,
+      });
+      hasUnreadNotifications = true;
+    });
+  }
+
   Widget _buildNotificationCard(Map<String, dynamic> notification, int index) {
     Color priorityColor = notification['priority'] == 'high'
         ? Colors.red
@@ -1753,183 +1834,146 @@ Container(
     );
   }
 
-  void _markAllNotificationsAsRead() {
-    setState(() {
-      for (var notification in notifications) {
-        notification['isRead'] = true;
-      }
-      hasUnreadNotifications = false;
-    });
-    
-    Navigator.pop(context);
-    _showBanner('All notifications marked as read');
-  }
-
-  void _addNewNotification(String title, String message, String type, IconData icon, String priority) {
-  setState(() {
-    notifications.insert(0, {
-      'id': DateTime.now().millisecondsSinceEpoch.toString(),
-      'title': title,
-      'message': message,
-      'type': type,
-      'time': 'Just now',
-      'isRead': false,
-      'icon': icon,
-      'priority': priority,
-    });
-    hasUnreadNotifications = true;
-  });
-}
-
   void _showNotificationsDialog() {
     showDialog(
       context: context,
       builder: (context) {
         return Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.9,
-          height: MediaQuery.of(context).size.height * 0.8,
-          child: Column(
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            height: MediaQuery.of(context).size.height * 0.8,
+            child: Column(
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Notifications',
+                        style: AppTextStyles.heading.copyWith(
+                          color: Colors.white,
+                          fontSize: 20,
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          // Mark all as read button
+                          TextButton(
+                            onPressed: _markAllNotificationsAsRead,
+                            child: Text(
+                              'Mark All Read',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(context),
+                            icon: Icon(Icons.close, color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Notifications',
-                      style: AppTextStyles.heading.copyWith(
-                        color: Colors.white,
-                        fontSize: 20,
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        // Mark all as read button
-                        TextButton(
-                          onPressed: _markAllNotificationsAsRead,
-                          child: Text(
-                            'Mark All Read',
+
+                // Notification Stats
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      Column(
+                        children: [
+                          Text(
+                            '${notifications.length}',
                             style: TextStyle(
-                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          Text(
+                            'Total',
+                            style: AppTextStyles.body.copyWith(
+                              color: AppColors.textSecondary,
                               fontSize: 12,
                             ),
                           ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: Icon(Icons.close, color: Colors.white),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                      Column(
+                        children: [
+                          Text(
+                            '${notifications.where((n) => !n['isRead']).length}',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red,
+                            ),
+                          ),
+                          Text(
+                            'Unread',
+                            style: AppTextStyles.body.copyWith(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        children: [
+                          Text(
+                            '${notifications.where((n) => n['priority'] == 'high').length}',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange,
+                            ),
+                          ),
+                          Text(
+                            'Priority',
+                            style: AppTextStyles.body.copyWith(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
 
-              // Notification Stats
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                // Notifications List
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: notifications.length,
+                    itemBuilder: (context, index) {
+                      final notification = notifications[index];
+                      return _buildNotificationCard(notification, index);
+                    },
+                  ),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    Column(
-                      children: [
-                        Text(
-                          '${notifications.length}',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        Text(
-                          'Total',
-                          style: AppTextStyles.body.copyWith(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        Text(
-                          '${notifications.where((n) => !n['isRead']).length}',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.red,
-                          ),
-                        ),
-                        Text(
-                          'Unread',
-                          style: AppTextStyles.body.copyWith(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        Text(
-                          '${notifications.where((n) => n['priority'] == 'high').length}',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.orange,
-                          ),
-                        ),
-                        Text(
-                          'Priority',
-                          style: AppTextStyles.body.copyWith(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              // Notifications List
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: notifications.length,
-                  itemBuilder: (context, index) {
-                    final notification = notifications[index];
-                    return _buildNotificationCard(notification, index);
-                  },
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      );
-    },
+        );
+      },
     );
-  }
-
-  void _markNotificationAsRead(int index) {
-    setState(() {
-      notifications[index]['isRead'] = true;
-      hasUnreadNotifications = notifications.any((n) => !n['isRead']);
-    });
-    
-    _showBanner('Notification marked as read');
   }
 }
