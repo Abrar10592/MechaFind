@@ -8,7 +8,6 @@ import 'package:location/location.dart';
 import 'package:http/http.dart' as http;
 import 'package:mechfind/utils.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:easy_localization/easy_localization.dart';
 
 import 'message_screen.dart';
 
@@ -142,12 +141,12 @@ class _DirectionPopupState extends State<DirectionPopup> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text("reject_request".tr(), style: AppTextStyles.heading),
-        content: Text("reject_request_confirm".tr(), style: AppTextStyles.body),
+        title: Text("Reject Request", style: AppTextStyles.heading),
+        content: Text("Are you sure you want to reject this request?", style: AppTextStyles.body),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text("cancel".tr(), style: AppTextStyles.label),
+            child: Text("Cancel", style: AppTextStyles.label),
           ),
           TextButton(
             onPressed: () {
@@ -155,7 +154,7 @@ class _DirectionPopupState extends State<DirectionPopup> {
               Navigator.of(context).pop();
               widget.onReject();
             },
-            child: Text("yes".tr(), style: AppTextStyles.label),
+            child: Text("Yes", style: AppTextStyles.label),
           ),
         ],
       ),
@@ -231,7 +230,7 @@ class _DirectionPopupState extends State<DirectionPopup> {
                                     shape: BoxShape.circle,
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withOpacity(0.4),
+                                        color: Colors.black.withValues(alpha: 0.4),
                                         blurRadius: 4,
                                         offset: const Offset(2, 2),
                                       )
@@ -256,7 +255,7 @@ class _DirectionPopupState extends State<DirectionPopup> {
                                       shape: BoxShape.circle,
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.4),
+                                          color: Colors.black.withValues(alpha: 0.4),
                                           blurRadius: 4,
                                           offset: const Offset(2, 2),
                                         )
@@ -280,7 +279,7 @@ class _DirectionPopupState extends State<DirectionPopup> {
                                   strokeWidth: 5.0,
                                   color: route == _routes.first
                                       ? AppColors.accent
-                                      : AppColors.accent.withOpacity(0.3),
+                                      : AppColors.accent.withValues(alpha: 0.3),
                                   borderColor: Colors.white,
                                   borderStrokeWidth: 1.0,
                                 ),
@@ -341,7 +340,7 @@ class _DirectionPopupState extends State<DirectionPopup> {
                         child: ElevatedButton.icon(
                           onPressed: () => _launchPhoneCall(widget.phone),
                           icon: const Icon(Icons.call),
-                          label: Text('call'.tr()),
+                          label: Text('Call'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green,
                             textStyle: AppTextStyles.label,
@@ -360,7 +359,7 @@ class _DirectionPopupState extends State<DirectionPopup> {
                             );
                           },
                           icon: const Icon(Icons.message),
-                          label: Text('message'.tr()),
+                          label: Text('Message'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blue,
                             textStyle: AppTextStyles.label,

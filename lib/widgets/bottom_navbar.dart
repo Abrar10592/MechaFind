@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../utils/page_transitions.dart';
 
 class BottomNavBar extends StatelessWidget {
   final int currentIndex;

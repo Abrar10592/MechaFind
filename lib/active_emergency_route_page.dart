@@ -8,10 +8,10 @@ class CallMechanicDialog extends StatelessWidget {
   final String phoneNumber;
 
   const CallMechanicDialog({
-    Key? key,
+    super.key,
     required this.mechanicName,
     required this.phoneNumber,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +55,7 @@ class CallMechanicDialog extends StatelessWidget {
 class DummyMessageScreen extends StatefulWidget {
   final String mechanicName;
 
-  const DummyMessageScreen({Key? key, required this.mechanicName}) : super(key: key);
+  const DummyMessageScreen({super.key, required this.mechanicName});
 
   @override
   State<DummyMessageScreen> createState() => _DummyMessageScreenState();
@@ -142,10 +142,10 @@ class ActiveEmergencyRoutePage extends StatelessWidget {
   final Map mechanic;
 
   const ActiveEmergencyRoutePage({
-    Key? key,
+    super.key,
     required this.userLocation,
     required this.mechanic,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -174,7 +174,7 @@ class ActiveEmergencyRoutePage extends StatelessWidget {
                 TileLayer(
                   urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
                   subdomains: ['a', 'b', 'c'],
-                  userAgentPackageName: 'com.example.app',
+                  userAgentPackageName: 'com.example.mechfind',
                 ),
                 PolylineLayer(
                   polylines: [

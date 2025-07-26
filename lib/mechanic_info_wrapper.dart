@@ -4,8 +4,7 @@ import 'detailed_mechanic_card.dart';
 class MechanicInfoWrapper extends StatelessWidget {
   final Map<String, dynamic> mechanicRaw;
 
-  const MechanicInfoWrapper({Key? key, required this.mechanicRaw})
-      : super(key: key);
+  const MechanicInfoWrapper({super.key, required this.mechanicRaw});
 
   @override
   Widget build(BuildContext context) {

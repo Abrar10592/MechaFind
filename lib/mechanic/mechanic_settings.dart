@@ -147,7 +147,7 @@ class _MechanicSettingsState extends State<MechanicSettings> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(context.locale.languageCode == 'en' ? 'Help & Support' : 'সাহায্য ও সহায়তা'),
-        content: Container(
+        content: SizedBox(
           width: double.maxFinite,
           height: 400,
           child: ListView.builder(
@@ -349,7 +349,7 @@ class _MechanicSettingsState extends State<MechanicSettings> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(context.locale.languageCode == 'en' ? 'Select Service Area' : 'সেবা এলাকা নির্বাচন'),
-        content: Container(
+        content: SizedBox(
           width: double.maxFinite,
           height: 300,
           child: ListView.builder(
