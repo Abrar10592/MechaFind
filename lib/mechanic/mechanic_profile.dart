@@ -1,6 +1,9 @@
-import 'dart:io';
-import 'package:image_picker/image_picker.dart';
+// ignore_for_file: deprecated_member_use
 
+import 'dart:io';
+import 'dart:typed_data'; // Add this for Uint8List
+import 'package:flutter/foundation.dart'; // Add this for kIsWeb
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:mechfind/utils.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -9,6 +12,11 @@ import 'package:fl_chart/fl_chart.dart';
 final String phoneNumber = '+1 234 567 8901';
 final String email = 'mechanic@example.com';
 final String address = '123 Main Street, Springfield, USA';
+
+// Editable contact info
+String editablePhoneNumber = '+1 234 567 8901';
+String editableEmail = 'mechanic@example.com';
+String editableAddress = '123 Main Street, Springfield, USA';
 
 // Dummy achievements
 final List<Map<String, String>> achievements = [
@@ -80,6 +88,70 @@ final List<Map<String, dynamic>> dummyReviews = [
   },
 ];
 
+// Dummy notifications data
+final List<Map<String, dynamic>> dummyNotifications = [
+  {
+    'id': '1',
+    'title': 'New Job Request',
+    'message': 'Alice Smith needs brake repair for Toyota Camry',
+    'type': 'job',
+    'time': '2 minutes ago',
+    'isRead': false,
+    'icon': Icons.build,
+    'priority': 'high',
+  },
+  {
+    'id': '2',
+    'title': 'Payment Received',
+    'message': 'You received ৳850 for Oil Change service',
+    'type': 'payment',
+    'time': '1 hour ago',
+    'isRead': false,
+    'icon': Icons.payment,
+    'priority': 'medium',
+  },
+  {
+    'id': '3',
+    'title': 'App Update Available',
+    'message': 'Version 2.1.0 is now available with new features',
+    'type': 'update',
+    'time': '3 hours ago',
+    'isRead': true,
+    'icon': Icons.system_update,
+    'priority': 'low',
+  },
+  {
+    'id': '4',
+    'title': 'Special Offer',
+    'message': 'Complete 5 jobs this week and get 10% bonus',
+    'type': 'offer',
+    'time': '1 day ago',
+    'isRead': true,
+    'icon': Icons.local_offer,
+    'priority': 'medium',
+  },
+  {
+    'id': '5',
+    'title': 'Customer Review',
+    'message': 'Bob Johnson left you a 5-star review',
+    'type': 'review',
+    'time': '2 days ago',
+    'isRead': true,
+    'icon': Icons.star,
+    'priority': 'low',
+  },
+  {
+    'id': '6',
+    'title': 'Profile Verification',
+    'message': 'Your mechanic certification has been verified',
+    'type': 'verification',
+    'time': '3 days ago',
+    'isRead': true,
+    'icon': Icons.verified_user,
+    'priority': 'high',
+  },
+];
+
 class MechanicProfile extends StatefulWidget {
   const MechanicProfile({super.key});
 
@@ -90,8 +162,13 @@ class MechanicProfile extends StatefulWidget {
 class _MechanicProfileState extends State<MechanicProfile> {
   bool isOnline = true;
   File? _profileImage;
-  double availableBalance = 1250; // Simulated balance
-
+  Uint8List? _webImage;
+  double availableBalance = 1250;
+  
+  // Add these notification variables
+  List<Map<String, dynamic>> notifications = List.from(dummyNotifications);
+  bool hasUnreadNotifications = true;
+  
   // Dummy data for earnings and jobs
   final List<double> weeklyEarnings = [120, 150, 90, 200, 170, 80, 130];
   final List<int> weeklyJobs = [2, 3, 1, 4, 3, 1, 2];
@@ -107,12 +184,50 @@ class _MechanicProfileState extends State<MechanicProfile> {
   ];
 
   Future<void> _pickProfileImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() {
-        _profileImage = File(pickedFile.path);
-      });
+    try {
+      final picker = ImagePicker();
+      
+      // Show processing immediately
+      _showBanner('Selecting image...');
+      
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 300,
+        maxHeight: 300,
+        imageQuality: 70,
+      );
+      
+      if (pickedFile != null) {
+        ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+        _showBanner('Processing image...');
+        
+        // Small delay for visual feedback
+        await Future.delayed(Duration(milliseconds: 300));
+        
+        if (kIsWeb) {
+          // For web platform
+          final bytes = await pickedFile.readAsBytes();
+          setState(() {
+            _webImage = bytes;
+            _profileImage = null; // Clear mobile image
+          });
+        } else {
+          // For mobile platform
+          setState(() {
+            _profileImage = File(pickedFile.path);
+            _webImage = null; // Clear web image
+          });
+        }
+        
+        ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+        _showBanner('Profile picture updated successfully!');
+      } else {
+        ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+      _showBanner('Image selection failed. Please try again.');
+      print('Image picker error: $e');
     }
   }
 
@@ -220,7 +335,7 @@ class _MechanicProfileState extends State<MechanicProfile> {
                     availableBalance -= amount;
                   });
                   Navigator.pop(context);
-                  _showBanner('৳${amount.toStringAsFixed(0)} withdrawn from MechFind Account via $method.');
+                  _showBanner('৳${amount.toStringAsFixed(0)} withdrawn successfully! New balance: ৳${availableBalance.toStringAsFixed(0)}');
                 } else {
                   _showBanner('Incorrect OTP. Please try again.');
                 }
@@ -239,7 +354,6 @@ class _MechanicProfileState extends State<MechanicProfile> {
     ScaffoldMessenger.of(context).showMaterialBanner(
       MaterialBanner(
         content: Text(message),
-        // ignore: deprecated_member_use
         backgroundColor: AppColors.primary.withOpacity(0.95),
         contentTextStyle: const TextStyle(color: Colors.white),
         actions: [
@@ -318,6 +432,165 @@ class _MechanicProfileState extends State<MechanicProfile> {
     );
   }
 
+  void _showEditContactsDialog() {
+    final TextEditingController phoneController = TextEditingController(text: editablePhoneNumber);
+    final TextEditingController emailController = TextEditingController(text: editableEmail);
+    final TextEditingController addressController = TextEditingController(text: editableAddress);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Edit Contact Information',
+                      style: AppTextStyles.heading.copyWith(
+                        fontSize: 18,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(Icons.close, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                
+                // Phone Number Field
+                TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: 'Phone Number',
+                    prefixIcon: Icon(Icons.phone, color: AppColors.primary),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.primary, width: 2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Email Field
+                TextField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    labelText: 'Email Address',
+                    prefixIcon: Icon(Icons.email, color: AppColors.primary),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.primary, width: 2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Address Field
+                TextField(
+                  controller: addressController,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    labelText: 'Address',
+                    prefixIcon: Icon(Icons.location_on, color: AppColors.primary),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.primary, width: 2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // Action Buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        // Validate inputs
+                        final phone = phoneController.text.trim();
+                        final email = emailController.text.trim();
+                        final address = addressController.text.trim();
+                        
+                        if (phone.isEmpty || email.isEmpty || address.isEmpty) {
+                          _showBanner('Please fill in all fields');
+                          return;
+                        }
+                        
+                        // Basic email validation
+                        if (!email.contains('@') || !email.contains('.')) {
+                          _showBanner('Please enter a valid email address');
+                          return;
+                        }
+                        
+                        // Update the contact information
+                        // Update the contact information
+                        setState(() {
+                          editablePhoneNumber = phone;
+                          editableEmail = email;
+                          editableAddress = address;
+                        });
+                        
+                        Navigator.pop(context);
+                        _showBanner('Contact information updated successfully!');
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.save, size: 18),
+                          const SizedBox(width: 8),
+                          Text('Save Changes'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -334,9 +607,39 @@ class _MechanicProfileState extends State<MechanicProfile> {
   ),
   backgroundColor: AppColors.primary,
   actions: [
-    IconButton(
-      icon: Icon(Icons.notifications, color: Colors.white),
-      onPressed: () {},
+    Stack(
+      children: [
+        IconButton(
+          icon: Icon(Icons.notifications, color: Colors.white),
+          onPressed: _showNotificationsDialog,
+        ),
+        // Unread notification badge
+        if (hasUnreadNotifications)
+          Positioned(
+            right: 8,
+            top: 8,
+            child: Container(
+              padding: EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              constraints: BoxConstraints(
+                minWidth: 16,
+                minHeight: 16,
+              ),
+              child: Text(
+                '${notifications.where((n) => !n['isRead']).length}',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
     ),
   ],
 ),
@@ -347,8 +650,9 @@ class _MechanicProfileState extends State<MechanicProfile> {
               accountName: Text('Zobaer Ali', style: TextStyle(fontFamily: AppFonts.primaryFont)),
               accountEmail: Text('Certified Mechanic', style: TextStyle(fontFamily: AppFonts.secondaryFont)),
               currentAccountPicture: CircleAvatar(
-                backgroundColor: Colors.white,
-                child: Icon(
+                backgroundColor: AppColors.primary.withOpacity(0.1),
+                backgroundImage: _getProfileImage(),
+                child: _hasProfileImage() ? null : Icon(
                   Icons.person,
                   size: 40,
                   color: AppColors.primary,
@@ -375,24 +679,37 @@ class _MechanicProfileState extends State<MechanicProfile> {
                   children: [
                     GestureDetector(
                       onTap: _pickProfileImage,
-                      child: CircleAvatar(
-                        radius: 32,
-                        backgroundImage: _profileImage != null
-                            ? FileImage(_profileImage!)
-                            : NetworkImage('https://i.pravatar.cc/150?img=3') as ImageProvider,
-                        child: _profileImage == null
-                            ? Align(
-                                alignment: Alignment.bottomRight,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  padding: const EdgeInsets.all(4),
-                                  child: Icon(Icons.camera_alt, color: AppColors.primary, size: 18),
-                                ),
-                              )
-                            : null,
+                      child: Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 32,
+                            backgroundColor: AppColors.primary.withOpacity(0.1),
+                            backgroundImage: _getProfileImage(),
+                            child: _hasProfileImage() ? null : Icon(
+                              Icons.person,
+                              size: 40,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          // Camera icon overlay
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              padding: const EdgeInsets.all(6),
+                              child: Icon(
+                                Icons.camera_alt,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -426,43 +743,53 @@ class _MechanicProfileState extends State<MechanicProfile> {
             ),
             const SizedBox(height: 24),
             // Contacts Section
-            Text('Contacts', style: AppTextStyles.heading),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.phone, color: AppColors.primary),
-                      const SizedBox(width: 8),
-                      Text(phoneNumber, style: AppTextStyles.body),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(Icons.email, color: AppColors.primary),
-                      const SizedBox(width: 8),
-                      Text(email, style: AppTextStyles.body),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(Icons.location_on, color: AppColors.primary),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(address, style: AppTextStyles.body)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            Row(
+  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  children: [
+    Text('Contacts', style: AppTextStyles.heading),
+    IconButton(
+      onPressed: _showEditContactsDialog,
+      icon: Icon(Icons.edit, color: AppColors.primary),
+      tooltip: 'Edit Contacts',
+    ),
+  ],
+),
+const SizedBox(height: 12),
+Container(
+  padding: const EdgeInsets.all(16),
+  decoration: BoxDecoration(
+    color: AppColors.background,
+    borderRadius: BorderRadius.circular(12),
+  ),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Icon(Icons.phone, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Text(editablePhoneNumber, style: AppTextStyles.body),
+        ],
+      ),
+      const SizedBox(height: 8),
+      Row(
+        children: [
+          Icon(Icons.email, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Text(editableEmail, style: AppTextStyles.body),
+        ],
+      ),
+      const SizedBox(height: 8),
+      Row(
+        children: [
+          Icon(Icons.location_on, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Expanded(child: Text(editableAddress, style: AppTextStyles.body)),
+        ],
+      ),
+    ],
+  ),
+),
             const SizedBox(height: 32),
 
             // Achievements Section
@@ -499,24 +826,6 @@ class _MechanicProfileState extends State<MechanicProfile> {
               ),
             ),
             const SizedBox(height: 32),
-            // Stats
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-               Expanded(
-      child: _buildStatCard('Jobs Today', '5', Icons.work_outline, Colors.blueAccent),
-    ),
-    SizedBox(width: 12),
-    Expanded(
-      child: _buildStatCard('Earnings', '৳120', Icons.attach_money, Colors.orangeAccent),
-    ),
-    SizedBox(width: 12),
-    Expanded(
-      child: _buildStatCard('Next Job', '2:30 PM', Icons.schedule, Colors.purpleAccent),
-    ),
-              ],
-            ),
-            const SizedBox(height: 32),
 
             Text('Upcoming Jobs', style: AppTextStyles.heading),
             const SizedBox(height: 12),
@@ -540,26 +849,67 @@ class _MechanicProfileState extends State<MechanicProfile> {
               ),
               child: Column(
                 children: [
-                  Text('Total Earnings (This Month):', style: AppTextStyles.body),
-                  const SizedBox(height: 8),
-                  Text('৳1,250',
-                      style: TextStyle(
-                        fontSize: FontSizes.heading,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: AppFonts.primaryFont,
-                        color: AppColors.textPrimary,
-                      )),
+                  // Total Earnings Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Total Earnings (This Month):', style: AppTextStyles.body),
+                      Text('৳1,250',
+                          style: TextStyle(
+                            fontSize: FontSizes.subHeading,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: AppFonts.primaryFont,
+                            color: AppColors.textPrimary,
+                          )),
+                    ],
+                  ),
                   const SizedBox(height: 16),
-                 ElevatedButton.icon(
-  onPressed: _showWithdrawDialog,
-  icon: const Icon(Icons.account_balance_wallet),
-  label: const Text('Withdraw Balance'),
-  style: ElevatedButton.styleFrom(
-    minimumSize: const Size(double.infinity, 48),
-    backgroundColor: AppColors.primary,
-    foregroundColor: Colors.white,
-  ),
-)
+                  
+                  // Available Balance Row
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.account_balance_wallet, 
+                                 color: AppColors.primary, size: 20),
+                            const SizedBox(width: 8),
+                            Text('Available Balance:', 
+                                 style: AppTextStyles.body.copyWith(
+                                   fontWeight: FontWeight.w600,
+                                   color: AppColors.primary,
+                                 )),
+                          ],
+                        ),
+                        Text('৳${availableBalance.toStringAsFixed(0)}',
+                            style: TextStyle(
+                              fontSize: FontSizes.subHeading,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: AppFonts.primaryFont,
+                              color: AppColors.primary,
+                            )),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  ElevatedButton.icon(
+                    onPressed: availableBalance > 0 ? _showWithdrawDialog : null,
+                    icon: const Icon(Icons.account_balance_wallet),
+                    label: Text(availableBalance > 0 ? 'Withdraw Balance' : 'No Balance Available'),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 48),
+                      backgroundColor: availableBalance > 0 ? AppColors.primary : Colors.grey,
+                      foregroundColor: Colors.white,
+                    ),
+                  )
                 ],
               ),
             ),
@@ -741,32 +1091,6 @@ class _MechanicProfileState extends State<MechanicProfile> {
   );
 }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
-    return Container(
-      width: 100,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color..withValues(alpha: .5),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, size: 28, color: color),
-          const SizedBox(height: 8),
-          Text(value,
-              style: TextStyle(
-                  fontSize: FontSizes.subHeading,
-                  fontWeight: FontWeight.bold,
-                  color: color)),
-          const SizedBox(height: 4),
-          Text(title,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: color, fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  }
-
   Widget _buildJobCard(String clientName, String carModel, String jobType, String time) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -912,78 +1236,79 @@ class _MechanicProfileState extends State<MechanicProfile> {
             ],
           ),
         ),
-      );
+      ); // Added missing closing parenthesis for Dialog
     },
   );
-}
+} // <-- Add this closing parenthesis for the _showReviewsDialog method
 
-Widget _buildReviewCard(Map<String, dynamic> review) {
-  return Card(
-    margin: const EdgeInsets.only(bottom: 12),
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    elevation: 2,
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header with name and rating
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                review['customerName'],
-                style: AppTextStyles.heading.copyWith(fontSize: 16),
-              ),
-              Row(
-                children: List.generate(5, (index) {
-                  return Icon(
-                    index < review['rating'] ? Icons.star : Icons.star_border,
-                    color: Colors.amber,
-                    size: 16,
-                  );
-                }),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          
-          // Job type
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(6),
+  Widget _buildReviewCard(Map<String, dynamic> review) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with name and rating
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  review['customerName'],
+                  style: AppTextStyles.heading.copyWith(fontSize: 16),
+                ),
+                Row(
+                  children: List.generate(5, (index) {
+                    return Icon(
+                      index < review['rating'] ? Icons.star : Icons.star_border,
+                      color: Colors.amber,
+                      size: 16,
+                    );
+                  }),
+                ),
+              ],
             ),
-            child: Text(
-              review['jobType'],
-              style: TextStyle(
-                color: AppColors.primary,
+            const SizedBox(height: 8),
+            
+            // Job type
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                review['jobType'],
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            
+            // Review comment
+            Text(
+              review['comment'],
+              style: AppTextStyles.body.copyWith(fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+            
+            // Date
+            Text(
+              review['date'],
+              style: AppTextStyles.label.copyWith(
+                color: AppColors.textSecondary,
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          
-          // Review comment
-          Text(
-            review['comment'],
-            style: AppTextStyles.body.copyWith(fontSize: 14),
-          ),
-          const SizedBox(height: 8),
-          
-          // Date
-          Text(
-            review['date'],
-            style: AppTextStyles.label.copyWith(
-              color: AppColors.textSecondary,
-              fontSize: 12,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ));
+    ); // Fixed closing parenthesis
   }
 
   void _showTranslateDialog() {
@@ -991,139 +1316,134 @@ Widget _buildReviewCard(Map<String, dynamic> review) {
     
     showDialog(
       context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Container(
-                width: MediaQuery.of(context).size.width * 0.85,
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.85,
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Language Settings',
+                        style: AppTextStyles.heading.copyWith(
+                          fontSize: 20,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: Icon(Icons.close, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  // Current Language Display
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                    ),
+                    child: Column(
                       children: [
+                        Icon(Icons.language, size: 40, color: AppColors.primary),
+                        const SizedBox(height: 8),
                         Text(
-                          'Language Settings',
+                          'Current Language',
                           style: AppTextStyles.heading.copyWith(
-                            fontSize: 20,
+                            fontSize: 18,
                             color: AppColors.primary,
                           ),
                         ),
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: Icon(Icons.close, color: AppColors.textSecondary),
-                        ),
                       ],
                     ),
-                    const SizedBox(height: 20),
-                    
-                    // Current Language Display
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        children: [
-                          Icon(Icons.language, size: 40, color: AppColors.primary),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Current Language',
-                            style: AppTextStyles.label.copyWith(color: AppColors.textSecondary),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            selectedLanguage,
-                            style: AppTextStyles.heading.copyWith(
-                              fontSize: 18,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    // Language Options
-                    Text(
-                      'Select Language',
-                      style: AppTextStyles.heading.copyWith(fontSize: 16),
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // English Option
-                    _buildLanguageOption(
-                      'English',
-                      '🇺🇸',
-                      'Switch to English',
-                      selectedLanguage == 'English',
-                      () {
-                        setState(() {
-                          selectedLanguage = 'English';
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    
-                    // Bangla Option
-                    _buildLanguageOption(
-                      'বাংলা (Bangla)',
-                      '🇧🇩',
-                      'বাংলায় পরিবর্তন করুন',
-                      selectedLanguage == 'বাংলা (Bangla)',
-                      () {
-                        setState(() {
-                          selectedLanguage = 'বাংলা (Bangla)';
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    // Action Buttons
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: Text(
-                            'Cancel',
-                            style: TextStyle(color: AppColors.textSecondary),
-                          ),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Language Options
+                  Text(
+                    'Select Language',
+                    style: AppTextStyles.heading.copyWith(fontSize: 16),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // English Option
+                  _buildLanguageOption(
+                    'English',
+                    '🇺🇸',
+                    'Switch to English',
+                    selectedLanguage == 'English',
+                    () {
+                      setState(() {
+                        selectedLanguage = 'English';
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  // Bangla Option
+                  _buildLanguageOption(
+                    'বাংলা (Bangla)',
+                    '🇧🇩',
+                    'বাংলায় পরিবর্তন করুন',
+                    selectedLanguage == 'বাংলা (Bangla)',
+                    () {
+                      setState(() {
+                        selectedLanguage = 'বাংলা (Bangla)';
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Action Buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(color: AppColors.textSecondary),
                         ),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _showBanner(
-                              selectedLanguage == 'English' 
-                                ? 'Language changed to English' 
-                                : 'ভাষা বাংলায় পরিবর্তিত হয়েছে (Language changed to Bangla)'
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          ),
-                          child: Text('Apply Changes'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _showBanner(
+                            selectedLanguage == 'English' 
+                              ? 'Language changed to English' 
+                              : 'ভাষা বাংলায় পরিবর্তিত হয়েছে (Language changed to Bangla)'
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                         ),
-                      ],
-                    ),
-                  ],
-                ),
+                        child: Text('Apply Changes'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            );
-          },
-        );
-      },
-    );
-  }
+            ),
+          ); 
+        },
+      );
+    },
+  );
+}
 
   Widget _buildLanguageOption(String language, String flag, String description, bool isSelected, VoidCallback onTap) {
     return GestureDetector(
@@ -1263,4 +1583,353 @@ Widget _buildReviewCard(Map<String, dynamic> review) {
     });
   }
 
-} // This closes the _MechanicProfileState class
+// Helper methods
+  ImageProvider? _getProfileImage() {
+    if (kIsWeb && _webImage != null) {
+      return MemoryImage(_webImage!);
+    } else if (!kIsWeb && _profileImage != null) {
+      return FileImage(_profileImage!);
+    }
+    return null;
+  }
+
+  bool _hasProfileImage() {
+    return (kIsWeb && _webImage != null) || (!kIsWeb && _profileImage != null);
+  }
+
+// Notification methods
+  Widget _buildNotificationCard(Map<String, dynamic> notification, int index) {
+    Color priorityColor = notification['priority'] == 'high'
+        ? Colors.red
+        : notification['priority'] == 'medium'
+            ? Colors.orange
+            : Colors.green;
+
+    Color typeColor = notification['type'] == 'job'
+        ? AppColors.primary
+        : notification['type'] == 'payment'
+            ? Colors.green
+            : notification['type'] == 'offer'
+                ? Colors.purple
+                : AppColors.textSecondary;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: notification['isRead'] ? 1 : 3,
+      child: InkWell(
+        onTap: () => _markNotificationAsRead(index),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: notification['isRead']
+                ? Colors.white
+                : AppColors.primary.withOpacity(0.05),
+            border: Border.all(
+              color: notification['isRead']
+                  ? Colors.grey.shade200
+                  : AppColors.primary.withOpacity(0.2),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Icon with priority indicator
+              Stack(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: typeColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      notification['icon'],
+                      color: typeColor,
+                      size: 24,
+                    ),
+                  ),
+                  // Priority indicator
+                  if (notification['priority'] == 'high')
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: priorityColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 12),
+
+              // Notification content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            notification['title'],
+                            style: AppTextStyles.heading.copyWith(
+                              fontSize: 16,
+                              fontWeight: notification['isRead']
+                                  ? FontWeight.w600
+                                  : FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        if (!notification['isRead'])
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+
+                    Text(
+                      notification['message'],
+                      style: AppTextStyles.body.copyWith(
+                        fontSize: 14,
+                        color: notification['isRead']
+                            ? AppColors.textSecondary
+                            : AppColors.textPrimary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          notification['time'],
+                          style: AppTextStyles.label.copyWith(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                        Container(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: typeColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            notification['type'].toUpperCase(),
+                            style: TextStyle(
+                              color: typeColor,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _markAllNotificationsAsRead() {
+    setState(() {
+      for (var notification in notifications) {
+        notification['isRead'] = true;
+      }
+      hasUnreadNotifications = false;
+    });
+    
+    Navigator.pop(context);
+    _showBanner('All notifications marked as read');
+  }
+
+  void _addNewNotification(String title, String message, String type, IconData icon, String priority) {
+  setState(() {
+    notifications.insert(0, {
+      'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      'title': title,
+      'message': message,
+      'type': type,
+      'time': 'Just now',
+      'isRead': false,
+      'icon': icon,
+      'priority': priority,
+    });
+    hasUnreadNotifications = true;
+  });
+}
+
+  void _showNotificationsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.9,
+          height: MediaQuery.of(context).size.height * 0.8,
+          child: Column(
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(16),
+                    topRight: Radius.circular(16),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Notifications',
+                      style: AppTextStyles.heading.copyWith(
+                        color: Colors.white,
+                        fontSize: 20,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        // Mark all as read button
+                        TextButton(
+                          onPressed: _markAllNotificationsAsRead,
+                          child: Text(
+                            'Mark All Read',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: Icon(Icons.close, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Notification Stats
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    Column(
+                      children: [
+                        Text(
+                          '${notifications.length}',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        Text(
+                          'Total',
+                          style: AppTextStyles.body.copyWith(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      children: [
+                        Text(
+                          '${notifications.where((n) => !n['isRead']).length}',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red,
+                          ),
+                        ),
+                        Text(
+                          'Unread',
+                          style: AppTextStyles.body.copyWith(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      children: [
+                        Text(
+                          '${notifications.where((n) => n['priority'] == 'high').length}',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange,
+                          ),
+                        ),
+                        Text(
+                          'Priority',
+                          style: AppTextStyles.body.copyWith(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Notifications List
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: notifications.length,
+                  itemBuilder: (context, index) {
+                    final notification = notifications[index];
+                    return _buildNotificationCard(notification, index);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+    );
+  }
+
+  void _markNotificationAsRead(int index) {
+    setState(() {
+      notifications[index]['isRead'] = true;
+      hasUnreadNotifications = notifications.any((n) => !n['isRead']);
+    });
+    
+    _showBanner('Notification marked as read');
+  }
+}
