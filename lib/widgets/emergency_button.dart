@@ -1,58 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'emergency_form_dialog.dart';
 
 class EmergencyButton extends StatelessWidget {
   const EmergencyButton({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        // 🔔 Trigger light vibration
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.red,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+        elevation: 6,
+        minimumSize: const Size.fromHeight(90), // optional
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+      ),
+      onPressed: () {
         HapticFeedback.heavyImpact();
-
-        // 🚨 Show snackbar as before
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Emergency help requested!'),
-        ));
-      }
-      ,
-      child: Container(
-        padding: EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.red,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(Icons.warning, color: Colors.white, size: 30),
-            SizedBox(width: 12),
-            Expanded( // ✅ This prevents overflow
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Need Emergency Help?',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+        showDialog(
+          context: context,
+          builder: (context) => const EmergencyFormDialog(),
+        );
+      },
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Icon(Icons.warning, color: Colors.white, size: 38),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Need Emergency Help?',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
                   ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Tap to send help signal to nearby mechanics',
-                    style: TextStyle(
-                      color: Colors.white70,
-                    ),
-                    softWrap: true, // ✅ Ensures the text wraps nicely
+                ),
+                SizedBox(height: 7),
+                Text(
+                  'Press this button to send an urgent request to nearby mechanics.\nUse only in real roadside emergencies.',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 15,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

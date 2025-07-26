@@ -72,18 +72,19 @@ class FindMechanicsPage extends StatelessWidget {
           if (index == 1) return; // Already on Find Mechanics
           switch (index) {
             case 0:
+              // Navigate to home with fade transition
               Navigator.pushNamedAndRemoveUntil(context, '/userHome', (route) => false);
               break;
             case 2:
-              // Messages - can be implemented later
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('Messages feature coming soon'),
-              ));
+              // Navigate to messages
+              Navigator.pushNamed(context, '/messages');
               break;
             case 3:
+              // Navigate to history with slide transition
               Navigator.pushNamed(context, '/history');
               break;
             case 4:
+              // Navigate to settings with slide transition
               Navigator.pushNamed(context, '/settings');
               break;
           }

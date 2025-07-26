@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import 'package:mechfind/utils.dart'; // <-- make sure this path is correct
+import '../../utils.dart';
+import '../../widgets/bottom_navbar.dart';
 
 class SettingsProfileScreen extends StatefulWidget {
   const SettingsProfileScreen({super.key});
@@ -193,6 +194,27 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
             ],
           ),
         ),
+      ),
+      bottomNavigationBar: BottomNavBar(
+        currentIndex: 4, // Profile/Settings tab index
+        onTap: (index) {
+          if (index == 4) return; // Already on Settings
+          switch (index) {
+            case 0:
+              Navigator.pushNamedAndRemoveUntil(context, '/userHome', (route) => false);
+              break;
+            case 1:
+              Navigator.pushNamed(context, '/find-mechanics');
+              break;
+            case 2:
+              // Navigate to messages
+              Navigator.pushNamed(context, '/messages');
+              break;
+            case 3:
+              Navigator.pushNamed(context, '/history');
+              break;
+          }
+        },
       ),
     );
   }

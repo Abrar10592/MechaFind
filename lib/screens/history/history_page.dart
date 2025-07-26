@@ -31,7 +31,7 @@ class _HistoryPageState extends State<HistoryPage> {
         serviceName: 'Engine Repair',
         serviceDate: DateTime.now().subtract(const Duration(days: 5)),
         status: 'completed',
-        cost: 150.0,
+        cost: 12500.0,
         description: 'Fixed engine overheating issue',
         rating: 4.5,
         userReview: 'Great service, very professional',
@@ -44,7 +44,7 @@ class _HistoryPageState extends State<HistoryPage> {
         serviceName: 'Tire Change',
         serviceDate: DateTime.now().subtract(const Duration(days: 12)),
         status: 'completed',
-        cost: 80.0,
+        cost: 4200.0,
         description: 'Replaced flat tire',
         rating: 5.0,
         userReview: 'Quick and efficient service',
@@ -57,7 +57,7 @@ class _HistoryPageState extends State<HistoryPage> {
         serviceName: 'Brake Service',
         serviceDate: DateTime.now().subtract(const Duration(days: 30)),
         status: 'completed',
-        cost: 200.0,
+        cost: 8500.0,
         description: 'Brake pad replacement',
         rating: 0.0,
         userReview: '',
@@ -140,9 +140,7 @@ class _HistoryPageState extends State<HistoryPage> {
               Navigator.pushNamed(context, '/find-mechanics');
               break;
             case 2:
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('Messages feature coming soon'),
-              ));
+              Navigator.pushNamed(context, '/messages');
               break;
             case 4:
               Navigator.pushNamed(context, '/settings');
@@ -237,7 +235,7 @@ class _HistoryPageState extends State<HistoryPage> {
             Row(
               children: [
                 Text(
-                  '\$${history.cost.toStringAsFixed(2)}',
+                  '৳${history.cost.toStringAsFixed(0)}',
                   style: TextStyle(
                     fontFamily: AppFonts.primaryFont,
                     fontSize: FontSizes.subHeading,
