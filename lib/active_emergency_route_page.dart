@@ -149,7 +149,9 @@ class ActiveEmergencyRoutePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mechanicLocation = LatLng(23.7900, 90.4050); // Demo mechanic location
+    final mechanicLocation = LatLng(23.7900, 90.4050); 
+    final accessToken =
+        'pk.eyJ1IjoiYWRpbDQyMCIsImEiOiJjbWRrN3dhb2wwdXRnMmxvZ2dhNmY2Nzc3In0.yrzJJ09yyfdT4Zg4Y_CJhQ';// Demo mechanic location
 
     return Scaffold(
       appBar: AppBar(
@@ -172,10 +174,13 @@ class ActiveEmergencyRoutePage extends StatelessWidget {
               ),
               children: [
                 TileLayer(
-                  urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  subdomains: ['a', 'b', 'c'],
-                  userAgentPackageName: 'com.example.app',
-                ),
+                            urlTemplate:
+                                "https://api.mapbox.com/styles/v1/adil420/cmdkaqq33007y01sj85a2gpa5/tiles/256/{z}/{x}/{y}@2x?access_token=$accessToken",
+                            additionalOptions: {
+                              'accessToken': accessToken,
+                              'id': 'mapbox.mapbox-traffic-v1',
+                            },
+                          ),
                 PolylineLayer(
                   polylines: [
                     Polyline(
