@@ -164,11 +164,11 @@ class _MechanicMapState extends State<MechanicMap> with WidgetsBindingObserver {
         )
       );
       if(result.points.isNotEmpty){
-        result.points.forEach((PointLatLng point){
+        for (var point in result.points) {
           polylineCoordinates.add(LatLng(point.latitude, point.longitude));
 
 
-        });
+        }
 
       }else{
         print(result.errorMessage);
