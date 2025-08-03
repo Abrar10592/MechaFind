@@ -84,7 +84,7 @@ class LandingPage extends StatelessWidget {
                   const SizedBox(height: 16),
                   OutlinedButton(
                     onPressed: () {
-                      Navigator.pushNamed(context, '/browse');
+                      Navigator.pushNamed(context, '/userHome');
                     },
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 80, vertical: 16),
