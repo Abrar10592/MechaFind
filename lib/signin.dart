@@ -29,7 +29,6 @@ class _SignInPageState extends State<SignInPage> {
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      Navigator.pushReplacementNamed(context, '/userHome');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter email and password')),
       );
@@ -55,31 +54,29 @@ class _SignInPageState extends State<SignInPage> {
       }
 
       if (user.emailConfirmedAt == null) {
+        await supabase.auth.signOut();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please verify your email before signing in.')),
         );
-        await supabase.auth.signOut();
         setState(() => _loading = false);
         return;
       }
 
       final userId = user.id;
 
+      // Fetch user role from users table
       final userRecord = await supabase.from('users').select('role').eq('id', userId).maybeSingle();
 
       if (userRecord == null) {
-        // Insert new user data if missing (optional)
-        await supabase.from('users').insert({
-          'id': userId,
-          'full_name': user.userMetadata?['full_name'] ?? '',
-          'phone': user.userMetadata?['phone'] ?? '',
-          'role': selectedRole ?? 'user',
-          'image_url': null,
-          'created_at': DateTime.now().toUtc().toIso8601String(),
-        });
+        await supabase.auth.signOut();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User data not found. Please sign up again.')),
+        );
+        setState(() => _loading = false);
+        return;
       }
 
-      final String role = userRecord != null ? userRecord['role'] : (selectedRole ?? 'user');
+      final String role = userRecord['role'];
 
       if (role == 'mechanic') {
         final mechanicRecord = await supabase.from('mechanics').select().eq('id', userId).maybeSingle();
@@ -114,7 +111,10 @@ class _SignInPageState extends State<SignInPage> {
     setState(() => _loading = true);
 
     try {
-      await supabase.auth.signInWithOAuth(OAuthProvider.google);
+      await supabase.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: 'YOUR_REDIRECT_URL', // Replace with your redirect URL
+      );
     } on AuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Google Sign-In failed: ${e.message}')),
@@ -122,6 +122,39 @@ class _SignInPageState extends State<SignInPage> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _resetPassword() async {
+    final email = _emailController.text.trim();
+
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your email to reset password')),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    try {
+      await supabase.auth.resetPasswordForEmail(
+        email,
+        redirectTo: 'YOUR_REDIRECT_URL', // Replace with your redirect URL
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password reset email sent. Check your inbox.')),
+      );
+    } on AuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.message}')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unexpected error: $e')),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -221,7 +254,7 @@ class _SignInPageState extends State<SignInPage> {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-                onPressed: () {}, // Implement forgot password as needed
+                onPressed: _loading ? null : _resetPassword,
                 child: Text(
                   'Forgot Password?',
                   style: TextStyle(color: AppColors.accent),
@@ -241,14 +274,14 @@ class _SignInPageState extends State<SignInPage> {
                 child: _loading
                     ? const CircularProgressIndicator(color: Colors.white)
                     : Text(
-                  'Sign In',
-                  style: AppTextStyles.body.copyWith(
-                    fontWeight: FontWeight.bold,
-                    fontSize: FontSizes.subHeading,
-                    color: Colors.white,
-                    fontFamily: AppFonts.primaryFont,
-                  ),
-                ),
+                        'Sign In',
+                        style: AppTextStyles.body.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: FontSizes.subHeading,
+                          color: Colors.white,
+                          fontFamily: AppFonts.primaryFont,
+                        ),
+                      ),
               ),
             ),
             const SizedBox(height: 16),

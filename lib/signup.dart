@@ -7,7 +7,6 @@ class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
 
   @override
-  // ignore: library_private_types_in_public_api
   _SignUpPageState createState() => _SignUpPageState();
 }
 
@@ -41,7 +40,7 @@ class _SignUpPageState extends State<SignUpPage> {
     final password = _passwordController.text;
     final confirmPassword = _confirmPasswordController.text;
 
-    if (fullName.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
+    if (fullName.isEmpty || email.isEmpty || phone.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
       _showMessage('Please fill all required fields');
       return;
     }
@@ -51,18 +50,24 @@ class _SignUpPageState extends State<SignUpPage> {
       return;
     }
 
-    if (selectedRole == null) {
-      _showMessage('Please select a role first');
+    if (selectedRole == null || !['user', 'mechanic', 'guest'].contains(selectedRole)) {
+      _showMessage('Please select a valid role');
       return;
     }
 
     setState(() => _loading = true);
 
     try {
+      // Sign up with Supabase Auth, including user metadata
       final signUpRes = await supabase.auth.signUp(
         email: email,
         password: password,
-        emailRedirectTo: 'YOUR_REDIRECT_URL',
+        emailRedirectTo: 'mechfind://signin', 
+        data: {
+          'full_name': fullName,
+          'phone': phone,
+          'role': selectedRole,
+        },
       );
 
       final user = signUpRes.user;
@@ -80,7 +85,7 @@ class _SignUpPageState extends State<SignUpPage> {
           title: const Text('Verify Your Email'),
           content: const Text(
             'A verification email has been sent to your email address. '
-                'Please verify your email to activate your account.',
+            'Please verify your email to activate your account.',
           ),
           actions: [
             TextButton(
@@ -210,7 +215,7 @@ class _SignUpPageState extends State<SignUpPage> {
             const SizedBox(height: 16),
             _buildTextField(Icons.email_outlined, 'Email address', _emailController),
             const SizedBox(height: 16),
-            _buildTextField(Icons.phone_outlined, 'Phone Number', _phoneController),
+            _buildTextField(Icons.phone, 'Phone Number', _phoneController),
             const SizedBox(height: 16),
             _buildPasswordField(
               obscureText: _obscurePassword,
@@ -237,13 +242,15 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
                 child: _loading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : Text('Create Account',
-                    style: AppTextStyles.body.copyWith(
-                      fontWeight: FontWeight.bold,
-                      fontSize: FontSizes.subHeading,
-                      color: Colors.white,
-                      fontFamily: AppFonts.primaryFont,
-                    )),
+                    : Text(
+                        'Create Account',
+                        style: AppTextStyles.body.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: FontSizes.subHeading,
+                          color: Colors.white,
+                          fontFamily: AppFonts.primaryFont,
+                        ),
+                      ),
               ),
             ),
             const SizedBox(height: 16),
