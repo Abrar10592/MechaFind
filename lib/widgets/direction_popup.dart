@@ -1,29 +1,37 @@
 import 'dart:async';
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as latlng;
 import 'package:location/location.dart';
 import 'package:http/http.dart' as http;
+import 'package:mechfind/mechanic/chat_screen.dart';
+
 import 'package:mechfind/utils.dart';
+import 'package:mechfind/widgets/message_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
-
-import 'message_screen.dart';
-
 
 class DirectionPopup extends StatefulWidget {
   final latlng.LatLng requestLocation;
   final String phone;
   final String name;
+  final String requestId;
+  final String user_id;
   final VoidCallback onReject;
+  final String imageUrl;
+  final VoidCallback onMinimize;
 
   const DirectionPopup({
     super.key,
     required this.requestLocation,
     required this.phone,
     required this.name,
+    required this.requestId,
     required this.onReject,
+    required this.onMinimize,
+    required this.user_id,
+    this.imageUrl = '',
   });
 
   @override
@@ -33,6 +41,7 @@ class DirectionPopup extends StatefulWidget {
 class _DirectionPopupState extends State<DirectionPopup> {
   final MapController _mapController = MapController();
   final Location _location = Location();
+  final SupabaseClient supabase = Supabase.instance.client;
 
   latlng.LatLng? _mechanicLocation;
   List<List<latlng.LatLng>> _routes = [];
@@ -142,17 +151,39 @@ class _DirectionPopupState extends State<DirectionPopup> {
       context: context,
       builder: (_) => AlertDialog(
         title: Text("Reject Request", style: AppTextStyles.heading),
-        content: Text("Are you sure you want to reject this request?", style: AppTextStyles.body),
+        content: Text(
+          "Are you sure you want to reject this request?",
+          style: AppTextStyles.body,
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: Text("Cancel", style: AppTextStyles.label),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop();
-              widget.onReject();
+            onPressed: () async {
+              try {
+                await supabase
+                    .from('requests')
+                    .update({
+                      'mechanic_id': null,
+                      'status': 'pending',
+                      'mech_lat': null,
+                      'mech_lng': null,
+                    })
+                    .eq('id', widget.requestId);
+                print(
+                  'Request ${widget.requestId} rejected: Cleared mechanic_id, mech_lat, mech_lng, and set status to pending',
+                );
+                Navigator.of(context).pop(); // Close dialog
+                Navigator.of(context).pop(); // Close modal
+                widget.onReject(); // Trigger UI update in MechanicLandingScreen
+              } catch (e) {
+                print('Error rejecting request ${widget.requestId}: $e');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error rejecting request: $e')),
+                );
+              }
             },
             child: Text("Yes", style: AppTextStyles.label),
           ),
@@ -171,206 +202,239 @@ class _DirectionPopupState extends State<DirectionPopup> {
   Widget build(BuildContext context) {
     final accessToken =
         'pk.eyJ1IjoiYWRpbDQyMCIsImEiOiJjbWRrN3dhb2wwdXRnMmxvZ2dhNmY2Nzc3In0.yrzJJ09yyfdT4Zg4Y_CJhQ';
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Container(
-          height: MediaQuery.of(context).size.height * 0.95,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Stack(
-            children: [
-              Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8.0, right: 8.0),
-                    child: Align(
-                      alignment: Alignment.topRight,
-                      child: IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: _showConfirmationDialog,
+    return NotificationListener<DraggableScrollableNotification>(
+      onNotification: (notification) {
+        if (notification.extent <= 0.1) {
+          widget.onMinimize();
+          _locationSubscription?.pause();
+          print('Modal minimized to bubble, location subscription paused');
+        } else {
+          if (_locationSubscription?.isPaused ?? false) {
+            _locationSubscription?.resume();
+            print('Modal restored, location subscription resumed');
+          }
+        }
+        return true;
+      },
+      child: SafeArea(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Container(
+            height: MediaQuery.of(context).size.height * 0.95,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Stack(
+              children: [
+                Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0, right: 8.0),
+                      child: Align(
+                        alignment: Alignment.topRight,
+                        child: IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: _showConfirmationDialog,
+                        ),
                       ),
                     ),
-                  ),
-                  Expanded(
-                    child: Listener(
-                      onPointerDown: (_) => _userMovedMap = true,
-                      child: FlutterMap(
-                        mapController: _mapController,
-                        options: MapOptions(
-                          initialCenter:
-                              _mechanicLocation ?? widget.requestLocation,
-                          initialZoom: _currentZoom,
-                          onPositionChanged: (MapCamera camera, bool hasGesture) {
-                            if (hasGesture) {
-                              _currentZoom = camera.zoom;
-                            }
-                          },
-                        ),
-                        children: [
-                          TileLayer(
-                            urlTemplate:
-                                "https://api.mapbox.com/styles/v1/adil420/cmdkaqq33007y01sj85a2gpa5/tiles/256/{z}/{x}/{y}@2x?access_token=$accessToken",
-                            additionalOptions: {
-                              'accessToken': accessToken,
-                              'id': 'mapbox.mapbox-traffic-v1',
-                            },
+                    Expanded(
+                      child: Listener(
+                        onPointerDown: (_) => _userMovedMap = true,
+                        child: FlutterMap(
+                          mapController: _mapController,
+                          options: MapOptions(
+                            initialCenter:
+                                _mechanicLocation ?? widget.requestLocation,
+                            initialZoom: _currentZoom,
+                            onPositionChanged:
+                                (MapCamera camera, bool hasGesture) {
+                                  if (hasGesture) {
+                                    _currentZoom = camera.zoom;
+                                  }
+                                },
                           ),
-                          MarkerLayer(
-                            markers: [
-                              Marker(
-                                point: widget.requestLocation,
-                                width: 60,
-                                height: 60,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.amber.shade700,
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.4),
-                                        blurRadius: 4,
-                                        offset: const Offset(2, 2),
-                                      )
-                                    ],
-                                    border: Border.all(
-                                        color: Colors.white, width: 2),
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Image.asset('zob_assets/user_icon.png'),
-                                  ),
-                                ),
-                              ),
-                              if (_mechanicLocation != null)
+                          children: [
+                            TileLayer(
+                              urlTemplate:
+                                  "https://api.mapbox.com/styles/v1/adil420/cmdkaqq33007y01sj85a2gpa5/tiles/256/{z}/{x}/{y}@2x?access_token=$accessToken",
+                              additionalOptions: {
+                                'accessToken': accessToken,
+                                'id': 'mapbox.mapbox-traffic-v1',
+                              },
+                            ),
+                            MarkerLayer(
+                              markers: [
                                 Marker(
-                                  point: _mechanicLocation!,
+                                  point: widget.requestLocation,
                                   width: 60,
                                   height: 60,
                                   child: Container(
                                     decoration: BoxDecoration(
-                                      color: Colors.blueAccent,
+                                      color: Colors.amber.shade700,
                                       shape: BoxShape.circle,
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withValues(alpha: 0.4),
+                                          color: Colors.black.withValues(
+                                            alpha: 0.4,
+                                          ),
                                           blurRadius: 4,
                                           offset: const Offset(2, 2),
-                                        )
+                                        ),
                                       ],
                                       border: Border.all(
-                                          color: Colors.white, width: 2),
+                                        color: Colors.white,
+                                        width: 2,
+                                      ),
                                     ),
                                     child: Padding(
                                       padding: const EdgeInsets.all(8.0),
-                                      child: Image.asset('zob_assets/mechanic_icon.png'),
+                                      child: Image.asset(
+                                        'zob_assets/user_icon.png',
+                                      ),
                                     ),
                                   ),
                                 ),
-                            ],
-                          ),
-                          for (final route in _routes)
-                            PolylineLayer(
-                              polylines: [
-                                Polyline(
-                                  points: route,
-                                  strokeWidth: 5.0,
-                                  color: route == _routes.first
-                                      ? AppColors.accent
-                                      : AppColors.accent.withValues(alpha: 0.3),
-                                  borderColor: Colors.white,
-                                  borderStrokeWidth: 1.0,
-                                ),
+                                if (_mechanicLocation != null)
+                                  Marker(
+                                    point: _mechanicLocation!,
+                                    width: 60,
+                                    height: 60,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.blueAccent,
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(
+                                              alpha: 0.4,
+                                            ),
+                                            blurRadius: 4,
+                                            offset: const Offset(2, 2),
+                                          ),
+                                        ],
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Image.asset(
+                                          'zob_assets/mechanic_icon.png',
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                               ],
                             ),
+                            for (final route in _routes)
+                              PolylineLayer(
+                                polylines: [
+                                  Polyline(
+                                    points: route,
+                                    strokeWidth: 5.0,
+                                    color: route == _routes.first
+                                        ? AppColors.accent
+                                        : AppColors.accent.withValues(
+                                            alpha: 0.3,
+                                          ),
+                                    borderColor: Colors.white,
+                                    borderStrokeWidth: 1.0,
+                                  ),
+                                ],
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 70),
+                  ],
+                ),
+                if (_distanceInMeters != null)
+                  Positioned(
+                    top: 60,
+                    left: 20,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black26, blurRadius: 4),
                         ],
+                      ),
+                      child: Text(
+                        '${(_distanceInMeters! / 1000).toStringAsFixed(2)} km',
+                        style: AppTextStyles.body.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 70),
-                ],
-              ),
-              if (_distanceInMeters != null)
                 Positioned(
-                  top: 60,
-                  left: 20,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 4,
+                  bottom: 100,
+                  right: 16,
+                  child: FloatingActionButton(
+                    onPressed: () {
+                      if (_mechanicLocation != null) {
+                        _userMovedMap = false;
+                        _mapController.move(_mechanicLocation!, _currentZoom);
+                      }
+                    },
+                    backgroundColor: Colors.white,
+                    child: const Icon(Icons.my_location, color: Colors.blue),
+                  ),
+                ),
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _launchPhoneCall(widget.phone),
+                            icon: const Icon(Icons.call),
+                            label: Text('Call'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              textStyle: AppTextStyles.label,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ChatScreen(
+                                    receiverId: widget.user_id,
+                                    receiverName: widget.name,
+                                    receiverImageUrl:widget.imageUrl,
+                                        
+                                  ),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.message),
+                            label: const Text("Message"),
+                          ),
                         ),
                       ],
                     ),
-                    child: Text(
-                      '${(_distanceInMeters! / 1000).toStringAsFixed(2)} km',
-                      style: AppTextStyles.body.copyWith(fontWeight: FontWeight.bold),
-                    ),
                   ),
                 ),
-              Positioned(
-                bottom: 100,
-                right: 16,
-                child: FloatingActionButton(
-                  onPressed: () {
-                    if (_mechanicLocation != null) {
-                      _userMovedMap = false;
-                      _mapController.move(_mechanicLocation!, _currentZoom);
-                    }
-                  },
-                  backgroundColor: Colors.white,
-                  child: const Icon(Icons.my_location, color: Colors.blue),
-                ),
-              ),
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () => _launchPhoneCall(widget.phone),
-                          icon: const Icon(Icons.call),
-                          label: Text('Call'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            textStyle: AppTextStyles.label,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => MessageScreen(name: widget.name),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.message),
-                          label: Text('Message'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            textStyle: AppTextStyles.label,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

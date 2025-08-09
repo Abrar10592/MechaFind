@@ -33,6 +33,8 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
   Timer? _locationUpdateTimer;
   String? _acceptedRequestId;
   LatLng? _lastUpdatedPosition;
+  Map<String, dynamic>? _activeRequest; // Store active request details for bubble
+  bool _isModalMinimized = false; // Track if modal is minimized to bubble
 
   @override
   void initState() {
@@ -198,6 +200,10 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         timer.cancel();
         _acceptedRequestId = null;
         _lastUpdatedPosition = null;
+        setState(() {
+          _activeRequest = null;
+          _isModalMinimized = false;
+        });
         print('Location update timer canceled: Request status is ${request['status']}');
         return;
       }
@@ -347,7 +353,11 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
               _locationUpdateTimer?.cancel();
               _acceptedRequestId = null;
               _lastUpdatedPosition = null;
-              print('Stopped location updates for request ${payload.newRecord['id']} due to status: ${payload.newRecord['status']}');
+              setState(() {
+                _activeRequest = null;
+                _isModalMinimized = false;
+              });
+              print('Cleared active request and stopped location updates for request ${payload.newRecord['id']} due to status: ${payload.newRecord['status']}');
             }
           },
         )
@@ -388,10 +398,15 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
           .update(updateData)
           .eq('id', requestId);
 
+      // Store active request details
+      final request = _sosRequests.firstWhere((req) => req['id'] == requestId);
       setState(() {
-        _sosRequests.removeWhere((request) => request['id'] == requestId);
+        _activeRequest = Map<String, dynamic>.from(request);
+        _sosRequests.removeWhere((req) => req['id'] == requestId);
         _activeRequests = _sosRequests.length.toString();
+        _isModalMinimized = false;
       });
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Request accepted')),
       );
@@ -417,12 +432,22 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
     try {
       await supabase
           .from('requests')
-          .update({'status': 'pending'})
+          .update({
+            'status': 'pending',
+            'mechanic_id': null,
+            'mech_lat': null,
+            'mech_lng': null,
+          })
           .eq('id', requestId);
 
       setState(() {
         _sosRequests.removeWhere((request) => request['id'] == requestId);
         _activeRequests = _sosRequests.length.toString();
+        _activeRequest = null;
+        _isModalMinimized = false;
+        _locationUpdateTimer?.cancel();
+        _acceptedRequestId = null;
+        _lastUpdatedPosition = null;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Request ignored')),
@@ -434,6 +459,49 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
       );
       print('Error rejecting request $requestId: $e');
     }
+  }
+
+  void _showDirectionModal() {
+    if (_activeRequest == null) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      isDismissible: false,
+      enableDrag: true,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.95,
+        minChildSize: 0.0,
+        maxChildSize: 0.95,
+        snap: true,
+        snapSizes: const [0.0, 0.95],
+        builder: (context, scrollController) {
+          return DirectionPopup(
+            user_id: _activeRequest!['user_id'],
+            requestId: _activeRequest!['id'],
+            requestLocation: latlng.LatLng(
+              _activeRequest!['lat'],
+              _activeRequest!['lng'],
+            ),
+            phone: _activeRequest!['phone'],
+            name: _activeRequest!['user_name'],
+            imageUrl: _activeRequest!['image_url'],
+            onReject: () => _rejectRequest(_activeRequest!['id']),
+            onMinimize: () {
+              setState(() {
+                _isModalMinimized = true;
+              });
+              Navigator.of(context).pop();
+            },
+          );
+        },
+      ),
+    ).then((_) {
+      // Modal dismissed without rejecting
+      setState(() {
+        _isModalMinimized = true;
+      });
+    });
   }
 
   @override
@@ -456,90 +524,84 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         backgroundColor: AppColors.primary,
       ),
       backgroundColor: AppColors.background,
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-              ? Center(child: Text(_errorMessage!, style: AppTextStyles.body))
-              : Padding(
-                  padding: const EdgeInsets.all(15),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+      body: Stack(
+        children: [
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _errorMessage != null
+                  ? Center(child: Text(_errorMessage!, style: AppTextStyles.body))
+                  : Padding(
+                      padding: const EdgeInsets.all(15),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                  child: _buildStatCard(
+                                      _completedToday, isEnglish ? "Completed Today" : "আজ সম্পন্ন")),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                  child: _buildStatCard(
+                                      _activeRequests, isEnglish ? "Active Request" : "সক্রিয় অনুরোধ")),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                  child: _buildStatCard(
+                                      _rating, isEnglish ? "Rating" : "রেটিং")),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          Text(
+                            isEnglish ? "Active SOS Signals" : "সক্রিয় এসওএস সংকেত",
+                            style: AppTextStyles.heading.copyWith(
+                              fontSize: FontSizes.subHeading,
+                              fontFamily: AppFonts.primaryFont,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
                           Expanded(
-                              child: _buildStatCard(
-                                  _completedToday, isEnglish ? "Completed Today" : "আজ সম্পন্ন")),
-                          const SizedBox(width: 10),
-                          Expanded(
-                              child: _buildStatCard(
-                                  _activeRequests, isEnglish ? "Active Request" : "সক্রিয় অনুরোধ")),
-                          const SizedBox(width: 10),
-                          Expanded(
-                              child: _buildStatCard(
-                                  _rating, isEnglish ? "Rating" : "রেটিং")),
+                            child: _sosRequests.isEmpty
+                                ? Center(
+                                    child: Text(
+                                      isEnglish ? "No active requests" : "কোন সক্রিয় অনুরোধ নেই",
+                                      style: AppTextStyles.body,
+                                    ),
+                                  )
+                                : ListView.builder(
+                                    itemCount: _sosRequests.length,
+                                    itemBuilder: (context, index) {
+                                      final request = _sosRequests[index];
+                                      print('Rendering SOS card: $request, current_location: $_currentPosition');
+                                      return SosCard(
+                                        request: request,
+                                        current_location: _currentPosition,
+                                        onIgnore: () => _rejectRequest(request['id']),
+                                        onAccept: () {
+                                          _acceptRequest(request['id']).then((_) {
+                                            _showDirectionModal();
+                                          });
+                                        },
+                                      );
+                                    },
+                                  ),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 20),
-                      Text(
-                        isEnglish ? "Active SOS Signals" : "সক্রিয় এসওএস সংকেত",
-                        style: AppTextStyles.heading.copyWith(
-                          fontSize: FontSizes.subHeading,
-                          fontFamily: AppFonts.primaryFont,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Expanded(
-                        child: _sosRequests.isEmpty
-                            ? Center(
-                                child: Text(
-                                  isEnglish ? "No active requests" : "কোন সক্রিয় অনুরোধ নেই",
-                                  style: AppTextStyles.body,
-                                ),
-                              )
-                            : ListView.builder(
-                                itemCount: _sosRequests.length,
-                                itemBuilder: (context, index) {
-                                  final request = _sosRequests[index];
-                                  print('Rendering SOS card: $request, current_location: $_currentPosition');
-                                  return SosCard(
-                                    request: request,
-                                    current_location: _currentPosition,
-                                    onIgnore: () => _rejectRequest(request['id']),
-                                    onAccept: () {
-                                      showModalBottomSheet(
-                                        context: context,
-                                        isScrollControlled: true,
-                                        backgroundColor: Colors.transparent,
-                                        isDismissible: false,
-                                        enableDrag: true,
-                                        builder: (_) => DraggableScrollableSheet(
-                                          initialChildSize: 0.95,
-                                          minChildSize: 0.3,
-                                          maxChildSize: 0.95,
-                                          builder: (context, scrollController) {
-                                            return DirectionPopup(
-                                              requestLocation: latlng.LatLng(
-                                                request['lat'],
-                                                request['lng'],
-                                              ),
-                                              phone: request['phone'],
-                                              name: request['user_name'],
-                                              onReject: () => _rejectRequest(request['id']),
-                                            );
-                                          },
-                                        ),
-                                      );
-                                      _acceptRequest(request['id']);
-                                    },
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
-                  ),
-                ),
+                    ),
+          if (_isModalMinimized && _activeRequest != null)
+            Positioned(
+              bottom: 16,
+              right: 16,
+              child: FloatingActionButton(
+                onPressed: _showDirectionModal,
+                backgroundColor: AppColors.primary,
+                child: const Icon(Icons.map, color: Colors.white),
+                tooltip: isEnglish ? 'Open Request' : 'অনুরোধ খুলুন',
+              ),
+            ),
+        ],
+      ),
     );
   }
 

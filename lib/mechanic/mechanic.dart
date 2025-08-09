@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:mechfind/mechanic/message_screen.dart';
 import 'package:mechfind/utils.dart';
 import 'package:mechfind/mechanic/mechanic_landing_screen.dart';
 import 'package:mechfind/mechanic/mechanic_map.dart';
 import 'package:mechfind/mechanic/mechanic_profile.dart';
 import 'package:mechfind/mechanic/mechanic_settings.dart';
+
 
 class Mechanic extends StatefulWidget {
   const Mechanic({super.key});
@@ -23,8 +25,11 @@ class _MechanicState extends State<Mechanic> {
       case 1:
         return const MechanicMap();
       case 2:
-        return const MechanicProfile();
+        return const MessagesScreen();
+      
       case 3:
+        return const MechanicProfile();
+      case 4:
         return const MechanicSettings();
       default:
         return const MechanicLandingScreen();
@@ -63,6 +68,10 @@ class _MechanicState extends State<Mechanic> {
           BottomNavigationBarItem(
             icon: const Icon(Icons.map),
             label: 'map'.tr(),
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.chat_rounded),
+            label: 'Chat'.tr(),
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.person),
