@@ -1,12 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:mechfind/utils.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
-import 'dart:io';
-
-import '../active_emergency_route_page.dart'; // Make sure path is correct
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../active_emergency_route_page.dart';
+import 'package:mechfind/utils.dart'; // Update this import if needed
 
 class EmergencyFormDialog extends StatefulWidget {
   const EmergencyFormDialog({super.key});
@@ -18,10 +18,10 @@ class EmergencyFormDialog extends StatefulWidget {
 class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
   final _vehicleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  File? _capturedImage;
 
-  String? _location;          // Human-readable address
-  Position? _coords;          // Actual user coordinates
+  File? _capturedImage;
+  String? _location;
+  Position? _coords;
   bool _loading = false;
 
   @override
@@ -39,13 +39,15 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
 
   Future<void> _fetchLocation() async {
     setState(() => _loading = true);
-
     try {
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-          setState(() => _location = 'Location denied');
+          setState(() {
+            _location = 'Location permission denied';
+            _loading = false;
+          });
           return;
         }
       }
@@ -62,19 +64,33 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
           ? '${placemarks.first.street ?? ''}, ${placemarks.first.locality ?? ''}, ${placemarks.first.country ?? ''}'
           : 'No address found';
 
-      setState(() => _location = address.trim().isEmpty ? "Unknown location" : address);
+      setState(() {
+        _location = address.trim().isEmpty ? "Unknown location" : address;
+        _loading = false;
+      });
     } catch (e) {
-      setState(() => _location = 'Location error');
-    } finally {
-      setState(() => _loading = false);
+      setState(() {
+        _location = 'Failed to get location';
+        _loading = false;
+      });
     }
   }
 
   Future<void> _takePicture() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.camera, imageQuality: 60);
-    if (pickedFile != null) {
-      setState(() => _capturedImage = File(pickedFile.path));
+    try {
+      final pickedFile = await picker.pickImage(source: ImageSource.camera, imageQuality: 60);
+      if (pickedFile != null) {
+        setState(() => _capturedImage = File(pickedFile.path));
+      }
+    } catch (e) {
+      _showMessage('Failed to take picture: $e');
+    }
+  }
+
+  void _showMessage(String msg) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 
@@ -92,45 +108,99 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
       return;
     }
 
-    // Simulated mechanic info
-    final demoMechanic = {
-      'name': "MIKE auto shop",
-      'distance': '0.5 km',
-      'rating': 4.8,
-      'status': 'Online',
-      'photoUrl': 'assets/mike.png',
-      'services': ['Battery Jumpstart', 'Tyre Change', 'Oil Top-up'],
-    };
+    setState(() => _loading = true);
 
-    // Comment out backend for now
-    /*
-    final supabase = Supabase.instance.client;
-    await supabase.from('emergencies').insert({
-      'vehicle_model': vehicle,
-      'description': desc,
-      'location_address': _location,
-      'location_lat': _coords!.latitude,
-      'location_lng': _coords!.longitude,
-      // Upload image to storage and save URL
-    });
-    */
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
 
-    if (!mounted) return;
-    Navigator.of(context).pop(); // Close the modal
+      print('🔐 Current user ID: ${user?.id}');
+      if (user == null) {
+        _showMessage('You must be logged in to submit a request.');
+        setState(() => _loading = false);
+        return;
+      }
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ActiveEmergencyRoutePage(
-          userLocation: LatLng(_coords!.latitude, _coords!.longitude),
-          mechanic: demoMechanic,
+      final bucketName = 'request-photos'; // Your private bucket name
+      final fileExt = _capturedImage!.path.split('.').last;
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+      final filePath = 'requests/${user.id}/$fileName'; // <--- RELATIVE to bucket
+
+      print('🛣️ Intended file path: $filePath');
+
+      String uploadedPath = '';
+      try {
+        uploadedPath = await supabase.storage.from(bucketName).upload(filePath, _capturedImage!);
+        print('📦 Uploaded path from Supabase: $uploadedPath');
+      } catch (e) {
+        print('❗ Upload error: $e');
+        _showMessage('Image upload failed: $e');
+        setState(() => _loading = false);
+        return;
+      }
+
+      // uploadedPath should be 'requests/userid/filename.jpg'.
+      // If it starts with 'request-photos/', strip it:
+      String relativePath = uploadedPath;
+      if (relativePath.startsWith('$bucketName/')) {
+        relativePath = relativePath.replaceFirst('$bucketName/', '');
+        print('✂️ Adjusted relative path for signed URL: $relativePath');
+      }
+
+      String imageUrl = '';
+      try {
+        imageUrl = await supabase.storage.from(bucketName).createSignedUrl(relativePath, 86400);
+        print('🔗 Obtained signed URL: $imageUrl');
+      } catch (e) {
+        print('❗ Signed URL error: $e');
+        _showMessage('Failed to get signed URL: $e');
+        setState(() => _loading = false);
+        return;
+      }
+
+      // Insert emergency request into 'requests' table
+      final response = await supabase.from('requests').insert({
+        'user_id': user.id,
+        'mechanic_id': null,
+        'status': 'pending',
+        'vehicle': vehicle,
+        'description': desc,
+        'image': imageUrl,
+        'lat': _coords!.latitude.toString(),
+        'lng': _coords!.longitude.toString(),
+        'mech_lat': null,
+        'mech_lng': null,
+      }).select('id, lat, lng');
+
+      if (response.isEmpty) {
+        _showMessage('Failed to submit request. Try again.');
+        setState(() => _loading = false);
+        return;
+      }
+
+      final Map<String, dynamic> requestRow = response.first;
+      final String requestId = requestRow['id'];
+      final double latitude = double.tryParse(requestRow['lat']) ?? _coords!.latitude;
+      final double longitude = double.tryParse(requestRow['lng']) ?? _coords!.longitude;
+
+      print('✅ Request inserted with ID: $requestId');
+
+      // Navigate to the Active Emergency Route Page
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Close this dialog
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => ActiveEmergencyRoutePage(
+            requestId: requestId,
+            userLocation: LatLng(latitude, longitude),
+          ),
         ),
-      ),
-    );
-  }
-
-  void _showMessage(String msg) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      );
+    } catch (e) {
+      print('❗ Unexpected error: $e');
+      _showMessage('Unexpected error occurred: $e');
+    } finally {
+      setState(() => _loading = false);
     }
   }
 
@@ -140,7 +210,7 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
       backgroundColor: AppColors.primary,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -208,7 +278,7 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
                   _capturedImage == null ? "Take a Photo" : "Retake Photo",
                   style: AppTextStyles.body.copyWith(color: Colors.white),
                 ),
-                onPressed: _takePicture,
+                onPressed: _loading ? null : _takePicture,
               ),
             ),
             if (_capturedImage != null)
