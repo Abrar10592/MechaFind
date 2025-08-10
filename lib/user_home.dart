@@ -7,6 +7,7 @@ import 'widgets/emergency_button.dart';
 import 'widgets/bottom_navbar.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 
 class UserHomePage extends StatefulWidget {
   final bool isGuest;
@@ -21,20 +22,40 @@ class _UserHomePageState extends State<UserHomePage> {
   String currentLocation = 'Getting location...';
   double? userLat;
   double? userLng;
-
   List<Map<String, dynamic>> nearbyMechanics = [];
 
   @override
   void initState() {
     super.initState();
-    fetchUserLocation().then((_) {
-      if (widget.isGuest) {
-        _insertGuestSession();
-      } else {
-        _fetchUserName();
+    _checkLocationServiceAndLoad();
+  }
+
+  /// Check if device location service is enabled; if not, prompt user to enable it
+  Future<void> _checkLocationServiceAndLoad() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      // Opens the native settings screen
+      await Geolocator.openLocationSettings();
+      serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Location services are required to use this app.')),
+          );
+        }
+        return; // stop here if still not enabled
       }
-      _fetchMechanicsFromDB();
-    });
+    }
+
+    // Now safe to proceed
+    await fetchUserLocation();
+    if (widget.isGuest) {
+      await _insertGuestSession();
+    } else {
+      await _fetchUserName();
+    }
+    await _fetchMechanicsFromDB();
   }
 
   Future<void> _insertGuestSession() async {
@@ -90,7 +111,8 @@ class _UserHomePageState extends State<UserHomePage> {
     }
   }
 
-  double _calculateDistanceKm(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistanceKm(
+      double lat1, double lon1, double lat2, double lon2) {
     const R = 6371; // km
     final dLat = _deg2rad(lat2 - lat1);
     final dLon = _deg2rad(lon2 - lon1);
@@ -110,24 +132,18 @@ class _UserHomePageState extends State<UserHomePage> {
       print("⚠️ No user location yet");
       return;
     }
-
     try {
       final supabase = Supabase.instance.client;
-      final mechanicData = await supabase
-          .from('mechanics')
-          .select(
-        '''
+      final mechanicData = await supabase.from('mechanics').select('''
             id,
             rating,
             location_x,
             location_y,
             users(full_name, image_url),
             mechanic_services(service_id, services(name))
-            ''',
-      );
+            ''');
 
       List<Map<String, dynamic>> mechanicsList = [];
-
       for (final mech in mechanicData) {
         final mLat = mech['location_x'] is double
             ? mech['location_x']
@@ -153,7 +169,6 @@ class _UserHomePageState extends State<UserHomePage> {
           });
         }
       }
-
       setState(() {
         nearbyMechanics = mechanicsList;
       });
@@ -189,9 +204,8 @@ class _UserHomePageState extends State<UserHomePage> {
                 Expanded(
                   child: Text(
                     currentLocation,
-                    style: AppTextStyles.body.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                    style: AppTextStyles.body
+                        .copyWith(color: AppColors.textSecondary),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -207,9 +221,8 @@ class _UserHomePageState extends State<UserHomePage> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
               'Nearby Mechanics',
-              style: AppTextStyles.heading.copyWith(
-                fontSize: FontSizes.subHeading,
-              ),
+              style:
+              AppTextStyles.heading.copyWith(fontSize: FontSizes.subHeading),
             ),
           ),
           const SizedBox(height: 10),
@@ -231,7 +244,8 @@ class _UserHomePageState extends State<UserHomePage> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          mech['image_url'] != null && mech['image_url'].toString().isNotEmpty
+                          mech['image_url'] != null &&
+                              mech['image_url'].toString().isNotEmpty
                               ? ClipRRect(
                             borderRadius: BorderRadius.circular(40),
                             child: Image.network(
@@ -244,7 +258,8 @@ class _UserHomePageState extends State<UserHomePage> {
                                   width: 80,
                                   height: 80,
                                   color: Colors.grey[300],
-                                  child: const Icon(Icons.person, size: 40, color: Colors.white),
+                                  child: const Icon(Icons.person,
+                                      size: 40, color: Colors.white),
                                 );
                               },
                             ),
@@ -256,7 +271,8 @@ class _UserHomePageState extends State<UserHomePage> {
                               color: Colors.grey[300],
                               borderRadius: BorderRadius.circular(40),
                             ),
-                            child: const Icon(Icons.person, size: 40, color: Colors.white),
+                            child: const Icon(Icons.person,
+                                size: 40, color: Colors.white),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
@@ -274,7 +290,8 @@ class _UserHomePageState extends State<UserHomePage> {
                                 Text('Distance: ${mech['distance']}'),
                                 Text('Rating: ${mech['rating']}'),
                                 const SizedBox(height: 4),
-                                Text('Services: ${mech['services'].join(', ')}'),
+                                Text(
+                                    'Services: ${mech['services'].join(', ')}'),
                               ],
                             ),
                           ),
@@ -285,7 +302,6 @@ class _UserHomePageState extends State<UserHomePage> {
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: () {
-                            // TODO: implement request service logic here
                             print("Request service from ${mech['name']}");
                           },
                           style: ElevatedButton.styleFrom(
