@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_import, prefer_interpolation_to_compose_strings
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -84,6 +86,7 @@ class _ChatScreenState extends State<ChatScreen> {
           table: 'messages',
           callback: (payload) {
             final newMessage = payload.newRecord;
+            // ignore: unnecessary_null_comparison
             if (newMessage == null) return;
 
             final isRelevant =

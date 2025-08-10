@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print, unused_local_variable
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
@@ -22,6 +24,8 @@ class _MechanicMapState extends State<MechanicMap> {
   latlng.LatLng? _currentLatLng;
   List<Marker> _sosMarkers = [];
   final String _mapboxAccessToken = 'pk.eyJ1IjoiYWRpbDQyMCIsImEiOiJjbWRrN3dhb2wwdXRnMmxvZ2dhNmY2Nzc3In0.yrzJJ09yyfdT4Zg4Y_CJhQ';
+  bool _isLocationLoading = true;
+  bool _isRequestsLoading = false;
 
   @override
   void initState() {
@@ -30,123 +34,192 @@ class _MechanicMapState extends State<MechanicMap> {
   }
 
   Future<void> _getUserLocation() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      _showError("Location services are disabled.");
-      return;
-    }
-
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        _showError("Location permission denied.");
+    setState(() {
+      _isLocationLoading = true;
+    });
+    
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() {
+          _isLocationLoading = false;
+        });
+        _showError("Location services are disabled");
         return;
       }
-    }
 
-    if (permission == LocationPermission.deniedForever) {
-      _showError("Location permissions are permanently denied.");
-      return;
-    }
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() {
+            _isLocationLoading = false;
+          });
+          _showError("Location permission denied");
+          return;
+        }
+      }
 
-    try {
+      if (permission == LocationPermission.deniedForever) {
+        setState(() {
+          _isLocationLoading = false;
+        });
+        _showError("Location permissions are permanently denied");
+        return;
+      }
+
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw Exception('Location access timed out'),
       );
 
       setState(() {
         _currentLatLng = latlng.LatLng(position.latitude, position.longitude);
+        _isLocationLoading = false;
       });
 
       _mapController.move(_currentLatLng!, 14);
       await _loadNearbySOSRequests();
     } catch (e) {
-      _showError("Failed to fetch location: $e");
+      setState(() {
+        _isLocationLoading = false;
+      });
+      _showError("Failed to fetch location");
       print('Error fetching location: $e');
     }
   }
 
   void _showError(String message) {
+    // Convert technical errors to user-friendly messages
+    String userMessage;
+    if (message.contains('location') && message.contains('denied')) {
+      userMessage = 'Location permission is required to show nearby requests';
+    } else if (message.contains('service') && message.contains('disabled')) {
+      userMessage = 'Please enable location services to continue';
+    } else if (message.contains('network') || message.contains('connection')) {
+      userMessage = 'Network issue. Please check your internet connection';
+    } else if (message.contains('fetch') && message.contains('location')) {
+      userMessage = 'Unable to get your location. Please try again';
+    } else if (message.contains('SOS')) {
+      userMessage = 'Unable to load nearby requests. Please try again';
+    } else {
+      userMessage = 'Something went wrong. Please try again';
+    }
+    
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(userMessage),
+        action: SnackBarAction(
+          label: 'Retry',
+          onPressed: () {
+            if (userMessage.contains('location')) {
+              _getUserLocation();
+            } else if (userMessage.contains('requests')) {
+              _loadNearbySOSRequests();
+            }
+          },
+        ),
+      ),
     );
   }
 
   Future<void> _loadNearbySOSRequests() async {
     if (_currentLatLng == null) {
-      _showError("Current location not available.");
+      _showError("Current location not available");
       print('Cannot load SOS requests: Current location is null');
       return;
     }
 
     final user = supabase.auth.currentUser;
     if (user == null) {
-      _showError("User not logged in.");
+      _showError("Please log in to continue");
       print('Error: User not logged in');
       return;
     }
+
+    setState(() {
+      _isRequestsLoading = true;
+    });
 
     try {
       final response = await supabase
           .from('requests')
           .select('id, user_id, vehicle, description, image, lat, lng, users!left(full_name, phone, image_url)')
           .eq('status', 'pending')
-          .filter('mechanic_id', 'is', null);
+          .filter('mechanic_id', 'is', null)
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => throw Exception('Request timed out'),
+          );
 
       print('Pending requests from Supabase: $response');
 
-      const double maxDistanceKm = 7.0;
+      const double maxDistanceKm = 10.0;
       final latlng.Distance distanceCalc = const latlng.Distance();
 
       List<Marker> filteredMarkers = response
           .map<Marker?>((request) {
-            final lat = double.tryParse(request['lat']?.toString() ?? '') ?? 0.0;
-            final lng = double.tryParse(request['lng']?.toString() ?? '') ?? 0.0;
-            final point = latlng.LatLng(lat, lng);
-            final distance = distanceCalc.as(
-              latlng.LengthUnit.Kilometer,
-              _currentLatLng!,
-              point,
-            );
+            try {
+              final lat = double.tryParse(request['lat']?.toString() ?? '') ?? 0.0;
+              final lng = double.tryParse(request['lng']?.toString() ?? '') ?? 0.0;
+              
+              if (lat == 0.0 || lng == 0.0) return null;
+              
+              final point = latlng.LatLng(lat, lng);
+              final distance = distanceCalc.as(
+                latlng.LengthUnit.Kilometer,
+                _currentLatLng!,
+                point,
+              );
 
-            if (distance <= maxDistanceKm) {
-              return Marker(
-                point: point,
-                width: 60,
-                height: 60,
-                child: GestureDetector(
-                  onTap: () {
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      builder: (_) => _buildRequestDetails(request),
-                    );
-                  },
-                  child: CircleAvatar(
-                    backgroundColor: Colors.white,
-                    radius: 30,
+              if (distance <= maxDistanceKm) {
+                return Marker(
+                  point: point,
+                  width: 60,
+                  height: 60,
+                  child: GestureDetector(
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        builder: (_) => _buildRequestDetails(request),
+                      );
+                    },
                     child: CircleAvatar(
-                      radius: 27,
-                      backgroundImage: request['users']?['image_url'] != null
-                          ? NetworkImage(request['users']['image_url'])
-                          : const AssetImage('zob_assets/user_icon.png') as ImageProvider,
+                      backgroundColor: Colors.white,
+                      radius: 30,
+                      child: CircleAvatar(
+                        radius: 27,
+                        backgroundImage: (request['users']?['image_url'] != null && 
+                            request['users']['image_url'].toString().isNotEmpty)
+                            ? NetworkImage(request['users']['image_url'])
+                            : const AssetImage('zob_assets/user_icon.png') as ImageProvider,
+                      ),
                     ),
                   ),
-                ),
-              );
+                );
+              }
+              return null;
+            } catch (e) {
+              print('Error processing request marker: $e');
+              return null;
             }
-            return null;
           })
           .whereType<Marker>()
           .toList();
 
       setState(() {
         _sosMarkers = filteredMarkers;
+        _isRequestsLoading = false;
       });
       print('Filtered SOS markers: ${filteredMarkers.length}');
     } catch (e) {
-      _showError("Error fetching SOS requests: $e");
+      setState(() {
+        _isRequestsLoading = false;
+      });
+      _showError("Error fetching SOS requests");
       print('Error fetching SOS requests: $e');
     }
   }
@@ -334,6 +407,68 @@ class _MechanicMapState extends State<MechanicMap> {
               MarkerLayer(markers: _sosMarkers),
             ],
           ),
+          // Loading overlay
+          if (_isLocationLoading)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Loading map and getting your location...',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          // Requests loading indicator
+          if (_isRequestsLoading && !_isLocationLoading)
+            Positioned(
+              top: 20,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Text(
+                        'Loading nearby requests...',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
       floatingActionButton: FloatingActionButton(

@@ -47,8 +47,17 @@
   "nearby_sos_requests": "Nearby SOS Requests",
   "home": "Home",
   "map": "Map",
-  "profile": "Profile"
-  
-  
-  
+  "profile": "Profile",
+  "find_your_mechanic": "Find Your Mechanic",
+  "skip": "Skip",
+  "next": "Next",
+  "get_started": "Get Started",
+  "find_mechanics_nearby": "Find Mechanics Nearby",
+  "find_qualified_mechanics_description": "Connect with qualified mechanics in your area for quick and reliable vehicle repairs.",
+  "emergency_help": "Emergency Help",
+  "get_emergency_assistance_description": "Get immediate assistance when you're stranded. Send SOS signals to nearby mechanics.",
+  "real_time_tracking": "Real-time Tracking",
+  "track_mechanic_location_description": "Track your mechanic's location in real-time and stay updated on their arrival.",
+  "good_morning": "Good morning, {name}!",
+  "nearby_mechanics": "Nearby Mechanics"
 }

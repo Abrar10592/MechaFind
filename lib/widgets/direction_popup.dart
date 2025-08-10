@@ -8,7 +8,6 @@ import 'package:http/http.dart' as http;
 import 'package:mechfind/mechanic/chat_screen.dart';
 
 import 'package:mechfind/utils.dart';
-import 'package:mechfind/widgets/message_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -50,6 +49,8 @@ class _DirectionPopupState extends State<DirectionPopup> {
   double _currentZoom = 14;
   bool _userMovedMap = false;
   double? _distanceInMeters;
+  bool _isLoadingRoute = false;
+  double? _mechanicHeading; // Direction the mechanic is facing
 
   @override
   void initState() {
@@ -82,6 +83,7 @@ class _DirectionPopupState extends State<DirectionPopup> {
     final newLoc = latlng.LatLng(locData.latitude!, locData.longitude!);
     setState(() {
       _mechanicLocation = newLoc;
+      _mechanicHeading = locData.heading; // Capture the direction user is facing
     });
 
     if (!_userMovedMap) {
@@ -92,6 +94,10 @@ class _DirectionPopupState extends State<DirectionPopup> {
   }
 
   Future<void> _fetchRoutes(latlng.LatLng start, latlng.LatLng end) async {
+    setState(() {
+      _isLoadingRoute = true;
+    });
+
     final accessToken =
         'pk.eyJ1IjoiYWRpbDQyMCIsImEiOiJjbWRrN3dhb2wwdXRnMmxvZ2dhNmY2Nzc3In0.yrzJJ09yyfdT4Zg4Y_CJhQ';
     final url =
@@ -108,6 +114,9 @@ class _DirectionPopupState extends State<DirectionPopup> {
 
         if (routes.isEmpty) {
           debugPrint('No routes found');
+          setState(() {
+            _isLoadingRoute = false;
+          });
           return;
         }
 
@@ -130,12 +139,19 @@ class _DirectionPopupState extends State<DirectionPopup> {
         setState(() {
           _routes = parsedRoutes;
           _distanceInMeters = minDistance;
+          _isLoadingRoute = false;
         });
       } else {
         debugPrint('Failed to get routes: ${response.statusCode}');
+        setState(() {
+          _isLoadingRoute = false;
+        });
       }
     } catch (e) {
       debugPrint('Error fetching routes: $e');
+      setState(() {
+        _isLoadingRoute = false;
+      });
     }
   }
 
@@ -301,30 +317,84 @@ class _DirectionPopupState extends State<DirectionPopup> {
                                     point: _mechanicLocation!,
                                     width: 60,
                                     height: 60,
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.blueAccent,
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(
-                                              alpha: 0.4,
+                                    child: Stack(
+                                      children: [
+                                        // Blue shadow indicating direction (background layer)
+                                        if (_mechanicHeading != null && _mechanicHeading! >= 0)
+                                          Transform.rotate(
+                                            angle: (_mechanicHeading! * 3.14159) / 180,
+                                            child: Container(
+                                              width: 60,
+                                              height: 60,
+                                              decoration: BoxDecoration(
+                                                gradient: RadialGradient(
+                                                  center: const Alignment(0, -0.3), // Offset towards heading direction
+                                                  radius: 0.8,
+                                                  colors: [
+                                                    Colors.blue.withOpacity(0.4),
+                                                    Colors.blue.withOpacity(0.2),
+                                                    Colors.blue.withOpacity(0.1),
+                                                    Colors.transparent,
+                                                  ],
+                                                  stops: const [0.0, 0.4, 0.7, 1.0],
+                                                ),
+                                                shape: BoxShape.circle,
+                                              ),
                                             ),
-                                            blurRadius: 4,
-                                            offset: const Offset(2, 2),
                                           ),
-                                        ],
-                                        border: Border.all(
-                                          color: Colors.white,
-                                          width: 2,
+                                        // Main mechanic marker (foreground layer)
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.blueAccent,
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withValues(
+                                                  alpha: 0.4,
+                                                ),
+                                                blurRadius: 4,
+                                                offset: const Offset(2, 2),
+                                              ),
+                                            ],
+                                            border: Border.all(
+                                              color: Colors.white,
+                                              width: 2,
+                                            ),
+                                          ),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(8.0),
+                                            child: Image.asset(
+                                              'zob_assets/mechanic_icon.png',
+                                            ),
+                                          ),
                                         ),
-                                      ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Image.asset(
-                                          'zob_assets/mechanic_icon.png',
-                                        ),
-                                      ),
+                                        // Direction arrow (top layer)
+                                        if (_mechanicHeading != null && _mechanicHeading! >= 0)
+                                          Positioned(
+                                            top: -5,
+                                            right: -5,
+                                            child: Transform.rotate(
+                                              angle: (_mechanicHeading! * 3.14159) / 180, // Convert degrees to radians
+                                              child: Container(
+                                                width: 25,
+                                                height: 25,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.orange,
+                                                  shape: BoxShape.circle,
+                                                  border: Border.all(
+                                                    color: Colors.white,
+                                                    width: 1,
+                                                  ),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.navigation,
+                                                  color: Colors.white,
+                                                  size: 16,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                   ),
                               ],
@@ -373,6 +443,48 @@ class _DirectionPopupState extends State<DirectionPopup> {
                         style: AppTextStyles.body.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
+                      ),
+                    ),
+                  ),
+                // Loading indicator for route calculation
+                if (_isLoadingRoute)
+                  Positioned(
+                    top: 100,
+                    left: 20,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black26, blurRadius: 4),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.accent,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Calculating route...',
+                            style: AppTextStyles.body.copyWith(
+                              fontSize: 14,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

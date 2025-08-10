@@ -475,8 +475,8 @@ class _WelcomePageState extends State<WelcomePage>
                 verticalOffset: 50,
                 child: FadeInAnimation(
                   child: ModernActionButton(
-                    text: 'Login',
-                    icon: Icons.login,
+                    text: 'Get Started',
+                    icon: Icons.rocket_launch,
                     isPrimary: true,
                     isTablet: isTablet,
                     isDesktop: isDesktop,
@@ -498,13 +498,13 @@ class _WelcomePageState extends State<WelcomePage>
                 verticalOffset: 50,
                 child: FadeInAnimation(
                   child: ModernActionButton(
-                    text: 'Sign Up',
-                    icon: Icons.person_add,
+                    text: 'Browse',
+                    icon: Icons.explore,
                     isPrimary: false,
                     isTablet: isTablet,
                     isDesktop: isDesktop,
                     onPressed: () {
-                      Navigator.pushNamed(context, '/role');
+                      Navigator.pushNamed(context, '/userHome');
                     },
                   ),
                 ),

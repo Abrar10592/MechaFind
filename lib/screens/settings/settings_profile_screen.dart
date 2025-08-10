@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import '../../utils.dart';
 import '../../widgets/bottom_navbar.dart';
@@ -186,6 +188,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
                     value: true,
                     onChanged: (value) {},
                   ),
+                  _buildLanguageTile(),
                   _buildNavTile('Privacy Policy', Icons.privacy_tip),
                   _buildNavTile('Help & Support', Icons.help),
                   _buildNavTile('Logout', Icons.logout, onTap: _logout),
@@ -315,6 +318,98 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
         ),
       );
     }
+  }
+
+  Widget _buildLanguageTile() {
+    final currentLang = context.locale.languageCode;
+    final languageText = currentLang == 'en' ? 'English' : 'বাংলা';
+    final flagEmoji = currentLang == 'en' ? '🇺🇸' : '🇧🇩';
+    
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(Icons.language, color: AppColors.primary),
+      title: Text('Language / ভাষা', style: AppTextStyles.body),
+      subtitle: Row(
+        children: [
+          Text(flagEmoji, style: TextStyle(fontSize: 16)),
+          SizedBox(width: 8),
+          Text(languageText, style: AppTextStyles.label),
+        ],
+      ),
+      trailing: Icon(Icons.chevron_right, color: Colors.grey),
+      onTap: _showLanguageDialog,
+    );
+  }
+
+  void _showLanguageDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Select Language / ভাষা নির্বাচন করুন', style: AppTextStyles.heading),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<String>(
+              title: Row(
+                children: [
+                  Text('🇺🇸', style: TextStyle(fontSize: 20)),
+                  SizedBox(width: 12),
+                  Text('English', style: AppTextStyles.body),
+                ],
+              ),
+              value: 'en',
+              groupValue: context.locale.languageCode,
+              onChanged: (value) => _changeLanguage(value!),
+              activeColor: AppColors.primary,
+            ),
+            RadioListTile<String>(
+              title: Row(
+                children: [
+                  Text('🇧🇩', style: TextStyle(fontSize: 20)),
+                  SizedBox(width: 12),
+                  Text('বাংলা', style: AppTextStyles.body),
+                ],
+              ),
+              value: 'bn',
+              groupValue: context.locale.languageCode,
+              onChanged: (value) => _changeLanguage(value!),
+              activeColor: AppColors.primary,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel / বাতিল'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _changeLanguage(String languageCode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('lang_code', languageCode);
+    
+    final newLocale = Locale(languageCode);
+    await context.setLocale(newLocale);
+    
+    Navigator.pop(context); // Close dialog
+    
+    setState(() {}); // Rebuild to reflect language change
+    
+    // Show feedback to user
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          languageCode == 'en' 
+            ? 'Language changed to English' 
+            : 'ভাষা বাংলায় পরিবর্তিত হয়েছে'
+        ),
+        backgroundColor: Colors.green,
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   void _logout() {

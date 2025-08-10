@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'selected_role.dart'; // Import the global variable
 
 // Import your utilities—update this path if necessary
@@ -53,8 +54,10 @@ class RoleSelectionPage extends StatelessWidget {
                 'Find nearby mechanics',
                 'Real-time tracking',
               ],
-              onTap: () {
+              onTap: () async {
                 selectedRole = 'user';
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('selected_role', 'user');
                 Navigator.pushNamed(context, '/signup');
               },
               cardColor: Colors.white.withOpacity(0.07),
@@ -72,8 +75,10 @@ class RoleSelectionPage extends StatelessWidget {
                 'Manage availability',
                 'Build your reputation',
               ],
-              onTap: () {
+              onTap: () async {
                 selectedRole = 'mechanic';
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('selected_role', 'mechanic');
                 Navigator.pushNamed(context, '/signup');
               },
               cardColor: Colors.white.withOpacity(0.07),

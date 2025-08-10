@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:mechfind/utils.dart';
 import 'location_service.dart';
 import 'mechanic_card.dart';
@@ -83,7 +84,7 @@ class _UserHomePageState extends State<UserHomePage> {
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         title: Text(
-          'Good morning, $userName!',
+          'good_morning'.tr(namedArgs: {'name': userName}),
           style: AppTextStyles.heading.copyWith(
             color: Colors.white,
             fontFamily: AppFonts.primaryFont,
@@ -113,7 +114,7 @@ class _UserHomePageState extends State<UserHomePage> {
             const EmergencyButton(),
             const SizedBox(height: 30),
             Text(
-              'Nearby Mechanics',
+              'nearby_mechanics'.tr(),
               style: AppTextStyles.heading.copyWith(
                 fontSize: FontSizes.subHeading,
                 fontFamily: AppFonts.primaryFont,

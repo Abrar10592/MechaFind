@@ -47,6 +47,17 @@
   "nearby_sos_requests": "নিকটবর্তী এসওএস অনুরোধসমূহ",
   "home": "হোম",
   "map": "মানচিত্র",
-  "profile": "প্রোফাইল"
-  
+  "profile": "প্রোফাইল",
+  "find_your_mechanic": "আপনার মেকানিক খুঁজুন",
+  "skip": "এড়িয়ে যান",
+  "next": "পরবর্তী",
+  "get_started": "শুরু করুন",
+  "find_mechanics_nearby": "কাছাকাছি মেকানিক খুঁজুন",
+  "find_qualified_mechanics_description": "দ্রুত এবং নির্ভরযোগ্য গাড়ি মেরামতের জন্য আপনার এলাকার যোগ্য মেকানিকদের সাথে যোগাযোগ করুন।",
+  "emergency_help": "জরুরি সাহায্য",
+  "get_emergency_assistance_description": "যখন আপনি আটকে থাকেন তখন তাৎক্ষণিক সহায়তা পান। কাছাকাছি মেকানিকদের কাছে এসওএস সিগন্যাল পাঠান।",
+  "real_time_tracking": "রিয়েল-টাইম ট্র্যাকিং",
+  "track_mechanic_location_description": "আপনার মেকানিকের অবস্থান রিয়েল-টাইমে ট্র্যাক করুন এবং তাদের আগমনের বিষয়ে আপডেট থাকুন।",
+  "good_morning": "সুপ্রভাত, {name}!",
+  "nearby_mechanics": "কাছাকাছি মেকানিক"
 }

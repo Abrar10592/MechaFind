@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mechfind/home.dart';
 import 'package:mechfind/mechanic/mechanic.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -12,10 +13,12 @@ import 'signin.dart';
 import 'role.dart';
 import 'user_home.dart';
 import 'find_mechanics.dart';
-import 'home.dart';
+
 import 'screens/history/history_page.dart';
 import 'screens/messages/messages_page.dart';
 import 'screens/settings/settings_profile_screen.dart';
+import 'screens/splash/splash_screen.dart';
+import 'screens/onboarding/onboarding_screen.dart';
 import 'utils.dart';
 
 Future<void> main() async {
@@ -177,9 +180,11 @@ class _MechFindAppState extends State<MechFindApp> {
         ),
       ),
       debugShowCheckedModeBanner: false,
-      initialRoute: '/',
+      initialRoute: '/splash',
       routes: {
-        '/': (context) => LandingPage(),
+        '/splash': (context) => const SplashScreen(),
+        '/onboarding': (context) => const OnboardingScreen(),
+        '/': (context) => const LandingPage(),
         '/signup': (context) => SignUpPage(),
         '/signin': (context) => SignInPage(),
         '/role': (context) => RoleSelectionPage(),

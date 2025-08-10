@@ -1,3 +1,5 @@
+// ignore_for_file: unused_field
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -8,10 +10,10 @@ class ActiveEmergencyRoutePage extends StatefulWidget {
   final LatLng userLocation;
 
   const ActiveEmergencyRoutePage({
-    Key? key,
+    super.key,
     required this.requestId,
     required this.userLocation,
-  }) : super(key: key);
+  });
 
   @override
   State<ActiveEmergencyRoutePage> createState() => _ActiveEmergencyRoutePageState();
@@ -302,10 +304,10 @@ class CallMechanicDialog extends StatelessWidget {
   final String mechanicName;
   final String phoneNumber;
   const CallMechanicDialog({
-    Key? key,
+    super.key,
     required this.mechanicName,
     required this.phoneNumber,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

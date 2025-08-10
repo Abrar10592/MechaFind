@@ -26,6 +26,7 @@ class SosCard extends StatefulWidget {
 class _SosCardState extends State<SosCard> {
   double? distanceInKm;
   String? placeName;
+  bool _isPlaceNameLoading = true;
 
   @override
   void initState() {
@@ -35,18 +36,23 @@ class _SosCardState extends State<SosCard> {
   }
 
   void _calculateDistance() {
-    if (widget.current_location != null &&
-        widget.request['lat'] != null &&
-        widget.request['lng'] != null) {
-      double distanceInMeters = Geolocator.distanceBetween(
-        widget.current_location!.latitude,
-        widget.current_location!.longitude,
-        widget.request['lat'],
-        widget.request['lng'],
-      );
-      setState(() {
-        distanceInKm = distanceInMeters / 1000;
-      });
+    try {
+      if (widget.current_location != null &&
+          widget.request['lat'] != null &&
+          widget.request['lng'] != null) {
+        double distanceInMeters = Geolocator.distanceBetween(
+          widget.current_location!.latitude,
+          widget.current_location!.longitude,
+          widget.request['lat'],
+          widget.request['lng'],
+        );
+        setState(() {
+          distanceInKm = distanceInMeters / 1000;
+        });
+      }
+    } catch (e) {
+      // Distance calculation failed, distanceInKm remains null
+      print('Error calculating distance: $e');
     }
   }
 
@@ -54,33 +60,50 @@ class _SosCardState extends State<SosCard> {
     final lat = widget.request['lat'];
     final lng = widget.request['lng'];
 
-    if (lat != null && lng != null) {
-      try {
-        final url = Uri.parse(
-          'https://api.mapbox.com/geocoding/v5/mapbox.places/$lng,$lat.json'
-          '?access_token=pk.eyJ1IjoiYWRpbDQyMCIsImEiOiJjbWRrN3dhb2wwdXRnMmxvZ2dhNmY2Nzc3In0.yrzJJ09yyfdT4Zg4Y_CJhQ&types=place,locality,address&limit=1',
-        );
+    if (lat == null || lng == null) {
+      setState(() {
+        placeName = 'Location unavailable';
+        _isPlaceNameLoading = false;
+      });
+      return;
+    }
 
-        final response = await http.get(url);
+    try {
+      final url = Uri.parse(
+        'https://api.mapbox.com/geocoding/v5/mapbox.places/$lng,$lat.json'
+        '?access_token=pk.eyJ1IjoiYWRpbDQyMCIsImEiOiJjbWRrN3dhb2wwdXRnMmxvZ2dhNmY2Nzc3In0.yrzJJ09yyfdT4Zg4Y_CJhQ&types=place,locality,address&limit=1',
+      );
 
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          final features = data['features'] as List?;
-          if (features != null && features.isNotEmpty) {
-            setState(() {
-              placeName = features.first['place_name'] ?? 'Unknown location';
-            });
-          } else {
-            placeName = 'Unknown location';
-          }
+      final response = await http.get(url).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => throw Exception('Network timeout'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final features = data['features'] as List?;
+        if (features != null && features.isNotEmpty) {
+          setState(() {
+            placeName = features.first['place_name'] ?? 'Nearby location';
+            _isPlaceNameLoading = false;
+          });
         } else {
-          placeName = 'Unknown location';
+          setState(() {
+            placeName = 'Nearby location';
+            _isPlaceNameLoading = false;
+          });
         }
-      } catch (_) {
-        placeName = 'Unknown location';
+      } else {
+        setState(() {
+          placeName = 'Nearby location';
+          _isPlaceNameLoading = false;
+        });
       }
-
-      setState(() {});
+    } catch (e) {
+      setState(() {
+        placeName = 'Nearby location';
+        _isPlaceNameLoading = false;
+      });
     }
   }
 
@@ -103,38 +126,44 @@ class _SosCardState extends State<SosCard> {
               children: [
                 CircleAvatar(
                   radius: 28,
-                  backgroundImage: request['image'] != null
-                      ? NetworkImage(request['image_url']?.toString() ?? '')
-                      : const AssetImage('assets/images/default_user.png')
+                  backgroundImage: (request['image_url'] != null && 
+                      request['image_url'].toString().isNotEmpty)
+                      ? NetworkImage(request['image_url'].toString())
+                      : const AssetImage('zob_assets/user_icon.png')
                           as ImageProvider,
                 ),
                 const SizedBox(width: 14),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      request['user_name']?.toString() ?? 'Unknown',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        request['user_name']?.toString() ?? 'Unknown User',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    Text(
-                      request['vehicle']?.toString() ?? 'Unknown',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 14,
+                      Text(
+                        request['vehicle']?.toString() ?? 'Unknown Vehicle',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 if (distanceInKm != null)
                   Text(
                     '${distanceInKm!.toStringAsFixed(1)} km',
                     style: const TextStyle(
                       color: Colors.blue,
                       fontWeight: FontWeight.bold,
+                      fontSize: 14,
                     ),
                   ),
               ],
@@ -144,7 +173,8 @@ class _SosCardState extends State<SosCard> {
             /// Issue Image (full width)
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: request['image'] != null
+              child: (request['image'] != null && 
+                  request['image'].toString().isNotEmpty)
                   ? Image.network(
                       request['image'],
                       height: 180,
@@ -184,12 +214,17 @@ class _SosCardState extends State<SosCard> {
                 const Icon(Icons.location_on, size: 18, color: Colors.grey),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text(
-                    placeName ?? 'Loading location...',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 14),
-                  ),
+                  child: _isPlaceNameLoading
+                      ? const Text(
+                          'Loading location...',
+                          style: TextStyle(fontSize: 14, color: Colors.grey),
+                        )
+                      : Text(
+                          placeName ?? 'Nearby location',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 14),
+                        ),
                 ),
               ],
             ),

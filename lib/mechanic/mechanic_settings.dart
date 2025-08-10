@@ -13,7 +13,7 @@ class _MechanicSettingsState extends State<MechanicSettings> {
   bool pushNotifications = true;
   bool locationAccess = true;
   bool autoAcceptRequests = false;
-  String _selectedLanguage = 'en';
+  String selectedLanguage = 'en';
   
   // Privacy & Security settings
   bool otpForUnknownLogin = true;
@@ -28,15 +28,10 @@ class _MechanicSettingsState extends State<MechanicSettings> {
     _loadSettings();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _selectedLanguage = context.locale.languageCode;
-  }
-
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
+      selectedLanguage = context.locale.languageCode;
       otpForUnknownLogin = prefs.getBool('otp_unknown_login') ?? true;
       twoFactorAuth = prefs.getBool('two_factor_auth') ?? false;
       selectedServiceArea = prefs.getString('service_area') ?? 'ঢাকা, বাংলাদেশ';
@@ -48,25 +43,6 @@ class _MechanicSettingsState extends State<MechanicSettings> {
     await prefs.setBool('otp_unknown_login', otpForUnknownLogin);
     await prefs.setBool('two_factor_auth', twoFactorAuth);
     await prefs.setString('service_area', selectedServiceArea);
-  }
-
-  Future<void> _changeLanguage(String langCode) async {
-    final newLocale = Locale(langCode);
-    await context.setLocale(newLocale);
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('lang_code', langCode);
-
-    setState(() {
-      _selectedLanguage = langCode;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(langCode == 'en' ? 'Language changed to English' : 'ভাষা বাংলায় পরিবর্তিত হয়েছে'),
-        duration: Duration(seconds: 2),
-      ),
-    );
   }
 
   void _showContactSupport() {
@@ -417,22 +393,9 @@ class _MechanicSettingsState extends State<MechanicSettings> {
               });
             }
           ),
-          Text(
-            context.locale.languageCode == 'en' ? 'Language' : 'ভাষা',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          RadioListTile(
-            title: Text('English'),
-            value: 'en',
-            groupValue: _selectedLanguage,
-            onChanged: (value) => _changeLanguage(value as String),
-          ),
-          RadioListTile(
-            title: Text('বাংলা (Bangla)'),
-            value: 'bn',
-            groupValue: _selectedLanguage,
-            onChanged: (value) => _changeLanguage(value as String),
-          ),
+          const SizedBox(height: 20),
+          _buildSectionTitle(context.locale.languageCode == 'en' ? 'Language' : 'ভাষা'),
+          _buildLanguageSelector(),
           const SizedBox(height: 20),
           _buildSectionTitle(context.locale.languageCode == 'en' ? 'Work Preferences' : 'কাজের পছন্দ'),
           _buildToggleItem(
@@ -526,19 +489,22 @@ class _MechanicSettingsState extends State<MechanicSettings> {
   Widget _buildSignOutButton(BuildContext context) {
     return Center(
       child: SizedBox(
-        width: 200, // Fixed width
-        height: 45, // Fixed height
+        width: 200,
+        height: 45,
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.red,
             foregroundColor: Colors.white,
           ),
-          onPressed: () {
+          onPressed: () async {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.clear(); // Clear all stored user data
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(context.locale.languageCode == 'en' ? 'Signed out' : 'সাইন আউট হয়েছে')
               )
             );
+            Navigator.of(context).pushNamedAndRemoveUntil('/signin', (route) => false);
           },
           child: Text(context.locale.languageCode == 'en' ? 'Sign Out' : 'সাইন আউট'),
         ),
@@ -588,6 +554,70 @@ class _MechanicSettingsState extends State<MechanicSettings> {
           },
           child: Text(context.locale.languageCode == 'en' ? 'Delete Account' : 'অ্যাকাউন্ট মুছুন'),
         ),
+      ),
+    );
+  }
+
+  Widget _buildLanguageSelector() {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: [
+          RadioListTile<String>(
+            title: Row(
+              children: [
+                Text('🇺🇸', style: TextStyle(fontSize: 20)),
+                SizedBox(width: 12),
+                Text('English'),
+              ],
+            ),
+            value: 'en',
+            groupValue: selectedLanguage,
+            onChanged: (value) => _changeLanguage(value!),
+            activeColor: Colors.blue,
+          ),
+          Divider(height: 1, color: Colors.grey.shade300),
+          RadioListTile<String>(
+            title: Row(
+              children: [
+                Text('🇧🇩', style: TextStyle(fontSize: 20)),
+                SizedBox(width: 12),
+                Text('বাংলা'),
+              ],
+            ),
+            value: 'bn',
+            groupValue: selectedLanguage,
+            onChanged: (value) => _changeLanguage(value!),
+            activeColor: Colors.blue,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _changeLanguage(String languageCode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('lang_code', languageCode);
+    
+    final newLocale = Locale(languageCode);
+    await context.setLocale(newLocale);
+    
+    setState(() {
+      selectedLanguage = languageCode;
+    });
+    
+    // Show feedback to user
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          languageCode == 'en' 
+            ? 'Language changed to English' 
+            : 'ভাষা বাংলায় পরিবর্তিত হয়েছে'
+        ),
+        duration: Duration(seconds: 2),
       ),
     );
   }

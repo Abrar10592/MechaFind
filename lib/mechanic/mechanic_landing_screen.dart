@@ -41,7 +41,7 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initLocationSetup();
-    _fetchMechanicData();
+    // Don't call _fetchMechanicData() here - it will be called after location is ready
     _setupRealtimeSubscription();
   }
 
@@ -71,12 +71,18 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
       serviceEnabled = await _locationController.requestService();
       if (!serviceEnabled) {
         setState(() {
-          _errorMessage = 'Location service is disabled';
+          _errorMessage = 'Please enable location services to receive nearby requests';
           _isLoading = false;
         });
         print('Location service still disabled');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enable location services')),
+          SnackBar(
+            content: const Text('Location services are required to show nearby requests'),
+            action: SnackBarAction(
+              label: 'Retry',
+              onPressed: () => _initLocationSetup(),
+            ),
+          ),
         );
         return;
       }
@@ -89,12 +95,18 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
       permissionGranted = await _locationController.requestPermission();
       if (permissionGranted != PermissionStatus.granted) {
         setState(() {
-          _errorMessage = 'Location permission denied';
+          _errorMessage = 'Location permission is required to show nearby requests';
           _isLoading = false;
         });
         print('Location permission status: $permissionGranted');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please grant location permissions')),
+          SnackBar(
+            content: const Text('Location permission is required to show nearby requests'),
+            action: SnackBarAction(
+              label: 'Retry',
+              onPressed: () => _initLocationSetup(),
+            ),
+          ),
         );
         return;
       }
@@ -103,9 +115,9 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
 
     try {
       final locationData = await _locationController.getLocation().timeout(
-        const Duration(seconds: 10),
+        const Duration(seconds: 15),
         onTimeout: () {
-          throw Exception('Location fetch timed out');
+          throw Exception('Location access timed out');
         },
       );
       if (locationData.latitude != null && locationData.longitude != null) {
@@ -116,21 +128,54 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         if (mounted) {
           setState(() {
             _currentPosition = newPosition;
+            _errorMessage = null; // Clear any previous errors
           });
           print('One-time location fetched: ${_currentPosition!.latitude}, ${_currentPosition!.longitude}');
+          
+          // Now that we have location, fetch mechanic data with distance filtering
+          _fetchMechanicData();
         }
       } else {
         print('Invalid one-time location data: $locationData');
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'Unable to get precise location';
+          });
+        }
       }
     } catch (e) {
       print('Error fetching one-time location: $e');
-      setState(() {
-        _errorMessage = 'Failed to fetch location: $e';
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to fetch location: $e')),
-      );
+      String userFriendlyError;
+      if (e.toString().contains('timeout') || e.toString().contains('timed out')) {
+        userFriendlyError = 'Location access is taking longer than usual. Please check your GPS signal.';
+      } else if (e.toString().contains('permission') || e.toString().contains('denied')) {
+        userFriendlyError = 'Location permission is required to show nearby requests.';
+      } else if (e.toString().contains('service') || e.toString().contains('disabled')) {
+        userFriendlyError = 'Please enable location services in your device settings.';
+      } else {
+        userFriendlyError = 'Unable to access location. The app will continue with limited functionality.';
+      }
+      
+      if (mounted) {
+        setState(() {
+          _errorMessage = userFriendlyError;
+          _isLoading = false;
+        });
+        
+        // Only show snackbar for critical errors, not timeouts
+        if (!e.toString().contains('timeout')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(userFriendlyError),
+              duration: const Duration(seconds: 4),
+              action: SnackBarAction(
+                label: 'Retry',
+                onPressed: () => _initLocationSetup(),
+              ),
+            ),
+          );
+        }
+      }
     }
 
     if (!_hasListenerAttached) {
@@ -146,6 +191,9 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
               _currentPosition = newPosition;
             });
             print('Location updated: ${_currentPosition!.latitude}, ${_currentPosition!.longitude}');
+            
+            // Refetch data when location changes significantly
+            _fetchMechanicData();
           }
         } else {
           print('Invalid location data from stream: $locationData');
@@ -163,6 +211,11 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
   }
 
   Future<void> _updateMechanicLocation(String requestId, LatLng position) async {
+    if (requestId.isEmpty) {
+      print('Error: Cannot update location - requestId is empty');
+      return;
+    }
+    
     try {
       await supabase
           .from('requests')
@@ -174,9 +227,8 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
       print('Mechanic location updated for request $requestId: ${position.latitude}, ${position.longitude}');
     } catch (e) {
       print('Error updating mechanic location for request $requestId: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating location: $e')),
-      );
+      // Don't show error to user for location updates as it's background operation
+      // Only log the error for debugging
     }
   }
 
@@ -185,7 +237,7 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
     _acceptedRequestId = requestId;
     _lastUpdatedPosition = _currentPosition;
     _locationUpdateTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
-      if (_acceptedRequestId == null || !mounted) {
+      if (_acceptedRequestId == null || _acceptedRequestId!.isEmpty || !mounted) {
         timer.cancel();
         print('Location update timer canceled: No active request or widget disposed');
         return;
@@ -194,7 +246,7 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
       final request = await supabase
           .from('requests')
           .select('status')
-          .eq('id', _acceptedRequestId ?? '')
+          .eq('id', _acceptedRequestId!)
           .single();
       if (request['status'] != 'accepted') {
         timer.cancel();
@@ -269,24 +321,64 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
       print('Reviews fetched: ${reviewsResponse.length}');
 
       List<Map<String, dynamic>> filteredRequests = [];
+      const double maxDistanceKm = 10.0;
+      final latlng.Distance distanceCalc = const latlng.Distance();
+      
+      // Convert _currentPosition to latlng.LatLng for distance calculation
+      latlng.LatLng? currentLatLng;
+      if (_currentPosition != null) {
+        currentLatLng = latlng.LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
+        print('🔄 Current position converted: ${currentLatLng.latitude}, ${currentLatLng.longitude}');
+      } else {
+        print('❌ _currentPosition is null');
+      }
+      
       for (var request in pendingResponse) {
         print('Request data: $request');
         final lat = double.tryParse(request['lat']?.toString() ?? '') ?? 0.0;
         final lng = double.tryParse(request['lng']?.toString() ?? '') ?? 0.0;
-        filteredRequests.add({
-          'id': request['id'],
-          'user_id': request['user_id'],
-          'vehicle': request['vehicle']?.toString() ?? 'Unknown',
-          'description': request['description']?.toString() ?? 'No description',
-          'image': request['image']?.toString(),
-          'lat': lat,
-          'lng': lng,
-          'user_name': request['users']?['full_name']?.toString() ?? 'Unknown',
-          'phone': request['users']?['phone']?.toString() ?? 'N/A',
-          'image_url': request['users']?['image_url']?.toString(),
-        });
+        
+        print('🎯 Parsed coordinates: lat=$lat, lng=$lng');
+        print('🎯 Validation check: currentLatLng != null = ${currentLatLng != null}, lat != 0.0 = ${lat != 0.0}, lng != 0.0 = ${lng != 0.0}');
+        
+        // Calculate distance between mechanic and SOS request using the same logic as mechanic_map
+        if (currentLatLng != null && lat != 0.0 && lng != 0.0) {
+          final point = latlng.LatLng(lat, lng);
+          final distance = distanceCalc.as(
+            latlng.LengthUnit.Kilometer,
+            currentLatLng,
+            point,
+          );
+          
+          print('Request ${request['id']}: Distance = ${distance.toStringAsFixed(2)} km');
+          
+          // Only add requests within 10 km radius
+          if (distance <= maxDistanceKm) {
+            print('✅ Request ${request['id']} ADDED (within ${maxDistanceKm}km)');
+            filteredRequests.add({
+              'id': request['id'],
+              'user_id': request['user_id'],
+              'vehicle': request['vehicle']?.toString() ?? 'Unknown',
+              'description': request['description']?.toString() ?? 'No description',
+              'image': request['image']?.toString(),
+              'lat': lat,
+              'lng': lng,
+              'user_name': request['users']?['full_name']?.toString() ?? 'Unknown',
+              'phone': request['users']?['phone']?.toString() ?? 'N/A',
+              'image_url': request['users']?['image_url']?.toString(),
+            });
+          } else {
+            print('❌ Request ${request['id']} REJECTED (${distance.toStringAsFixed(2)}km > ${maxDistanceKm}km)');
+          }
+        } else {
+          print('❌ Request ${request['id']} REJECTED (invalid location data)');
+        }
+        // If location data is missing, don't show the request
       }
 
+      print('📊 Distance Filtering Summary:');
+      print('   Total requests from database: ${pendingResponse.length}');
+      print('   Filtered requests (within ${maxDistanceKm}km): ${filteredRequests.length}');
       print('Filtered requests: $filteredRequests');
 
       double totalRating = 0.0;
@@ -364,8 +456,11 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         .subscribe((status, [error]) {
           print('Subscription status: $status, Error: $error');
           if (status == 'SUBSCRIPTION_ERROR' && error != null) {
+            // Don't show technical subscription errors to users
+            // Just log them and continue with app functionality
+            print('Subscription error occurred: $error');
             setState(() {
-              _errorMessage = 'Subscription error: $error';
+              _errorMessage = 'Connection issue. Some features may be limited.';
             });
           }
         });
@@ -375,7 +470,7 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
     final user = supabase.auth.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User not logged in')),
+        const SnackBar(content: Text('Please log in to accept requests')),
       );
       print('Error: User not logged in during accept request');
       return;
@@ -408,7 +503,10 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Request accepted')),
+        const SnackBar(
+          content: Text('Request accepted successfully'),
+          backgroundColor: Colors.green,
+        ),
       );
       print('Request $requestId accepted');
 
@@ -416,13 +514,33 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         _startLocationUpdateTimer(requestId);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to track location: Please ensure location services are enabled')),
+          const SnackBar(
+            content: Text('Location tracking unavailable. Please ensure GPS is enabled.'),
+            duration: Duration(seconds: 3),
+          ),
         );
         print('Cannot start location update timer: No current position');
       }
     } catch (e) {
+      String errorMessage;
+      if (e.toString().contains('network') || e.toString().contains('connection')) {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (e.toString().contains('permission') || e.toString().contains('auth')) {
+        errorMessage = 'Authentication error. Please log in again.';
+      } else {
+        errorMessage = 'Unable to accept request. Please try again.';
+      }
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error accepting request: $e')),
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+          action: SnackBarAction(
+            label: 'Retry',
+            textColor: Colors.white,
+            onPressed: () => _acceptRequest(requestId),
+          ),
+        ),
       );
       print('Error accepting request $requestId: $e');
     }

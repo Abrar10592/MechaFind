@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mechfind/utils.dart';
-import '../selected_role.dart';
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -77,6 +77,10 @@ class _SignInPageState extends State<SignInPage> {
       }
 
       final String role = userRecord['role'];
+
+      // Store user role in SharedPreferences for session persistence
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_role', role);
 
       if (role == 'mechanic') {
         final mechanicRecord = await supabase.from('mechanics').select().eq('id', userId).maybeSingle();
