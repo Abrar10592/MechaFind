@@ -3,6 +3,7 @@ import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
 import 'dart:math' as math;
 import 'package:mechfind/utils.dart';
+import 'user_home.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -17,7 +18,7 @@ class _LandingPageState extends State<LandingPage>
   late AnimationController _pulseController;
   late AnimationController _rotationController;
   late AnimationController _glowController;
-  
+
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   late Animation<double> _pulseAnimation;
@@ -99,7 +100,7 @@ class _LandingPageState extends State<LandingPage>
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
     final isDesktop = size.width > 1024;
-    
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
@@ -119,10 +120,10 @@ class _LandingPageState extends State<LandingPage>
           children: [
             // Animated background elements
             _buildAnimatedBackground(),
-            
+
             // Floating particles effect
             _buildFloatingParticles(),
-            
+
             // Main content
             SafeArea(
               child: AnimatedBuilder(
@@ -155,7 +156,7 @@ class _LandingPageState extends State<LandingPage>
               final angle = _rotationAnimation.value + (index * math.pi / 4);
               final radius = 150.0 + (index * 30);
               final size = MediaQuery.of(context).size;
-              
+
               return Positioned(
                 left: size.width / 2 + math.cos(angle) * radius - 15,
                 top: size.height / 2 + math.sin(angle) * radius - 15,
@@ -171,7 +172,7 @@ class _LandingPageState extends State<LandingPage>
             },
           );
         }),
-        
+
         // Grid pattern overlay
         Positioned.fill(
           child: CustomPaint(
@@ -227,8 +228,8 @@ class _LandingPageState extends State<LandingPage>
   Widget _buildMainContent({required bool isTablet, required bool isDesktop}) {
     return Padding(
       padding: EdgeInsets.symmetric(
-        horizontal: isDesktop ? 48.0 : isTablet ? 32.0 : 24.0, 
-        vertical: 8.0
+          horizontal: isDesktop ? 48.0 : isTablet ? 32.0 : 24.0,
+          vertical: 8.0
       ),
       child: Column(
         children: [
@@ -301,9 +302,9 @@ class _LandingPageState extends State<LandingPage>
             ),
           ),
         ),
-        
+
         const SizedBox(height: 20),
-        
+
         // Animated title
         AnimationConfiguration.staggeredList(
           position: 1,
@@ -338,9 +339,9 @@ class _LandingPageState extends State<LandingPage>
             ),
           ),
         ),
-        
+
         const SizedBox(height: 12),
-        
+
         // Subtitle
         AnimationConfiguration.staggeredList(
           position: 2,
@@ -405,7 +406,7 @@ class _LandingPageState extends State<LandingPage>
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        if (isDesktop) 
+        if (isDesktop)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: features.asMap().entries.map((entry) {
@@ -421,30 +422,30 @@ class _LandingPageState extends State<LandingPage>
               );
             }).toList(),
           )
-        else 
+        else
           ...features.asMap().entries.map((entry) {
             final index = entry.key;
             final feature = entry.value;
-          
-          return AnimationConfiguration.staggeredList(
-            position: index,
-            duration: const Duration(milliseconds: 600),
-            delay: Duration(milliseconds: 1200 + (index * 200)),
-            child: SlideAnimation(
-              horizontalOffset: index.isEven ? -50 : 50,
-              child: FadeInAnimation(
-                child: Container(
-                  margin: const EdgeInsets.symmetric(vertical: 4),
-                  child: ModernFeatureItem(
-                    icon: feature.icon,
-                    text: feature.text,
-                    color: feature.color,
+
+            return AnimationConfiguration.staggeredList(
+              position: index,
+              duration: const Duration(milliseconds: 600),
+              delay: Duration(milliseconds: 1200 + (index * 200)),
+              child: SlideAnimation(
+                horizontalOffset: index.isEven ? -50 : 50,
+                child: FadeInAnimation(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    child: ModernFeatureItem(
+                      icon: feature.icon,
+                      text: feature.text,
+                      color: feature.color,
+                    ),
                   ),
                 ),
               ),
-            ),
-          );
-        }).toList(),
+            );
+          }).toList(),
       ],
     );
   }
@@ -452,53 +453,12 @@ class _LandingPageState extends State<LandingPage>
   Widget _buildActionButtons({required bool isTablet, required bool isDesktop}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: isDesktop ? 
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            Expanded(
-              child: AnimationConfiguration.staggeredList(
-                position: 0,
-                duration: const Duration(milliseconds: 600),
-                delay: const Duration(milliseconds: 2000),
-                child: SlideAnimation(
-                  verticalOffset: 50,
-                  child: FadeInAnimation(
-                    child: GlowingButton(
-                      text: 'Get Started',
-                      primaryColor: AppColors.tealPrimary,
-                      secondaryColor: AppColors.tealSecondary,
-                      icon: Icons.rocket_launch,
-                      isTablet: isTablet,
-                      isDesktop: isDesktop,
-                      onPressed: () {
-                        Navigator.pushNamed(context, '/home');
-                      },
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: AnimationConfiguration.staggeredList(
-                position: 1,
-                duration: const Duration(milliseconds: 600),
-                delay: const Duration(milliseconds: 2200),
-                child: SlideAnimation(
-                  verticalOffset: 50,
-                  child: FadeInAnimation(
-                    child: _buildSecondaryButton(isTablet: isTablet, isDesktop: isDesktop),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ) :
-        Column(
-          children: [
-            // Primary button
-            AnimationConfiguration.staggeredList(
+      child: isDesktop ?
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          Expanded(
+            child: AnimationConfiguration.staggeredList(
               position: 0,
               duration: const Duration(milliseconds: 600),
               delay: const Duration(milliseconds: 2000),
@@ -519,23 +479,64 @@ class _LandingPageState extends State<LandingPage>
                 ),
               ),
             ),
-            
-            const SizedBox(height: 8),
-            
-            // Secondary button
-            AnimationConfiguration.staggeredList(
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: AnimationConfiguration.staggeredList(
               position: 1,
               duration: const Duration(milliseconds: 600),
               delay: const Duration(milliseconds: 2200),
               child: SlideAnimation(
-                verticalOffset: 30,
+                verticalOffset: 50,
                 child: FadeInAnimation(
                   child: _buildSecondaryButton(isTablet: isTablet, isDesktop: isDesktop),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
+      ) :
+      Column(
+        children: [
+          // Primary button
+          AnimationConfiguration.staggeredList(
+            position: 0,
+            duration: const Duration(milliseconds: 600),
+            delay: const Duration(milliseconds: 2000),
+            child: SlideAnimation(
+              verticalOffset: 50,
+              child: FadeInAnimation(
+                child: GlowingButton(
+                  text: 'Get Started',
+                  primaryColor: AppColors.tealPrimary,
+                  secondaryColor: AppColors.tealSecondary,
+                  icon: Icons.rocket_launch,
+                  isTablet: isTablet,
+                  isDesktop: isDesktop,
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/home');
+                  },
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          // Secondary button
+          AnimationConfiguration.staggeredList(
+            position: 1,
+            duration: const Duration(milliseconds: 600),
+            delay: const Duration(milliseconds: 2200),
+            child: SlideAnimation(
+              verticalOffset: 30,
+              child: FadeInAnimation(
+                child: _buildSecondaryButton(isTablet: isTablet, isDesktop: isDesktop),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -558,7 +559,10 @@ class _LandingPageState extends State<LandingPage>
       ),
       child: OutlinedButton(
         onPressed: () {
-          Navigator.pushNamed(context, '/userHome');
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const UserHomePage(isGuest: true)),
+          );
         },
         style: OutlinedButton.styleFrom(
           backgroundColor: Colors.transparent,
@@ -675,8 +679,8 @@ class _ModernFeatureItemState extends State<ModernFeatureItem>
             onTapCancel: () => _hoverController.reverse(),
             child: Container(
               padding: EdgeInsets.symmetric(
-                horizontal: widget.isDesktop ? 20 : widget.isTablet ? 18 : 16, 
-                vertical: widget.isDesktop ? 16 : widget.isTablet ? 14 : 12
+                  horizontal: widget.isDesktop ? 20 : widget.isTablet ? 18 : 16,
+                  vertical: widget.isDesktop ? 16 : widget.isTablet ? 14 : 12
               ),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -822,7 +826,7 @@ class _GlowingButtonState extends State<GlowingButton>
             boxShadow: [
               BoxShadow(
                 color: widget.primaryColor.withOpacity(
-                  0.3 + (_glowAnimation.value * 0.2)
+                    0.3 + (_glowAnimation.value * 0.2)
                 ),
                 blurRadius: 20,
                 spreadRadius: _glowAnimation.value * 4,
@@ -873,7 +877,7 @@ class LandingGridPatternPainter extends CustomPainter {
       ..strokeWidth = 1;
 
     const spacing = 80.0;
-    
+
     // Draw vertical lines
     for (double x = 0; x < size.width; x += spacing) {
       canvas.drawLine(
@@ -882,7 +886,7 @@ class LandingGridPatternPainter extends CustomPainter {
         paint,
       );
     }
-    
+
     // Draw horizontal lines
     for (double y = 0; y < size.height; y += spacing) {
       canvas.drawLine(
