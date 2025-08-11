@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:mechfind/utils.dart';
@@ -8,13 +9,14 @@ import 'widgets/bottom_navbar.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 
 class UserHomePage extends StatefulWidget {
   final bool isGuest;
   const UserHomePage({super.key, this.isGuest = false});
 
   @override
-  State<UserHomePage> createState() => _UserHomePageState();
+  State createState() => _UserHomePageState();
 }
 
 class _UserHomePageState extends State<UserHomePage> {
@@ -30,11 +32,9 @@ class _UserHomePageState extends State<UserHomePage> {
     _checkLocationServiceAndLoad();
   }
 
-  /// Check if device location service is enabled; if not, prompt user to enable it
-  Future<void> _checkLocationServiceAndLoad() async {
+  Future _checkLocationServiceAndLoad() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      // Opens the native settings screen
       await Geolocator.openLocationSettings();
       serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
@@ -44,11 +44,9 @@ class _UserHomePageState extends State<UserHomePage> {
                 content: Text('Location services are required to use this app.')),
           );
         }
-        return; // stop here if still not enabled
+        return;
       }
     }
-
-    // Now safe to proceed
     await fetchUserLocation();
     if (widget.isGuest) {
       await _insertGuestSession();
@@ -58,18 +56,17 @@ class _UserHomePageState extends State<UserHomePage> {
     await _fetchMechanicsFromDB();
   }
 
-  Future<void> _insertGuestSession() async {
+  Future _insertGuestSession() async {
     try {
       final supabase = Supabase.instance.client;
-      final sessionInfo =
-          'Guest session at ${DateTime.now().toIso8601String()}';
+      final sessionInfo = 'Guest session at ${DateTime.now().toIso8601String()}';
       await supabase.from('guests').insert({'session_info': sessionInfo});
     } catch (e) {
       print("❌ Guest insert error: $e");
     }
   }
 
-  Future<void> _fetchUserName() async {
+  Future _fetchUserName() async {
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
@@ -87,7 +84,7 @@ class _UserHomePageState extends State<UserHomePage> {
     }
   }
 
-  Future<void> fetchUserLocation() async {
+  Future fetchUserLocation() async {
     final location = await LocationService.getCurrentLocation(context);
     if (location != null) {
       final parts = location.split(', ');
@@ -100,7 +97,7 @@ class _UserHomePageState extends State<UserHomePage> {
     }
   }
 
-  Future<String> getAddressFromLatLng(double lat, double lng) async {
+  Future getAddressFromLatLng(double lat, double lng) async {
     try {
       List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
       Placemark place = placemarks.first;
@@ -127,7 +124,7 @@ class _UserHomePageState extends State<UserHomePage> {
 
   double _deg2rad(double deg) => deg * (math.pi / 180);
 
-  Future<void> _fetchMechanicsFromDB() async {
+  Future _fetchMechanicsFromDB() async {
     if (userLat == null || userLng == null) {
       print("⚠️ No user location yet");
       return;
@@ -142,7 +139,6 @@ class _UserHomePageState extends State<UserHomePage> {
             users(full_name, image_url),
             mechanic_services(service_id, services(name))
             ''');
-
       List<Map<String, dynamic>> mechanicsList = [];
       for (final mech in mechanicData) {
         final mLat = mech['location_x'] is double
@@ -175,6 +171,122 @@ class _UserHomePageState extends State<UserHomePage> {
     } catch (e) {
       print("❌ Fetch mechanics error: $e");
     }
+  }
+
+  // Request Service popup dialog
+  void _showRequestServiceDialog(Map<String, dynamic> mechanic) {
+    final vehicleController = TextEditingController();
+    final problemController = TextEditingController();
+    XFile? pickedImage;
+    final picker = ImagePicker();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              title: Text('Request Service from ${mechanic['name']}'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        "Your Location:",
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        currentLocation,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: vehicleController,
+                      decoration: const InputDecoration(
+                        labelText: 'Vehicle Model',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: problemController,
+                      decoration: const InputDecoration(
+                        labelText: 'Problem Description',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 10),
+                    pickedImage != null
+                        ? Image.file(File(pickedImage!.path), height: 120)
+                        : const Text('No image selected'),
+                    const SizedBox(height: 10),
+                    // Pick image button (different color)
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange, // DIFFERENT COLOR
+                      ),
+                      icon: const Icon(Icons.camera_alt),
+                      label: const Text('Pick Image'),
+                      onPressed: () async {
+                        final img = await picker.pickImage(
+                            source: ImageSource.camera, imageQuality: 70);
+                        if (img != null) {
+                          setState(() => pickedImage = img);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel')),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue, // Submit button color
+                  ),
+                  onPressed: () {
+                    if (vehicleController.text.isEmpty ||
+                        problemController.text.isEmpty ||
+                        pickedImage == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text(
+                                'Please fill all fields and pick an image')),
+                      );
+                      return;
+                    }
+                    // TODO: Insert to Supabase requests table if needed
+                    print('Mechanic ID: ${mechanic['id']}');
+                    print('Vehicle: ${vehicleController.text}');
+                    print('Problem: ${problemController.text}');
+                    print('Image: ${pickedImage!.path}');
+                    print('Location: $currentLocation');
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Request submitted')),
+                    );
+                  },
+                  child: const Text('Submit'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -253,7 +365,8 @@ class _UserHomePageState extends State<UserHomePage> {
                               width: 80,
                               height: 80,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
+                              errorBuilder:
+                                  (context, error, stackTrace) {
                                 return Container(
                                   width: 80,
                                   height: 80,
@@ -290,8 +403,7 @@ class _UserHomePageState extends State<UserHomePage> {
                                 Text('Distance: ${mech['distance']}'),
                                 Text('Rating: ${mech['rating']}'),
                                 const SizedBox(height: 4),
-                                Text(
-                                    'Services: ${mech['services'].join(', ')}'),
+                                Text('Services: ${mech['services'].join(', ')}'),
                               ],
                             ),
                           ),
@@ -301,12 +413,9 @@ class _UserHomePageState extends State<UserHomePage> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () {
-                            print("Request service from ${mech['name']}");
-                          },
+                          onPressed: () => _showRequestServiceDialog(mech),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.accent,
-                          ),
+                              backgroundColor: AppColors.accent),
                           child: const Text("Request Service"),
                         ),
                       ),
@@ -314,7 +423,7 @@ class _UserHomePageState extends State<UserHomePage> {
                   ),
                 );
               }).toList(),
-            )
+            ),
         ],
       ),
       bottomNavigationBar: BottomNavBar(
