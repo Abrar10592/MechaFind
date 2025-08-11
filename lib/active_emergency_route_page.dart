@@ -1,14 +1,12 @@
-// ignore_for_file: unused_field
-
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ActiveEmergencyRoutePage extends StatefulWidget {
   final String requestId;
   final LatLng userLocation;
-
   const ActiveEmergencyRoutePage({
     super.key,
     required this.requestId,
@@ -16,36 +14,165 @@ class ActiveEmergencyRoutePage extends StatefulWidget {
   });
 
   @override
-  State<ActiveEmergencyRoutePage> createState() => _ActiveEmergencyRoutePageState();
+  State createState() => _ActiveEmergencyRoutePageState();
 }
 
 class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage> {
   late Stream<Map<String, dynamic>?> _requestStream;
-  Map<String, dynamic>? _mechanicProfile;
 
   @override
   void initState() {
     super.initState();
-    // Listen to updates on the specific request row ("status","mechanic_id")
+    debugPrint(
+        '🚀 ActiveEmergencyRoutePage opened for requestId=${widget.requestId}');
+    debugPrint('🚀 Initial userLocation = ${widget.userLocation}');
     _requestStream = Supabase.instance.client
         .from('requests')
         .stream(primaryKey: ['id'])
         .eq('id', widget.requestId)
         .limit(1)
-        .map((events) => events.isNotEmpty ? events.first : null);
+        .map((events) {
+      debugPrint('📡 Supabase stream emitted event list: $events');
+      if (events.isNotEmpty) {
+        final row = events.first as Map<String, dynamic>;
+        debugPrint('📡 Row keys: ${row.keys}');
+        debugPrint('📡 Row data: $row');
+        return row;
+      }
+      return null;
+    });
   }
 
   Future<Map<String, dynamic>?> _fetchMechanicProfile(String mechanicId) async {
-    // Fetch mechanic info from DB (for demo: name, rating, photoURL, etc)
-    final res = await Supabase.instance.client
-        .from('mechanics')
-        .select('name, rating, image_url, lat, lng, phone, expertise')
-        .eq('id', mechanicId)
-        .maybeSingle();
-    return res;
+    debugPrint('🔍 Fetching mechanic profile for ID=$mechanicId');
+    try {
+      final res = await Supabase.instance.client
+          .from('mechanics')
+          .select('''
+            rating,
+            users(full_name, phone, image_url),
+            mechanic_services(services(name))
+          ''')
+          .eq('id', mechanicId)
+          .maybeSingle();
+      debugPrint('📡 Raw mechanic profile result: $res');
+      if (res == null) {
+        debugPrint('⚠️ No mechanic found for id=$mechanicId');
+        return null;
+      }
+      final List svcList = res['mechanic_services'] ?? [];
+      final expertise = svcList
+          .map((e) => e['services']?['name'] as String?)
+          .whereType<String>()
+          .toList();
+      debugPrint('🛠 Extracted expertise list: $expertise');
+      final data = {
+        'rating': res['rating'],
+        'full_name': res['users']?['full_name'],
+        'phone': res['users']?['phone'],
+        'image_url': res['users']?['image_url'],
+        'expertise': expertise,
+      };
+      debugPrint('✅ Final mechanic profile map: $data');
+      return data;
+    } catch (e, st) {
+      debugPrint('❌ Error fetching mechanic profile: $e');
+      debugPrint('$st');
+      return null;
+    }
   }
 
-  Widget _buildWaitingUI() {
+  Future<void> _cancelRequest() async {
+    await Supabase.instance.client
+        .from('requests')
+        .update({'status': 'canceled'})
+        .eq('id', widget.requestId);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Request canceled')),
+      );
+    }
+  }
+
+  // NEW: Service complete popup
+  void _showServiceCompleteDialog() {
+    double rating = 0;
+    final TextEditingController reviewController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Rate the Service'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Star rating row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    return IconButton(
+                      icon: Icon(
+                        index < rating ? Icons.star : Icons.star_border,
+                        color: Colors.amber,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          rating = index + 1.0;
+                        });
+                      },
+                    );
+                  }),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: reviewController,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Write a review',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel')),
+              ElevatedButton(
+                  onPressed: () async {
+                    if (rating == 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('Please give a rating')));
+                      return;
+                    }
+
+                    await Supabase.instance.client.from('requests').update({
+                      'status': 'completed',
+                      'rating': rating,
+                      'review': reviewController.text.trim(),
+                    }).eq('id', widget.requestId);
+
+                    if (mounted) {
+                      Navigator.pop(context); // close dialog
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('Service marked as complete.')));
+                    }
+                  },
+                  child: const Text('Submit')),
+            ],
+          );
+        });
+      },
+    );
+  }
+
+  Widget _buildWaitingUI([String reason = '']) {
+    if (reason.isNotEmpty) {
+      debugPrint('⏳ Still waiting… reason: $reason');
+    }
     return Column(
       children: [
         SizedBox(
@@ -58,208 +185,192 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage> {
             ),
             children: [
               TileLayer(
-                urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-              ),
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: widget.userLocation,
-                    width: 36,
-                    height: 36,
-                    child: const Icon(Icons.person_pin_circle, color: Colors.red, size: 32),
-                  ),
-                ],
-              ),
+                  urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png"),
+              MarkerLayer(markers: [
+                Marker(
+                  point: widget.userLocation,
+                  width: 36,
+                  height: 36,
+                  child: const Icon(Icons.person_pin_circle,
+                      color: Colors.red, size: 32),
+                ),
+              ]),
             ],
           ),
         ),
         const SizedBox(height: 28),
         const CircularProgressIndicator(),
         const SizedBox(height: 16),
-        const Text(
-          "Searching for mechanics nearby...",
-          style: TextStyle(fontSize: 17, color: Colors.blue),
-        ),
+        const Text("Searching for mechanics nearby...",
+            style: TextStyle(fontSize: 17, color: Colors.blue)),
         const SizedBox(height: 12),
-        const Text("Mechanics are connecting...", style: TextStyle(fontSize: 15, color: Colors.black54)),
+        const Text("Mechanics are connecting...",
+            style: TextStyle(fontSize: 15, color: Colors.black54)),
       ],
     );
   }
 
-  Widget _buildConnectedUI(Map<String, dynamic> request, Map<String, dynamic> mechanic) {
-    // show both user & mechanic on map, draw route, show mechanic card
-    final LatLng? mechLocation = (mechanic['lat'] != null && mechanic['lng'] != null)
-        ? LatLng(double.tryParse(mechanic['lat'].toString()) ?? 0, double.tryParse(mechanic['lng'].toString()) ?? 0)
-        : null;
-
-    return Column(
-      children: [
-        SizedBox(
-          height: 260,
-          width: double.infinity,
-          child: FlutterMap(
-            options: MapOptions(
-              initialCenter: mechLocation != null
-                  ? LatLng(
-                  (widget.userLocation.latitude + mechLocation.latitude) / 2,
-                  (widget.userLocation.longitude + mechLocation.longitude) / 2)
-                  : widget.userLocation,
-              initialZoom: 13,
+  Widget _buildLiveMap({
+    required LatLng userPos,
+    required LatLng mechPos,
+  }) {
+    return SizedBox(
+      height: 250,
+      width: double.infinity,
+      child: FlutterMap(
+        options: MapOptions(
+          initialCenter: LatLng(
+            (userPos.latitude + mechPos.latitude) / 2,
+            (userPos.longitude + mechPos.longitude) / 2,
+          ),
+          initialZoom: 14.5,
+        ),
+        children: [
+          TileLayer(
+              urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png"),
+          PolylineLayer(polylines: [
+            Polyline(
+                points: [userPos, mechPos],
+                color: Colors.blue,
+                strokeWidth: 4),
+          ]),
+          MarkerLayer(markers: [
+            Marker(
+              point: userPos,
+              width: 34,
+              height: 34,
+              child: const Icon(Icons.person_pin_circle,
+                  color: Colors.red, size: 28),
             ),
+            Marker(
+              point: mechPos,
+              width: 34,
+              height: 34,
+              child: const Icon(Icons.build, color: Colors.green, size: 28),
+            ),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMechanicCard(Map mechanic) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      margin: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [BoxShadow(blurRadius: 6, color: Colors.black12)],
+      ),
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TileLayer(
-                urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+              CircleAvatar(
+                radius: 28,
+                backgroundImage: (mechanic['image_url'] != null &&
+                    mechanic['image_url'].toString().isNotEmpty)
+                    ? NetworkImage(mechanic['image_url'])
+                    : null,
+                backgroundColor: Colors.grey[200],
               ),
-              if (mechLocation != null)
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: [widget.userLocation, mechLocation],
-                      color: Colors.blue,
-                      strokeWidth: 4,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(mechanic['full_name'] ?? '',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 17)),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.star,
+                            color: Colors.amber, size: 16),
+                        Text(" ${mechanic['rating'] ?? ''}",
+                            style: const TextStyle(fontSize: 13)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text('Phone: ${mechanic['phone'] ?? '-'}',
+                        style: const TextStyle(fontSize: 13)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: -4,
+                      children: (mechanic['expertise'] as List? ?? [])
+                          .map((s) => Chip(
+                        label: Text(s,
+                            style: const TextStyle(fontSize: 11)),
+                        backgroundColor: Colors.blue[50],
+                      ))
+                          .toList(),
                     ),
                   ],
                 ),
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: widget.userLocation,
-                    width: 34,
-                    height: 34,
-                    child: const Icon(
-                      Icons.person_pin_circle,
-                      color: Colors.red,
-                      size: 28,
-                    ),
-                  ),
-                  if (mechLocation != null)
-                    Marker(
-                      point: mechLocation,
-                      width: 34,
-                      height: 34,
-                      child: const Icon(Icons.build, color: Colors.green, size: 28),
-                    ),
-                ],
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 10),
-        // MECHANIC INFO CARD WITH BUTTONS
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          margin: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [BoxShadow(blurRadius: 6, color: Colors.black12)],
-          ),
-          child: Column(
+          const SizedBox(height: 12),
+          // Action buttons
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundImage: (mechanic['image_url'] != null && mechanic['image_url'].toString().isNotEmpty)
-                        ? NetworkImage(mechanic['image_url'])
-                        : null,
-                    backgroundColor: Colors.grey[200],
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          mechanic['name'] ?? '',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.star, color: Colors.amber, size: 16),
-                            Text(" ${mechanic['rating'] ?? ''}", style: const TextStyle(fontSize: 13)),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Status: Online', // option: mechanic status?
-                          style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w500, fontSize: 12),
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: -4,
-                          children: (mechanic['expertise'] as List<dynamic>? ?? [])
-                              .map((service) => Chip(
-                            label: Text(service.toString(), style: const TextStyle(fontSize: 11)),
-                            backgroundColor: Colors.blue[50],
-                          ))
-                              .toList(),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              ElevatedButton.icon(
+                icon: const Icon(Icons.call),
+                label: const Text("Call"),
+                style:
+                ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                onPressed: () {
+                  if (mechanic['phone'] != null) {
+                    launchUrl(Uri.parse('tel:${mechanic['phone']}'));
+                  }
+                },
               ),
-              const SizedBox(height: 14),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      if (mechanic['phone'] == null) return;
-                      showDialog(
-                        context: context,
-                        builder: (_) => CallMechanicDialog(
-                          mechanicName: mechanic['name'] ?? 'Mechanic',
-                          phoneNumber: mechanic['phone'] ?? '',
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.call, size: 18),
-                    label: const Text("Call"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green[500],
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(90, 38),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: Text("${mechanic['name'] ?? 'Mechanic'}'s Profile"),
-                          content: const Text('Profile details and reviews coming soon...'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(),
-                              child: const Text('Close'),
-                            ),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.chat),
+                label: const Text("Chat"),
+                style:
+                ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Chat not implemented')),
+                  );
+                },
+              ),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.person),
+                label: const Text("Profile"),
+                onPressed: () {
+                  showDialog(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title:
+                        Text(mechanic['full_name'] ?? 'Profile'),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Phone: ${mechanic['phone'] ?? '-'}'),
+                            const SizedBox(height: 8),
+                            Text(
+                                'Expertise: ${(mechanic['expertise'] as List?)?.join(", ") ?? "-"}'),
                           ],
                         ),
-                      );
-                    },
-                    icon: const Icon(Icons.person, size: 19),
-                    label: const Text("Profile"),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.black87,
-                      minimumSize: const Size(100, 38),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      side: const BorderSide(color: Colors.black12),
-                    ),
-                  ),
-                ],
+                        actions: [
+                          TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Close'))
+                        ],
+                      ));
+                },
               ),
             ],
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -267,81 +378,91 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Emergency Request Status'),
-        backgroundColor: Colors.blue,
-      ),
+          title: const Text('Emergency Request Status'),
+          backgroundColor: Colors.blue),
       body: StreamBuilder<Map<String, dynamic>?>(
         stream: _requestStream,
         builder: (context, snapshot) {
           final request = snapshot.data;
-          if (snapshot.connectionState == ConnectionState.waiting || request == null) {
-            return Center(child: _buildWaitingUI());
+          if (snapshot.connectionState == ConnectionState.waiting ||
+              request == null) {
+            return _buildWaitingUI('Stream loading or null request');
           }
 
-          // If still pending or no mechanic assigned
-          if (request['status'] == 'pending' || request['mechanic_id'] == null) {
-            return Center(child: _buildWaitingUI());
+          final status =
+              request['status']?.toString().toLowerCase().trim() ?? '';
+          if (status != 'accepted' ||
+              request['mechanic_id'] == null ||
+              request['mech_lat'] == null ||
+              request['mech_lng'] == null) {
+            return _buildWaitingUI(
+                'Conditions for live tracking not met yet');
           }
 
-          // Mechanic assigned!
+          final userLat = double.tryParse(
+              request['user_lat']?.toString() ??
+                  widget.userLocation.latitude.toString()) ??
+              widget.userLocation.latitude;
+          final userLng = double.tryParse(
+              request['user_lng']?.toString() ??
+                  widget.userLocation.longitude.toString()) ??
+              widget.userLocation.longitude;
+          final mechLat =
+              double.tryParse(request['mech_lat']?.toString() ?? '0') ?? 0.0;
+          final mechLng =
+              double.tryParse(request['mech_lng']?.toString() ?? '0') ?? 0.0;
+
+          final userCurrentPos = LatLng(userLat, userLng);
+          final mechanicPos = LatLng(mechLat, mechLng);
+
           return FutureBuilder<Map<String, dynamic>?>(
-            future: _fetchMechanicProfile(request['mechanic_id']),
+            future: _fetchMechanicProfile(
+                request['mechanic_id'].toString()),
             builder: (context, mechanicSnap) {
-              if (mechanicSnap.connectionState != ConnectionState.done || mechanicSnap.data == null) {
-                return Center(child: _buildWaitingUI());
+              if (mechanicSnap.connectionState != ConnectionState.done ||
+                  mechanicSnap.data == null) {
+                return _buildWaitingUI('Mechanic profile still loading');
               }
-              return _buildConnectedUI(request, mechanicSnap.data!);
+              return ListView(
+                children: [
+                  _buildLiveMap(
+                      userPos: userCurrentPos, mechPos: mechanicPos),
+                  const SizedBox(height: 10),
+                  _buildMechanicCard(mechanicSnap.data!),
+                  const SizedBox(height: 20),
+                  // Cancel button
+                  Padding(
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.cancel),
+                      label: const Text('Cancel Request'),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          minimumSize: const Size.fromHeight(48)),
+                      onPressed: _cancelRequest,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Service complete button
+                  Padding(
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.check_circle),
+                      label: const Text('Service Complete'),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          minimumSize: const Size.fromHeight(48)),
+                      onPressed: _showServiceCompleteDialog,
+                    ),
+                  ),
+                ],
+              );
             },
           );
         },
       ),
-    );
-  }
-}
-
-// --- Dummy call dialog for demonstration
-class CallMechanicDialog extends StatelessWidget {
-  final String mechanicName;
-  final String phoneNumber;
-  const CallMechanicDialog({
-    super.key,
-    required this.mechanicName,
-    required this.phoneNumber,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('Call $mechanicName'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('Phone Number:', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.phone, color: Colors.green[800]),
-              const SizedBox(width: 8),
-              Text(phoneNumber, style: const TextStyle(fontSize: 16)),
-            ],
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton.icon(
-          onPressed: () {
-            Navigator.of(context).pop();
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pretending to call...')));
-          },
-          icon: const Icon(Icons.call),
-          label: const Text('CALL NOW'),
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-        ),
-      ],
     );
   }
 }
