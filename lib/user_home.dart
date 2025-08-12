@@ -147,7 +147,6 @@ class _UserHomePageState extends State<UserHomePage> {
         final mLng = mech['location_y'] is double
             ? mech['location_y']
             : double.tryParse(mech['location_y'].toString()) ?? 0.0;
-
         final distance = _calculateDistanceKm(userLat!, userLng!, mLat, mLng);
         if (distance <= 7.0) {
           final services = (mech['mechanic_services'] as List<dynamic>)
@@ -173,18 +172,98 @@ class _UserHomePageState extends State<UserHomePage> {
     }
   }
 
-  // Request Service popup dialog
+  // Request Service popup dialog - now functional
   void _showRequestServiceDialog(Map<String, dynamic> mechanic) {
     final vehicleController = TextEditingController();
     final problemController = TextEditingController();
     XFile? pickedImage;
     final picker = ImagePicker();
+    bool loading = false;
 
     showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
+            Future<void> handleSubmit() async {
+              if (vehicleController.text.isEmpty ||
+                  problemController.text.isEmpty ||
+                  pickedImage == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text(
+                          'Please fill all fields and pick an image')),
+                );
+                return;
+              }
+              if (userLat == null || userLng == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Location not available')),
+                );
+                return;
+              }
+
+              setState(() => loading = true);
+
+              try {
+                final supabase = Supabase.instance.client;
+                final user = supabase.auth.currentUser;
+                if (user == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content:
+                        Text('You must be logged in to submit a request.')),
+                  );
+                  setState(() => loading = false);
+                  return;
+                }
+
+                // Upload image to storage
+                final bucketName = 'request-photos';
+                final fileExt = pickedImage!.path.split('.').last;
+                final fileName =
+                    '${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+                final filePath = 'requests/${user.id}/$fileName';
+                await supabase.storage
+                    .from(bucketName)
+                    .upload(filePath, File(pickedImage!.path));
+
+                String relativePath = filePath;
+                String imageUrl = await supabase.storage
+                    .from(bucketName)
+                    .createSignedUrl(relativePath, 86400);
+
+                // Insert into requests table
+                await supabase.from('requests').insert({
+                  'user_id': user.id,
+                  'mechanic_id': mechanic['id'],
+                  'status': 'pending',
+                  'vehicle': vehicleController.text.trim(),
+                  'description': problemController.text.trim(),
+                  'image': imageUrl,
+                  'lat': userLat.toString(),
+                  'lng': userLng.toString(),
+                  'mech_lat': null,
+                  'mech_lng': null,
+                  'request_type': 'normal',
+                });
+
+                if (mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Request submitted')),
+                  );
+                }
+              } catch (e) {
+                print('❗ Error submitting request: $e');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error: $e')),
+                );
+              } finally {
+                setState(() => loading = false);
+              }
+            }
+
             return AlertDialog(
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
@@ -231,10 +310,9 @@ class _UserHomePageState extends State<UserHomePage> {
                         ? Image.file(File(pickedImage!.path), height: 120)
                         : const Text('No image selected'),
                     const SizedBox(height: 10),
-                    // Pick image button (different color)
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange, // DIFFERENT COLOR
+                        backgroundColor: Colors.orange,
                       ),
                       icon: const Icon(Icons.camera_alt),
                       label: const Text('Pick Image'),
@@ -255,31 +333,10 @@ class _UserHomePageState extends State<UserHomePage> {
                     child: const Text('Cancel')),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue, // Submit button color
+                    backgroundColor: Colors.blue,
                   ),
-                  onPressed: () {
-                    if (vehicleController.text.isEmpty ||
-                        problemController.text.isEmpty ||
-                        pickedImage == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text(
-                                'Please fill all fields and pick an image')),
-                      );
-                      return;
-                    }
-                    // TODO: Insert to Supabase requests table if needed
-                    print('Mechanic ID: ${mechanic['id']}');
-                    print('Vehicle: ${vehicleController.text}');
-                    print('Problem: ${problemController.text}');
-                    print('Image: ${pickedImage!.path}');
-                    print('Location: $currentLocation');
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Request submitted')),
-                    );
-                  },
-                  child: const Text('Submit'),
+                  onPressed: loading ? null : handleSubmit,
+                  child: Text(loading ? 'Submitting...' : 'Submit'),
                 ),
               ],
             );
