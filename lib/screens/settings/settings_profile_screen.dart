@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import '../../utils.dart';
 import '../../widgets/bottom_navbar.dart';
+import '../../services/user_service.dart';
 
 class SettingsProfileScreen extends StatefulWidget {
   const SettingsProfileScreen({super.key});
@@ -16,16 +18,16 @@ class SettingsProfileScreen extends StatefulWidget {
 class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _addressController = TextEditingController();
-  final _emergencyContactController = TextEditingController();
   final _vehicleController = TextEditingController();
 
+  final SupabaseClient supabase = Supabase.instance.client;
   File? _profileImage;
+  String? _profileImageUrl;
   final ImagePicker _picker = ImagePicker();
   DateTime? _selectedDate;
   List<String> _vehicleModels = [];
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -33,14 +35,46 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
     _loadUserProfile();
   }
 
-  void _loadUserProfile() {
-    _nameController.text = 'John Doe';
-    _emailController.text = 'john.doe@example.com';
-    _phoneController.text = '+1234567890';
-    _addressController.text = '123 Main St, City, State';
-    _emergencyContactController.text = '+1234567891';
-    _selectedDate = DateTime(1990, 1, 1);
-    _vehicleModels = ['Toyota Camry 2020', 'Honda Civic 2018'];
+  Future<void> _loadUserProfile() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final profile = await UserService.getCurrentUserProfile();
+      if (profile == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Unable to load profile data')),
+          );
+        }
+        return;
+      }
+
+      setState(() {
+        _nameController.text = profile.fullName;
+        _phoneController.text = profile.phone;
+        
+        // Handle date of birth
+        _selectedDate = profile.dateOfBirth;
+        
+        // Handle vehicle models array
+        _vehicleModels = List<String>.from(profile.vehicleModels);
+        
+        // Handle profile image URL
+        _profileImageUrl = profile.imageUrl;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading profile: $e')),
+        );
+      }
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -52,12 +86,23 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
         foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: const Icon(Icons.save),
-            onPressed: _saveProfile,
+            icon: _isLoading 
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.save),
+            onPressed: _isLoading ? null : _saveProfile,
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: _isLoading && _nameController.text.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
@@ -77,8 +122,12 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
                             CircleAvatar(
                               radius: 60,
                               backgroundColor: Colors.grey[300],
-                              backgroundImage: _profileImage != null ? FileImage(_profileImage!) : null,
-                              child: _profileImage == null ? const Icon(Icons.person, size: 60) : null,
+                              backgroundImage: _profileImage != null 
+                                  ? FileImage(_profileImage!) 
+                                  : (_profileImageUrl != null ? NetworkImage(_profileImageUrl!) : null),
+                              child: _profileImage == null && _profileImageUrl == null 
+                                  ? const Icon(Icons.person, size: 60) 
+                                  : null,
                             ),
                             Positioned(
                               bottom: 0,
@@ -108,9 +157,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
                 title: 'Personal Information',
                 children: [
                   _buildInput(_nameController, 'Full Name', Icons.person),
-                  _buildInput(_emailController, 'Email Address', Icons.email),
                   _buildInput(_phoneController, 'Phone Number', Icons.phone),
-                  _buildInput(_addressController, 'Address', Icons.location_on, maxLines: 2),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.calendar_today),
@@ -123,7 +170,6 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: _selectDate,
                   ),
-                  _buildInput(_emergencyContactController, 'Emergency Contact', Icons.contact_emergency),
                 ],
               ),
 
@@ -294,29 +340,147 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
     }
   }
 
-  void _addVehicle() {
+  Future<void> _addVehicle() async {
     if (_vehicleController.text.isNotEmpty) {
+      final newVehicle = _vehicleController.text.trim();
+      
+      // Since the schema only supports one vehicle (veh_model is text, not array),
+      // Add the new vehicle to the list (don't clear existing ones)
       setState(() {
-        _vehicleModels.add(_vehicleController.text);
+        if (!_vehicleModels.contains(newVehicle)) {
+          _vehicleModels.add(newVehicle);
+        }
         _vehicleController.clear();
       });
+
+      // Update database immediately with the entire list
+      try {
+        final success = await UserService.updateVehicleModel(_vehicleModels);
+        if (!success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to save vehicle. Changes will be saved when you save your profile.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      } catch (e) {
+        // Error handling without debug print
+      }
     }
   }
 
-  void _removeVehicle(String vehicle) {
+  Future<void> _removeVehicle(String vehicle) async {
     setState(() {
       _vehicleModels.remove(vehicle);
     });
+
+    // Update database immediately with the updated list (not empty array)
+    try {
+      final success = await UserService.updateVehicleModel(_vehicleModels);
+      if (!success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to remove vehicle. Changes will be saved when you save your profile.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      // Error handling without debug print
+    }
   }
 
-  void _saveProfile() {
+  Future<void> _saveProfile() async {
     if (_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile updated successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      setState(() {
+        _isLoading = true;
+      });
+
+      try {
+        String? imageUrl;
+        
+        // Upload profile image if selected
+        if (_profileImage != null) {
+          try {
+            final bytes = await _profileImage!.readAsBytes();
+            final uploadedImageUrl = await UserService.uploadProfileImage(
+              _profileImage!.path, 
+              bytes
+            );
+            imageUrl = uploadedImageUrl;
+          } catch (uploadError) {
+            // Continue without image update
+          }
+        }
+
+        // Prepare update data
+        Map<String, dynamic> updateData = {
+          'full_name': _nameController.text.trim(),
+          'phone': _phoneController.text.trim(),
+        };
+
+        // Note: Email is not updated as it's managed by auth system
+
+        // Add date of birth if selected
+        if (_selectedDate != null) {
+          updateData['dob'] = _selectedDate!.toIso8601String().split('T')[0]; // Date only
+        } else {
+          // If no date selected, set to null
+          updateData['dob'] = null;
+        }
+
+        // Handle vehicle models array
+        // First, check if there's a vehicle in the input box that hasn't been added yet
+        String pendingVehicle = _vehicleController.text.trim();
+        if (pendingVehicle.isNotEmpty && !_vehicleModels.contains(pendingVehicle)) {
+          _vehicleModels.add(pendingVehicle);
+          _vehicleController.clear(); // Clear the input after adding
+        }
+        
+        updateData['veh_model'] = _vehicleModels;
+
+        // Add image URL if uploaded
+        if (imageUrl != null) {
+          updateData['image_url'] = imageUrl;
+        }
+
+        // Update user data in database using UserService
+        final success = await UserService.updateUserProfile(updateData);
+
+        if (mounted) {
+          if (success) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Profile updated successfully!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Failed to update profile. Please try again.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error saving profile: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
     }
   }
 

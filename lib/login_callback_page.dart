@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'services/user_service.dart';
 
 class LoginCallbackPage extends StatefulWidget {
   const LoginCallbackPage({super.key});
@@ -40,35 +41,35 @@ class _LoginCallbackPageState extends State<LoginCallbackPage> {
     }
 
     try {
-      // Prevent duplicate insert
-      final exists = await supabase
-          .from('users')
-          .select('id')
-          .eq('id', user.id)
-          .maybeSingle();
+      // Check if user already exists to prevent duplicate insert
+      final userExists = await UserService.userExists(user.id);
 
-      if (exists == null) {
-        await supabase.from('users').insert({
-          'id': user.id,
-          'full_name': fullName,
-          'email': email,
-          'phone': phone,
-          'role': role,
-        });
+      if (!userExists) {
+        final success = await UserService.createUser(
+          id: user.id,
+          fullName: fullName,
+          email: email,
+          phone: phone,
+          role: role,
+        );
+
+        if (!success) {
+          print('Failed to create user record in database');
+        }
       }
 
-      // Clean up
+      // Clean up temporary preferences
       await prefs.remove('temp_full_name');
       await prefs.remove('temp_email');
       await prefs.remove('temp_phone');
       await prefs.remove('temp_role');
 
-      // Navigate to home or role-based screen
+      // Navigate to appropriate home screen
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/home'); // Or role-based route
+        Navigator.pushReplacementNamed(context, '/home');
       }
     } catch (e) {
-      print('Insert error: $e');
+      print('Error in signup completion: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
