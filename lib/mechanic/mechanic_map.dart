@@ -239,11 +239,11 @@ class _MechanicMapState extends State<MechanicMap> {
         return 'Unknown location';
       } else {
         print('Mapbox API error: ${response.statusCode} ${response.body}');
-        return '(${lat}, ${lng})';
+        return '($lat, $lng)';
       }
     } catch (e) {
       print('Error fetching place name: $e');
-      return '(${lat}, ${lng})';
+      return '($lat, $lng)';
     }
   }
 

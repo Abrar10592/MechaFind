@@ -714,8 +714,8 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
               child: FloatingActionButton(
                 onPressed: _showDirectionModal,
                 backgroundColor: AppColors.primary,
-                child: const Icon(Icons.map, color: Colors.white),
                 tooltip: isEnglish ? 'Open Request' : 'অনুরোধ খুলুন',
+                child: const Icon(Icons.map, color: Colors.white),
               ),
             ),
         ],

@@ -8,7 +8,6 @@ import '../onboarding/onboarding_screen.dart';
 import '../../landing.dart';
 import '../../user_home.dart';
 import '../../mechanic/mechanic.dart';
-import 'dart:convert';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});

@@ -478,7 +478,7 @@ class _UserHomePageState extends State<UserHomePage> {
               isThreeLine: true,
             ),
           );
-        }).toList(),
+        }),
       ],
     );
   }

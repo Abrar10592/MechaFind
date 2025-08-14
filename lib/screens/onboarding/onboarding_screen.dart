@@ -486,7 +486,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     top: 140 + math.sin(angle) * radius - 24,
                     child: Transform.scale(
                       scale: index == 2 ? _pulseAnimation.value * 0.8 : 1.0,
-                      child: Container(
+                      child: SizedBox(
                         width: 24,
                         height: 32,
                         child: Icon(
