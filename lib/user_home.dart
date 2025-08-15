@@ -2,7 +2,6 @@
 import 'dart:math' as math;
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:mechfind/utils.dart';
 import 'location_service.dart';
 import 'widgets/emergency_button.dart';

@@ -99,8 +99,9 @@ class DetailedMechanicCard extends StatelessWidget {
                       NavigationHelper.modalToPage(
                         context,
                         ChatScreen(
+                          mechanicId: mechanic['id'] ?? '',
                           mechanicName: mechanic['name'],
-                          isOnline: mechanic['online'] ?? false,
+                          mechanicImageUrl: mechanic['image_url'],
                         ),
                       );
                     },
