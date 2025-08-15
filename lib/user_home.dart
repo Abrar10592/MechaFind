@@ -1,4 +1,3 @@
-// Import math at top of the file if not present
 import 'dart:math' as math;
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -6,6 +5,7 @@ import 'package:mechfind/utils.dart';
 import 'location_service.dart';
 import 'widgets/emergency_button.dart';
 import 'widgets/bottom_navbar.dart';
+import 'widgets/profile_avatar.dart';
 import 'services/message_notification_service.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -159,7 +159,7 @@ class _UserHomePageState extends State<UserHomePage> {
             rating,
             location_x,
             location_y,
-            users(full_name, image_url, phone),
+            users(full_name, profile_pic, phone),
             mechanic_services(service_id, services(name))
             ''');
       List<Map<String, dynamic>> mechanicsList = [];
@@ -180,7 +180,7 @@ class _UserHomePageState extends State<UserHomePage> {
           mechanicsList.add({
             'id': mech['id'],
             'name': mech['users']?['full_name'] ?? 'Unnamed',
-            'image_url': mech['users']?['image_url'],
+            'image_url': mech['users']?['profile_pic'],
             'phone': mech['users']?['phone'],
             'distance': '${distance.toStringAsFixed(1)} km',
             'rating': mech['rating'] ?? 0.0,
@@ -212,7 +212,7 @@ class _UserHomePageState extends State<UserHomePage> {
         final data = await supabase
             .from('mechanics')
             .select(
-            'id,rating,users(full_name,image_url,phone),mechanic_services(services(name))')
+            'id,rating,users(full_name,profile_pic,phone),mechanic_services(services(name))')
             .eq('id', mechanicId)
             .maybeSingle();
         if (data == null) throw Exception("Mechanic not found");
@@ -224,7 +224,7 @@ class _UserHomePageState extends State<UserHomePage> {
         final fetchedMech = {
           'id': data['id'],
           'name': user['full_name'] ?? 'Unnamed',
-          'image_url': user['image_url'],
+          'image_url': user['profile_pic'],
           'phone': user['phone'],
           'rating': data['rating'] ?? 0.0,
           'services': services,
@@ -497,6 +497,20 @@ class _UserHomePageState extends State<UserHomePage> {
         backgroundColor: AppColors.primary,
         title: Text(greetingText,
             style: AppTextStyles.heading.copyWith(color: Colors.white)),
+        actions: [
+          if (!widget.isGuest)
+            Padding(
+              padding: const EdgeInsets.only(right: 16.0),
+              child: CurrentUserAvatar(
+                radius: 18,
+                showBorder: true,
+                borderColor: Colors.white,
+                onTap: () {
+                  Navigator.pushNamed(context, '/settings');
+                },
+              ),
+            ),
+        ],
       ),
       backgroundColor: AppColors.background,
       body: ListView(
