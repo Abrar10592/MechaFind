@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../../widgets/bottom_navbar.dart';
 import '../chat/chat_screen.dart';
+import '../../services/message_notification_service.dart';
 import 'package:mechfind/utils.dart';
 
 class MessagesPage extends StatefulWidget {
@@ -189,6 +190,7 @@ class _MessagesPageState extends State<MessagesPage>
           ),
           callback: (payload) {
             _loadConversations(); // Refresh conversations on new message
+            MessageNotificationService().refresh(); // Update global notification count
           },
         )
         .onPostgresChanges(
@@ -202,6 +204,7 @@ class _MessagesPageState extends State<MessagesPage>
           ),
           callback: (payload) {
             _loadConversations(); // Refresh conversations on message update (e.g., read status)
+            MessageNotificationService().refresh(); // Update global notification count
           },
         )
         .subscribe();
@@ -224,6 +227,9 @@ class _MessagesPageState extends State<MessagesPage>
           .eq('sender_id', mechanicId)
           .eq('receiver_id', user.id)
           .eq('is_read', false);
+      
+      // Update the global notification service
+      MessageNotificationService().refresh();
     } catch (e) {
       print("Error marking messages as read: $e");
     }

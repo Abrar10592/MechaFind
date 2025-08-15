@@ -6,6 +6,7 @@ import 'package:mechfind/utils.dart';
 import 'location_service.dart';
 import 'widgets/emergency_button.dart';
 import 'widgets/bottom_navbar.dart';
+import 'services/message_notification_service.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -34,6 +35,11 @@ class _UserHomePageState extends State<UserHomePage> {
     super.initState();
     _checkLocationServiceAndLoad();
     _listenActiveRequests();
+    
+    // Refresh message notifications when home page loads
+    if (supabase.auth.currentUser != null) {
+      MessageNotificationService().refresh();
+    }
   }
 
   void _listenActiveRequests() {

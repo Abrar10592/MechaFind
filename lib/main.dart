@@ -19,6 +19,7 @@ import 'screens/messages/messages_page.dart';
 import 'screens/settings/settings_profile_screen.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
+import 'services/message_notification_service.dart';
 import 'utils.dart';
 
 Future<void> main() async {
@@ -64,6 +65,26 @@ class _MechFindAppState extends State<MechFindApp> {
   void initState() {
     super.initState();
     _setupDeepLinkHandling();
+    _initializeServices();
+  }
+
+  Future<void> _initializeServices() async {
+    // Initialize message notification service after authentication
+    final supabase = Supabase.instance.client;
+    supabase.auth.onAuthStateChange.listen((data) {
+      final event = data.event;
+      if (event == AuthChangeEvent.signedIn) {
+        MessageNotificationService().initialize();
+      } else if (event == AuthChangeEvent.signedOut) {
+        // Reset service when user signs out
+        MessageNotificationService().dispose();
+      }
+    });
+
+    // Initialize if user is already signed in
+    if (supabase.auth.currentUser != null) {
+      MessageNotificationService().initialize();
+    }
   }
 
   @override

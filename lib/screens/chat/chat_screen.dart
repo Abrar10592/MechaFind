@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import '../../services/message_notification_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final String mechanicId;
@@ -89,6 +90,9 @@ class _ChatScreenState extends State<ChatScreen> {
           .eq('sender_id', widget.mechanicId)
           .eq('receiver_id', user.id)
           .eq('is_read', false);
+      
+      // Update the global notification service
+      MessageNotificationService().refresh();
     } catch (e) {
       print("Error marking messages as read: $e");
     }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/message_notification_service.dart';
 
 class BottomNavBar extends StatelessWidget {
   final int currentIndex;
@@ -54,6 +55,7 @@ class BottomNavBar extends StatelessWidget {
                 label: 'Messages',
                 index: 2,
                 isActive: currentIndex == 2,
+                showBadge: true, // Enable badge for messages
               ),
               _buildNavItem(
                 context,
@@ -85,6 +87,7 @@ class BottomNavBar extends StatelessWidget {
     required String label,
     required int index,
     required bool isActive,
+    bool showBadge = false,
   }) {
     final color = isActive ? Theme.of(context).primaryColor : Colors.grey[600];
     
@@ -102,10 +105,66 @@ class BottomNavBar extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              isActive ? activeIcon : icon,
-              color: color,
-              size: 24,
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  isActive ? activeIcon : icon,
+                  color: color,
+                  size: 24,
+                ),
+                if (showBadge)
+                  ListenableBuilder(
+                    listenable: MessageNotificationService(),
+                    builder: (context, child) {
+                      final hasUnread = MessageNotificationService().hasUnreadMessages;
+                      if (!hasUnread) return const SizedBox.shrink();
+                      
+                      return Positioned(
+                        right: -8,
+                        top: -8,
+                        child: TweenAnimationBuilder<double>(
+                          duration: const Duration(milliseconds: 300),
+                          tween: Tween<double>(begin: 0.0, end: 1.0),
+                          builder: (context, value, child) {
+                            return Transform.scale(
+                              scale: value,
+                              child: Container(
+                                width: 16,
+                                height: 16,
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.red.withOpacity(0.3),
+                                      spreadRadius: 1,
+                                      blurRadius: 3,
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  ),
+              ],
             ),
             const SizedBox(height: 4),
             Text(
