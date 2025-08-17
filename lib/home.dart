@@ -453,7 +453,7 @@ class _WelcomePageState extends State<WelcomePage>
                       isDesktop: isDesktop,
                     ),
                   );
-                }).toList(),
+                }),
             ],
           ),
         );

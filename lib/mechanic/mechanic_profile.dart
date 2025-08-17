@@ -1,7 +1,7 @@
 // ignore_for_file: deprecated_member_use
 
 import 'dart:io';
-import 'dart:typed_data'; // Add this for Uint8List
+// Add this for Uint8List
 import 'package:flutter/foundation.dart'; // Add this for kIsWeb
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';

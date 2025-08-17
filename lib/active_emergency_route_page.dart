@@ -34,7 +34,7 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage> {
         .map((events) {
       debugPrint('📡 Supabase stream emitted event list: $events');
       if (events.isNotEmpty) {
-        final row = events.first as Map<String, dynamic>;
+        final row = events.first;
         debugPrint('📡 Row keys: ${row.keys}');
         debugPrint('📡 Row data: $row');
         return row;

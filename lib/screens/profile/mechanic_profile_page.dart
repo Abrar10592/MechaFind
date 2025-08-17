@@ -413,8 +413,9 @@ class _MechanicProfilePageState extends State<MechanicProfilePage>
     NavigationHelper.modalToPage(
       context,
       ChatScreen(
+        mechanicId: widget.mechanic.id,
         mechanicName: widget.mechanic.name,
-        isOnline: widget.mechanic.isOnline,
+        mechanicImageUrl: widget.mechanic.profileImage,
       ),
     );
   }

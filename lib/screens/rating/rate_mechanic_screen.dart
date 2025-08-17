@@ -255,23 +255,13 @@ class _RateMechanicScreenState extends State<RateMechanicScreen> {
       _isSubmitting = true;
     });
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
-
+    // Call the callback function to handle the actual database saving
     widget.onRatingSubmitted(_rating, _reviewController.text);
 
     if (mounted) {
       setState(() {
         _isSubmitting = false;
       });
-
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Thank you for your feedback!'),
-          backgroundColor: Colors.green,
-        ),
-      );
 
       // Go back to previous screen
       Navigator.pop(context);

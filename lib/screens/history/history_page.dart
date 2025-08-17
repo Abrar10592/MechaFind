@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/service_history.dart';
 import '../rating/rate_mechanic_screen.dart';
 import '../../widgets/bottom_navbar.dart';
@@ -14,7 +15,10 @@ class HistoryPage extends StatefulWidget {
 
 class _HistoryPageState extends State<HistoryPage> {
   List<ServiceHistory> _serviceHistory = [];
-  String _selectedFilter = 'All';
+  List<Map<String, dynamic>> _completedRequests = [];
+  final SupabaseClient _supabase = Supabase.instance.client;
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -22,55 +26,128 @@ class _HistoryPageState extends State<HistoryPage> {
     _loadServiceHistory();
   }
 
-  void _loadServiceHistory() {
-    _serviceHistory = [
-      ServiceHistory(
-        id: '1',
-        mechanicId: 'mech_1',
-        mechanicName: 'AutoCare Plus',
-        serviceName: 'Engine Repair',
-        serviceDate: DateTime.now().subtract(const Duration(days: 5)),
-        status: 'completed',
-        cost: 12500.0,
-        description: 'Fixed engine overheating issue',
-        rating: 4.5,
-        userReview: 'Great service, very professional',
-        mechanicLocation: '123 Main St, Downtown',
-      ),
-      ServiceHistory(
-        id: '2',
-        mechanicId: 'mech_2',
-        mechanicName: 'QuickFix Motors',
-        serviceName: 'Tire Change',
-        serviceDate: DateTime.now().subtract(const Duration(days: 12)),
-        status: 'completed',
-        cost: 4200.0,
-        description: 'Replaced flat tire',
-        rating: 5.0,
-        userReview: 'Quick and efficient service',
-        mechanicLocation: '456 Oak Ave, Midtown',
-      ),
-      ServiceHistory(
-        id: '3',
-        mechanicId: 'mech_3',
-        mechanicName: 'Elite Auto Workshop',
-        serviceName: 'Brake Service',
-        serviceDate: DateTime.now().subtract(const Duration(days: 30)),
-        status: 'completed',
-        cost: 8500.0,
-        description: 'Brake pad replacement',
-        rating: 0.0,
-        userReview: '',
-        mechanicLocation: '789 Pine Rd, Uptown',
-      ),
-    ];
+  Future<void> _loadServiceHistory() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) {
+        setState(() {
+          _errorMessage = 'User not authenticated';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Fetch completed requests with mechanic details
+      final completedRequestsResponse = await _supabase
+          .from('requests')
+          .select('''
+            id,
+            mechanic_id,
+            created_at,
+            mechanics(
+              users(full_name, image_url)
+            )
+          ''')
+          .eq('user_id', user.id)
+          .eq('status', 'completed')
+          .order('created_at', ascending: false);
+
+      _completedRequests = List<Map<String, dynamic>>.from(completedRequestsResponse);
+
+      // Fetch existing reviews for these mechanics (including null ratings)
+      final reviewsResponse = await _supabase
+          .from('reviews')
+          .select('''
+            id,
+            mechanic_id,
+            rating,
+            comment,
+            created_at,
+            mechanics(
+              users(full_name)
+            )
+          ''')
+          .eq('user_id', user.id)
+          .order('created_at', ascending: false);
+
+      // Convert reviews to ServiceHistory objects
+      final reviewHistory = reviewsResponse.map<ServiceHistory>((review) {
+        return ServiceHistory.fromJson(review);
+      }).toList();
+
+      setState(() {
+        _serviceHistory = reviewHistory;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load service history: $e';
+        _isLoading = false;
+      });
+      print('Error loading service history: $e');
+    }
   }
 
-  List<ServiceHistory> get filteredHistory {
-    if (_selectedFilter == 'All') return _serviceHistory;
-    return _serviceHistory
-        .where((history) => history.status == _selectedFilter.toLowerCase())
+  // Get mechanics from completed requests that haven't been reviewed yet
+  List<Map<String, dynamic>> get unratedMechanics {
+    final ratedMechanicIds = _serviceHistory
+        .where((h) => h.rating > 0) // Only consider actually rated services
+        .map((h) => h.mechanicId)
+        .toSet();
+    return _completedRequests
+        .where((request) => !ratedMechanicIds.contains(request['mechanic_id']))
         .toList();
+  }
+
+  // Get reviews that exist but have null rating/comment (pending reviews)
+  List<ServiceHistory> get pendingReviews {
+    return _serviceHistory.where((h) => h.rating == 0.0).toList();
+  }
+
+  // Get actually completed reviews
+  List<ServiceHistory> get completedReviews {
+    return _serviceHistory.where((h) => h.rating > 0).toList();
+  }
+
+  // Combined list of all service interactions
+  List<dynamic> get allServiceInteractions {
+    final List<dynamic> combined = [];
+    
+    // Add completed reviews
+    combined.addAll(completedReviews);
+    
+    // Add pending reviews (reviews with null rating)
+    combined.addAll(pendingReviews);
+    
+    // Add unrated completed requests (no review entry at all)
+    combined.addAll(unratedMechanics);
+    
+    // Sort by date (most recent first)
+    combined.sort((a, b) {
+      DateTime dateA;
+      DateTime dateB;
+      
+      if (a is ServiceHistory) {
+        dateA = a.serviceDate;
+      } else {
+        dateA = DateTime.parse(a['created_at']);
+      }
+      
+      if (b is ServiceHistory) {
+        dateB = b.serviceDate;
+      } else {
+        dateB = DateTime.parse(b['created_at']);
+      }
+      
+      return dateB.compareTo(dateA);
+    });
+    
+    return combined;
   }
 
   @override
@@ -94,39 +171,71 @@ class _HistoryPageState extends State<HistoryPage> {
           },
         ),
       ),
-      body: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildFilterChip('All'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Completed'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Ongoing'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Cancelled'),
-                ],
-              ),
-            ),
-          ),
-          Expanded(
-            child: filteredHistory.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: filteredHistory.length,
-                    itemBuilder: (context, index) {
-                      final history = filteredHistory[index];
-                      return _buildHistoryCard(history);
-                    },
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 64,
+                        color: Colors.red[300],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        _errorMessage!,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.red,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadServiceHistory,
+                        child: const Text('Retry'),
+                      ),
+                    ],
                   ),
-          ),
-        ],
-      ),
+                )
+              : Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        'Your service history and mechanics you can rate',
+                        style: TextStyle(
+                          fontFamily: AppFonts.primaryFont,
+                          fontSize: FontSizes.body,
+                          color: AppColors.textSecondary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    Expanded(
+                      child: allServiceInteractions.isEmpty
+                          ? _buildEmptyState()
+                          : ListView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              itemCount: allServiceInteractions.length,
+                              itemBuilder: (context, index) {
+                                final item = allServiceInteractions[index];
+                                if (item is ServiceHistory) {
+                                  if (item.rating > 0) {
+                                    return _buildReviewedServiceCard(item);
+                                  } else {
+                                    return _buildPendingReviewCard(item);
+                                  }
+                                } else {
+                                  return _buildUnratedRequestCard(item);
+                                }
+                              },
+                            ),
+                    ),
+                  ],
+                ),
       bottomNavigationBar: BottomNavBar(
         currentIndex: 3,
         onTap: (index) {
@@ -151,29 +260,7 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  Widget _buildFilterChip(String filter) {
-    final isSelected = _selectedFilter == filter;
-    return FilterChip(
-      label: Text(
-        filter,
-        style: TextStyle(
-          fontFamily: AppFonts.primaryFont,
-          fontSize: FontSizes.body,
-          color: isSelected ? Colors.white : AppColors.textPrimary,
-        ),
-      ),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() {
-          _selectedFilter = filter;
-        });
-      },
-      backgroundColor: AppColors.background,
-      selectedColor: AppColors.primary,
-    );
-  }
-
-  Widget _buildHistoryCard(ServiceHistory history) {
+  Widget _buildPendingReviewCard(ServiceHistory history) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: Padding(
@@ -194,14 +281,24 @@ class _HistoryPageState extends State<HistoryPage> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        history.serviceName,
-                        style: AppTextStyles.label,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.orange,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          'NOT REVIEWED',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
-                _buildStatusChip(history.status),
               ],
             ),
             const SizedBox(height: 12),
@@ -214,65 +311,104 @@ class _HistoryPageState extends State<HistoryPage> {
                   DateFormat('MMM dd, yyyy').format(history.serviceDate),
                   style: AppTextStyles.label,
                 ),
-                const SizedBox(width: 16),
-                const Icon(Icons.location_on,
-                    size: 16, color: AppColors.textSecondary),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    history.mechanicLocation,
-                    style: AppTextStyles.label,
-                  ),
-                ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Text(
-              history.description,
+              'Service entry exists but needs your review. Please rate this mechanic.',
               style: AppTextStyles.body.copyWith(fontSize: FontSizes.body),
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Text(
-                  '৳${history.cost.toStringAsFixed(0)}',
-                  style: TextStyle(
-                    fontFamily: AppFonts.primaryFont,
-                    fontSize: FontSizes.subHeading,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
-                ),
                 const Spacer(),
-                if (history.status == 'completed' && history.rating == 0.0)
-                  ElevatedButton(
-                    onPressed: () => _rateService(history),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('Rate Service'),
-                  )
-                else if (history.rating > 0.0)
-                  Row(
+                ElevatedButton(
+                  onPressed: () => _updateExistingReview(history),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Add Review'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReviewedServiceCard(ServiceHistory history) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      ...List.generate(
-                        5,
-                        (index) => Icon(
-                          index < history.rating
-                              ? Icons.star
-                              : Icons.star_border,
-                          size: 16,
-                          color: Colors.amber,
+                      Text(
+                        history.mechanicName,
+                        style: AppTextStyles.heading.copyWith(
+                          fontSize: FontSizes.subHeading,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        history.rating.toString(),
-                        style: AppTextStyles.label,
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          'REVIEWED',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ],
                   ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Icon(Icons.calendar_today,
+                    size: 16, color: AppColors.textSecondary),
+                const SizedBox(width: 4),
+                Text(
+                  DateFormat('MMM dd, yyyy').format(history.serviceDate),
+                  style: AppTextStyles.label,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                ...List.generate(
+                  5,
+                  (index) => Icon(
+                    index < history.rating
+                        ? Icons.star
+                        : Icons.star_border,
+                    size: 16,
+                    color: Colors.amber,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  history.rating.toString(),
+                  style: AppTextStyles.label,
+                ),
               ],
             ),
             if (history.userReview.isNotEmpty) ...[
@@ -305,39 +441,191 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  Widget _buildStatusChip(String status) {
-    Color color;
-    switch (status) {
-      case 'completed':
-        color = Colors.green;
-        break;
-      case 'ongoing':
-        color = Colors.blue;
-        break;
-      case 'cancelled':
-        color = Colors.red;
-        break;
-      default:
-        color = Colors.grey;
-    }
+  Widget _buildUnratedRequestCard(Map<String, dynamic> request) {
+    final mechanicName = request['mechanics']?['users']?['full_name'] ?? 'Unknown Mechanic';
+    final serviceDate = DateTime.parse(request['created_at']);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        status.toUpperCase(),
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          fontFamily: AppFonts.primaryFont,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        mechanicName,
+                        style: AppTextStyles.heading.copyWith(
+                          fontSize: FontSizes.subHeading,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.orange,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          'PENDING REVIEW',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Icon(Icons.calendar_today,
+                    size: 16, color: AppColors.textSecondary),
+                const SizedBox(width: 4),
+                Text(
+                  DateFormat('MMM dd, yyyy').format(serviceDate),
+                  style: AppTextStyles.label,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Service completed successfully. How was your experience?',
+              style: AppTextStyles.body.copyWith(fontSize: FontSizes.body),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Spacer(),
+                ElevatedButton(
+                  onPressed: () => _rateService(request),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Rate Service'),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
+
+  void _updateExistingReview(ServiceHistory history) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RateMechanicScreen(
+          mechanicId: history.mechanicId,
+          mechanicName: history.mechanicName,
+          serviceId: history.id,
+          onRatingSubmitted: (rating, review) async {
+            // Update existing review in database
+            try {
+              await _supabase.from('reviews').update({
+                'rating': rating.round(),
+                'comment': review,
+              }).eq('id', history.id);
+              
+              // Refresh the list to show the updated review
+              _loadServiceHistory();
+              
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Review updated successfully!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            } catch (e) {
+              print('Error updating review: $e');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to update review: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  void _rateService(dynamic item) {
+    String mechanicId;
+    String mechanicName;
+    
+    if (item is ServiceHistory) {
+      mechanicId = item.mechanicId;
+      mechanicName = item.mechanicName;
+    } else {
+      mechanicId = item['mechanic_id'];
+      mechanicName = item['mechanics']?['users']?['full_name'] ?? 'Unknown Mechanic';
+    }
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RateMechanicScreen(
+          mechanicId: mechanicId,
+          mechanicName: mechanicName,
+          serviceId: '', // Not needed for our use case
+          onRatingSubmitted: (rating, review) async {
+            // Save review to database
+            try {
+              final user = _supabase.auth.currentUser;
+              if (user != null) {
+                await _supabase.from('reviews').insert({
+                  'user_id': user.id,
+                  'mechanic_id': mechanicId,
+                  'rating': rating.round(),
+                  'comment': review,
+                });
+                
+                // Refresh the list to show the new review
+                _loadServiceHistory();
+                
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Review submitted successfully!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              }
+            } catch (e) {
+              print('Error saving review: $e');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to save review: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            }
+          },
+        ),
+      ),
+    );
+  }
+}
 
   Widget _buildEmptyState() {
     return Center(
@@ -360,7 +648,7 @@ class _HistoryPageState extends State<HistoryPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Your service history will appear here',
+            'Your completed services will appear here for rating',
             style: TextStyle(
               fontSize: FontSizes.body,
               fontFamily: AppFonts.primaryFont,
@@ -371,38 +659,3 @@ class _HistoryPageState extends State<HistoryPage> {
       ),
     );
   }
-
-  void _rateService(ServiceHistory history) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => RateMechanicScreen(
-          mechanicId: history.mechanicId,
-          mechanicName: history.mechanicName,
-          serviceId: history.id,
-          onRatingSubmitted: (rating, review) {
-            setState(() {
-              final index =
-                  _serviceHistory.indexWhere((h) => h.id == history.id);
-              if (index != -1) {
-                _serviceHistory[index] = ServiceHistory(
-                  id: history.id,
-                  mechanicId: history.mechanicId,
-                  mechanicName: history.mechanicName,
-                  serviceName: history.serviceName,
-                  serviceDate: history.serviceDate,
-                  status: history.status,
-                  cost: history.cost,
-                  description: history.description,
-                  rating: rating,
-                  userReview: review,
-                  mechanicLocation: history.mechanicLocation,
-                );
-              }
-            });
-          },
-        ),
-      ),
-    );
-  }
-}

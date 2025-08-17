@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
+import '../../services/message_notification_service.dart';
 
 class ChatScreen extends StatefulWidget {
+  final String mechanicId;
   final String mechanicName;
-  final bool isOnline;
+  final String? mechanicImageUrl;
 
   const ChatScreen({
     super.key,
+    required this.mechanicId,
     required this.mechanicName,
-    this.isOnline = true,
+    this.mechanicImageUrl,
   });
 
   @override
@@ -15,56 +20,165 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
+  final SupabaseClient supabase = Supabase.instance.client;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  
-  List<ChatMessage> messages = [
-    ChatMessage(
-      text: "Hello! I'm available to help with your vehicle issues. What can I assist you with today?",
-      isFromMechanic: true,
-      timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-    ),
-  ];
+  List<Map<String, dynamic>> _messages = [];
+  RealtimeChannel? _subscription;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMessages();
+    _setupRealtimeSubscription();
+  }
 
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    if (_subscription != null) {
+      supabase.removeChannel(_subscription!);
+    }
     super.dispose();
   }
 
-  void _sendMessage() {
-    if (_messageController.text.trim().isEmpty) return;
+  Future<void> _loadMessages() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) {
+      _showError("User not logged in.");
+      return;
+    }
 
-    setState(() {
-      messages.add(ChatMessage(
-        text: _messageController.text.trim(),
-        isFromMechanic: false,
-        timestamp: DateTime.now(),
-      ));
-    });
+    try {
+      final response = await supabase
+          .from('messages')
+          .select('id, sender_id, receiver_id, content, created_at, is_read')
+          .or(
+            'and(sender_id.eq.${user.id},receiver_id.eq.${widget.mechanicId}),and(sender_id.eq.${widget.mechanicId},receiver_id.eq.${user.id})',
+          )
+          .order('created_at', ascending: true);
 
-    _messageController.clear();
-    _scrollToBottom();
-    
-    // Show a subtle haptic feedback
-    // HapticFeedback.lightImpact(); // Uncomment if you want haptic feedback
+      setState(() {
+        _messages = List<Map<String, dynamic>>.from(response)
+          ..sort((a, b) => DateTime.parse(a['created_at'])
+              .compareTo(DateTime.parse(b['created_at'])));
+        _isLoading = false;
+      });
+
+      // Mark messages from mechanic as read
+      await _markMessagesAsRead();
+      
+      Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
+    } catch (e) {
+      _showError("Error loading messages: $e");
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _markMessagesAsRead() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await supabase
+          .from('messages')
+          .update({'is_read': true})
+          .eq('sender_id', widget.mechanicId)
+          .eq('receiver_id', user.id)
+          .eq('is_read', false);
+      
+      // Update the global notification service
+      MessageNotificationService().refresh();
+    } catch (e) {
+      print("Error marking messages as read: $e");
+    }
+  }
+
+  void _setupRealtimeSubscription() {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    _subscription = supabase
+        .channel('public:messages:chat_${user.id}_${widget.mechanicId}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'messages',
+          callback: (payload) {
+            final newMessage = payload.newRecord;
+
+            final isRelevant =
+                (newMessage['sender_id'] == user.id &&
+                        newMessage['receiver_id'] == widget.mechanicId) ||
+                    (newMessage['sender_id'] == widget.mechanicId &&
+                        newMessage['receiver_id'] == user.id);
+
+            if (isRelevant) {
+              setState(() {
+                _messages.add(Map<String, dynamic>.from(newMessage));
+                _messages.sort((a, b) => DateTime.parse(a['created_at'])
+                    .compareTo(DateTime.parse(b['created_at'])));
+              });
+
+              // If message is from mechanic, mark as read
+              if (newMessage['sender_id'] == widget.mechanicId) {
+                _markMessagesAsRead();
+              }
+              
+              Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
+            }
+          },
+        )
+        .subscribe();
+  }
+
+  Future<void> _sendMessage() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) {
+      _showError("User not logged in.");
+      return;
+    }
+
+    final content = _messageController.text.trim();
+    if (content.isEmpty) return;
+
+    try {
+      await supabase.from('messages').insert({
+        'sender_id': user.id,
+        'receiver_id': widget.mechanicId,
+        'content': content,
+        'is_read': false,
+      });
+      _messageController.clear();
+    } catch (e) {
+      _showError("Error sending message: $e");
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOutCubic,
-        );
-      }
-    });
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final user = supabase.auth.currentUser;
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -82,14 +196,19 @@ class _ChatScreenState extends State<ChatScreen> {
                 tag: 'mechanic-avatar-${widget.mechanicName}',
                 child: CircleAvatar(
                   radius: 20,
+                  backgroundImage: widget.mechanicImageUrl != null
+                      ? NetworkImage(widget.mechanicImageUrl!)
+                      : null,
                   backgroundColor: const Color(0xFF0D47A1),
-                  child: Text(
-                    widget.mechanicName[0].toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: widget.mechanicImageUrl == null
+                      ? Text(
+                          widget.mechanicName[0].toUpperCase(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      : null,
                 ),
               ),
               const SizedBox(width: 12),
@@ -105,27 +224,11 @@ class _ChatScreenState extends State<ChatScreen> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 500),
-                      child: Row(
-                        children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 500),
-                            child: Icon(
-                              Icons.circle,
-                              size: 8,
-                              color: widget.isOnline ? Colors.green : Colors.grey,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            widget.isOnline ? 'Online' : 'Last seen recently',
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
+                    Text(
+                      'Mechanic',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 12,
                       ),
                     ),
                   ],
@@ -138,10 +241,10 @@ class _ChatScreenState extends State<ChatScreen> {
           IconButton(
             icon: const Icon(Icons.call, color: Color(0xFF0D47A1)),
             onPressed: () {
-              // Call functionality with haptic feedback
+              // Call functionality
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: const Text('Calling mechanic...'),
+                  content: Text('Calling ${widget.mechanicName}...'),
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -163,18 +266,31 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           // Messages List
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: messages.length,
-              itemBuilder: (context, index) {
-                return AnimatedContainer(
-                  duration: Duration(milliseconds: 300 + (index * 50)),
-                  curve: Curves.easeOutCubic,
-                  child: _buildMessageBubble(messages[index]),
-                );
-              },
-            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _messages.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No messages yet\nStart the conversation!',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 16,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _messages.length,
+                        itemBuilder: (context, index) {
+                          return AnimatedContainer(
+                            duration: Duration(milliseconds: 300 + (index * 50)),
+                            curve: Curves.easeOutCubic,
+                            child: _buildMessageBubble(_messages[index], user?.id),
+                          );
+                        },
+                      ),
           ),
           
           // Message Input Area
@@ -195,27 +311,6 @@ class _ChatScreenState extends State<ChatScreen> {
             child: SafeArea(
               child: Row(
                 children: [
-                  // Attachment button
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    child: IconButton(
-                      icon: const Icon(Icons.attach_file, color: Colors.grey),
-                      onPressed: () {
-                        // Attachment functionality
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Attachment feature coming soon'),
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  
                   // Message input field
                   Expanded(
                     child: AnimatedContainer(
@@ -283,27 +378,35 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildMessageBubble(ChatMessage message) {
+  Widget _buildMessageBubble(Map<String, dynamic> message, String? currentUserId) {
+    final isFromCurrentUser = message['sender_id'] == currentUserId;
+    final timestamp = DateTime.parse(message['created_at']);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
-        mainAxisAlignment: message.isFromMechanic 
-            ? MainAxisAlignment.start 
-            : MainAxisAlignment.end,
+        mainAxisAlignment: isFromCurrentUser 
+            ? MainAxisAlignment.end 
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (message.isFromMechanic) ...[
+          if (!isFromCurrentUser) ...[
             CircleAvatar(
               radius: 16,
+              backgroundImage: widget.mechanicImageUrl != null
+                  ? NetworkImage(widget.mechanicImageUrl!)
+                  : null,
               backgroundColor: const Color(0xFF0D47A1),
-              child: Text(
-                widget.mechanicName[0].toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              child: widget.mechanicImageUrl == null
+                  ? Text(
+                      widget.mechanicName[0].toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )
+                  : null,
             ),
             const SizedBox(width: 8),
           ],
@@ -312,16 +415,16 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: message.isFromMechanic 
-                    ? Colors.white 
-                    : const Color(0xFF0D47A1),
+                color: isFromCurrentUser 
+                    ? const Color(0xFF0D47A1)
+                    : Colors.white,
                 borderRadius: BorderRadius.circular(18).copyWith(
-                  bottomLeft: message.isFromMechanic 
-                      ? const Radius.circular(4) 
-                      : const Radius.circular(18),
-                  bottomRight: message.isFromMechanic 
+                  bottomLeft: isFromCurrentUser 
                       ? const Radius.circular(18) 
                       : const Radius.circular(4),
+                  bottomRight: isFromCurrentUser 
+                      ? const Radius.circular(4) 
+                      : const Radius.circular(18),
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -336,28 +439,43 @@ class _ChatScreenState extends State<ChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    message.text,
+                    message['content'],
                     style: TextStyle(
-                      color: message.isFromMechanic ? Colors.black87 : Colors.white,
+                      color: isFromCurrentUser ? Colors.white : Colors.black87,
                       fontSize: 15,
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    _formatTime(message.timestamp),
-                    style: TextStyle(
-                      color: message.isFromMechanic 
-                          ? Colors.grey[500] 
-                          : Colors.white.withOpacity(0.7),
-                      fontSize: 11,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _formatTime(timestamp),
+                        style: TextStyle(
+                          color: isFromCurrentUser 
+                              ? Colors.white.withOpacity(0.7)
+                              : Colors.grey[500],
+                          fontSize: 11,
+                        ),
+                      ),
+                      if (isFromCurrentUser) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          message['is_read'] ? Icons.done_all : Icons.done,
+                          size: 14,
+                          color: message['is_read'] 
+                              ? Colors.blue[200] 
+                              : Colors.white.withOpacity(0.7),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
             ),
           ),
           
-          if (!message.isFromMechanic) ...[
+          if (isFromCurrentUser) ...[
             const SizedBox(width: 8),
             CircleAvatar(
               radius: 16,
@@ -385,19 +503,7 @@ class _ChatScreenState extends State<ChatScreen> {
     } else if (difference.inDays < 1) {
       return '${difference.inHours}h ago';
     } else {
-      return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
+      return DateFormat('dd/MM/yyyy').format(timestamp);
     }
   }
-}
-
-class ChatMessage {
-  final String text;
-  final bool isFromMechanic;
-  final DateTime timestamp;
-
-  ChatMessage({
-    required this.text,
-    required this.isFromMechanic,
-    required this.timestamp,
-  });
 }

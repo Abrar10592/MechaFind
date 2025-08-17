@@ -41,7 +41,7 @@ class UserProfile {
       email: json['email'],
       phone: json['phone'],
       role: json['role'],
-      imageUrl: json['image_url'],
+      imageUrl: json['image_url'], // Use image_url column
       dateOfBirth: json['dob'] != null ? DateTime.parse(json['dob']) : null,
       vehicleModels: vehicles,
       createdAt: DateTime.parse(json['created_at']),
@@ -55,7 +55,7 @@ class UserProfile {
       'email': email,
       'phone': phone,
       'role': role,
-      'image_url': imageUrl,
+      'image_url': imageUrl, // Use image_url column
       'dob': dateOfBirth?.toIso8601String().split('T')[0],
       'veh_model': vehicleModels,
       'created_at': createdAt.toIso8601String(),
@@ -70,7 +70,7 @@ class UserProfile {
       'veh_model': vehicleModels,
     };
 
-    if (imageUrl != null) data['image_url'] = imageUrl;
+    if (imageUrl != null) data['image_url'] = imageUrl; // Use image_url column
     if (dateOfBirth != null) data['dob'] = dateOfBirth!.toIso8601String().split('T')[0];
 
     return data;
