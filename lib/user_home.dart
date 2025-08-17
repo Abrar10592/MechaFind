@@ -153,24 +153,33 @@ class _UserHomePageState extends State<UserHomePage> {
 
   Future _fetchMechanicsFromDB() async {
     if (userLat == null || userLng == null) return;
+
     try {
+      // First fetch all mechanics with their locations
       final mechanicData = await supabase.from('mechanics').select('''
-            id,
-            rating,
-            location_x,
-            location_y,
-            users(full_name, profile_pic, phone),
-            mechanic_services(service_id, services(name))
-            ''');
+          id,
+          rating,
+          location_x,
+          location_y,
+          users(full_name, image_url, phone),
+          mechanic_services(service_id, services(name))
+          ''');
+
       List<Map<String, dynamic>> mechanicsList = [];
+
       for (final mech in mechanicData) {
+        // Parse mechanic's location coordinates
         final mLat = mech['location_x'] is double
             ? mech['location_x']
             : double.tryParse(mech['location_x'].toString()) ?? 0.0;
         final mLng = mech['location_y'] is double
             ? mech['location_y']
             : double.tryParse(mech['location_y'].toString()) ?? 0.0;
+
+        // Calculate distance in kilometers
         final distance = _calculateDistanceKm(userLat!, userLng!, mLat, mLng);
+
+        // Only include mechanics within 7km radius
         if (distance <= 7.0) {
           final services = (mech['mechanic_services'] as List<dynamic>)
               .map((s) => s['services']?['name'] as String?)
@@ -180,19 +189,32 @@ class _UserHomePageState extends State<UserHomePage> {
           mechanicsList.add({
             'id': mech['id'],
             'name': mech['users']?['full_name'] ?? 'Unnamed',
-            'image_url': mech['users']?['profile_pic'],
+            'image_url': mech['users']?['image_url'],
             'phone': mech['users']?['phone'],
             'distance': '${distance.toStringAsFixed(1)} km',
+            'distance_value': distance, // Store numerical value for sorting
             'rating': mech['rating'] ?? 0.0,
             'services': services,
+            'lat': mLat, // Store latitude for mapping
+            'lng': mLng, // Store longitude for mapping
           });
         }
       }
+
+      // Sort mechanics by distance (nearest first)
+      mechanicsList.sort((a, b) => a['distance_value'].compareTo(b['distance_value']));
+
       setState(() {
         nearbyMechanics = mechanicsList;
       });
+
     } catch (e) {
       print("❌ Fetch mechanics error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading mechanics: ${e.toString()}')),
+        );
+      }
     }
   }
 
@@ -468,7 +490,14 @@ class _UserHomePageState extends State<UserHomePage> {
           return Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: ListTile(
-              onTap: () => _showActiveRequestMechanicDetails(req),
+              onTap: () {
+                if ((req['request_type'] ?? 'normal') == 'emergency') {
+                  Navigator.pushNamed(context, '/active_emergency_route', arguments: req);
+                } else {
+                  _showActiveRequestMechanicDetails(req);
+                }
+              },
+
               leading: CircleAvatar(
                 backgroundColor: statusColor,
                 child:
@@ -488,15 +517,26 @@ class _UserHomePageState extends State<UserHomePage> {
     );
   }
 
+  Future<void> _refreshHomePage() async {
+    await _checkLocationServiceAndLoad();
+    await _fetchUserName();
+    await _fetchMechanicsFromDB();
+    // No need to re-listen to activeRequests stream because it updates live automatically
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final greetingText =
     widget.isGuest ? "Welcome" : "Welcome ${userName ?? ''}";
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.primary,
-        title: Text(greetingText,
-            style: AppTextStyles.heading.copyWith(color: Colors.white)),
+        title: Text(
+          greetingText,
+          style: AppTextStyles.heading.copyWith(color: Colors.white),
+        ),
         actions: [
           if (!widget.isGuest)
             Padding(
@@ -513,141 +553,157 @@ class _UserHomePageState extends State<UserHomePage> {
         ],
       ),
       backgroundColor: AppColors.background,
-      body: ListView(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(children: [
-              const Icon(Icons.location_on,
-                  size: 20, color: AppColors.textSecondary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(currentLocation,
-                    style: AppTextStyles.body
-                        .copyWith(color: AppColors.textSecondary),
-                    overflow: TextOverflow.ellipsis),
+      body: RefreshIndicator(
+        onRefresh: _refreshHomePage,
+        child: ListView(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.location_on,
+                    size: 20,
+                    color: AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      currentLocation,
+                      style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
-            ]),
-          ),
-          const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: EmergencyButton()),
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text('Nearby Mechanics',
-                style: AppTextStyles.heading
-                    .copyWith(fontSize: FontSizes.subHeading)),
-          ),
-          const SizedBox(height: 10),
-          if (nearbyMechanics.isEmpty)
+            ),
             const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: EmergencyButton(),
+            ),
+            const SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'Nearby Mechanics',
+                style: AppTextStyles.heading.copyWith(fontSize: FontSizes.subHeading),
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (nearbyMechanics.isEmpty)
+              const Padding(
                 padding: EdgeInsets.all(16),
-                child: Text("No mechanics found."))
-          else
-            Column(
-              children: nearbyMechanics.map((mech) {
-                final hasPending =
-                _isRequestActiveForMechanic(mech['id'], 'pending');
-                final hasAccepted =
-                _isRequestActiveForMechanic(mech['id'], 'accepted');
-                Color btnColor = AppColors.accent;
-                String btnText = "Request Service";
-                if (hasPending) {
-                  btnColor = Colors.orange;
-                  btnText = "Request Pending";
-                } else if (hasAccepted) {
-                  btnColor = Colors.green;
-                  btnText = "Request Accepted";
-                }
-                return Container(
-                  margin:
-                  const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                  padding: const EdgeInsets.all(16),
-                  color: Colors.white,
-                  child: Column(children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                child: Text("No mechanics found."),
+              )
+            else
+              Column(
+                children: nearbyMechanics.map((mech) {
+                  final hasPending = _isRequestActiveForMechanic(mech['id'], 'pending');
+                  final hasAccepted = _isRequestActiveForMechanic(mech['id'], 'accepted');
+
+                  Color btnColor = AppColors.accent;
+                  String btnText = "Request Service";
+
+                  if (hasPending) {
+                    btnColor = Colors.orange;
+                    btnText = "Request Pending";
+                  } else if (hasAccepted) {
+                    btnColor = Colors.green;
+                    btnText = "Request Accepted";
+                  }
+
+                  return Container(
+                    margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                    padding: const EdgeInsets.all(16),
+                    color: Colors.white,
+                    child: Column(
                       children: [
-                        mech['image_url'] != null &&
-                            mech['image_url'].toString().isNotEmpty
-                            ? ClipRRect(
-                          borderRadius: BorderRadius.circular(40),
-                          child: Image.network(mech['image_url'],
-                              width: 80,
-                              height: 80,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            mech['image_url'] != null && mech['image_url'].toString().isNotEmpty
+                                ? ClipRRect(
+                              borderRadius: BorderRadius.circular(40),
+                              child: Image.network(
+                                mech['image_url'],
                                 width: 80,
                                 height: 80,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  width: 80,
+                                  height: 80,
+                                  color: Colors.grey[300],
+                                  child: const Icon(Icons.person, size: 40, color: Colors.white),
+                                ),
+                              ),
+                            )
+                                : Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
                                 color: Colors.grey[300],
-                                child: const Icon(Icons.person,
-                                    size: 40, color: Colors.white),
-                              )),
-                        )
-                            : Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                              color: Colors.grey[300],
-                              borderRadius: BorderRadius.circular(40)),
-                          child: const Icon(Icons.person,
-                              size: 40, color: Colors.white),
+                                borderRadius: BorderRadius.circular(40),
+                              ),
+                              child: const Icon(Icons.person, size: 40, color: Colors.white),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    mech['name'],
+                                    style: AppTextStyles.heading.copyWith(fontSize: 18, fontWeight: FontWeight.bold),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text('Distance: ${mech['distance']}'),
+                                  Text('Rating: ${mech['rating']}'),
+                                  Text('Services: ${mech['services']?.join(', ')}'),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(mech['name'],
-                                    style: AppTextStyles.heading.copyWith(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 4),
-                                Text('Distance: ${mech['distance']}'),
-                                Text('Rating: ${mech['rating']}'),
-                                Text('Services: ${mech['services'].join(', ')}'),
-                              ],
-                            ))
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: btnColor),
+                            onPressed: (hasPending || hasAccepted) ? null : () => _showRequestServiceDialog(mech),
+                            child: Text(btnText),
+                          ),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style:
-                        ElevatedButton.styleFrom(backgroundColor: btnColor),
-                        onPressed: (hasPending || hasAccepted)
-                            ? null
-                            : () => _showRequestServiceDialog(mech),
-                        child: Text(btnText),
-                      ),
-                    )
-                  ]),
-                );
-              }).toList(),
-            ),
-          const SizedBox(height: 20),
-          _activeRequestsSection(),
-        ],
+                  );
+                }).toList(),
+              ),
+            const SizedBox(height: 20),
+            _activeRequestsSection(),
+          ],
+        ),
       ),
-      bottomNavigationBar: BottomNavBar(currentIndex: 0, onTap: (index) {
-        if (index == 0) return;
-        switch (index) {
-          case 1:
-            Navigator.pushNamed(context, '/find-mechanics');
-            break;
-          case 2:
-            Navigator.pushNamed(context, '/messages');
-            break;
-          case 3:
-            Navigator.pushNamed(context, '/history');
-            break;
-          case 4:
-            Navigator.pushNamed(context, '/settings');
-            break;
-        }
-      }),
+      bottomNavigationBar: BottomNavBar(
+        currentIndex: 0,
+        onTap: (index) {
+          if (index == 0) return;
+          switch (index) {
+            case 1:
+              Navigator.pushNamed(context, '/find-mechanics');
+              break;
+            case 2:
+              Navigator.pushNamed(context, '/messages');
+              break;
+            case 3:
+              Navigator.pushNamed(context, '/history');
+              break;
+            case 4:
+              Navigator.pushNamed(context, '/settings');
+              break;
+          }
+        },
+      ),
     );
   }
+
 }

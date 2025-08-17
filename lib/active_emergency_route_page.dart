@@ -3,7 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
-
+import 'user_home.dart';
 class ActiveEmergencyRoutePage extends StatefulWidget {
   final String requestId;
   final LatLng userLocation;
@@ -95,7 +95,7 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage> {
   }
 
   // NEW: Service complete popup
-  void _showServiceCompleteDialog() {
+  void _showServiceCompleteDialog(Map<String, dynamic> request) {
     double rating = 0;
     final TextEditingController reviewController = TextEditingController();
 
@@ -108,7 +108,6 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage> {
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Star rating row
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(5, (index) {
@@ -139,35 +138,72 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage> {
             ),
             actions: [
               TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel')),
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
               ElevatedButton(
-                  onPressed: () async {
-                    if (rating == 0) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('Please give a rating')));
-                      return;
-                    }
+                onPressed: () async {
+                  if (rating == 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('Please give a rating'),
+                    ));
+                    return;
+                  }
 
-                    await Supabase.instance.client.from('requests').update({
-                      'status': 'completed',
-                      'rating': rating,
-                      'review': reviewController.text.trim(),
-                    }).eq('id', widget.requestId);
+                  try {
+                    // 1. Update request status to completed
+                    await Supabase.instance.client
+                        .from('requests')
+                        .update({'status': 'completed'})
+                        .eq('id', widget.requestId);
+
+                    // 2. Create review record
+                    await Supabase.instance.client.from('reviews').insert({
+                      'request_id': widget.requestId,
+                      'user_id': request['user_id'],
+                      'mechanic_id': request['mechanic_id'],
+                      'rating': rating.toInt(),
+                      'comment': reviewController.text.trim(),
+                    });
 
                     if (mounted) {
-                      Navigator.pop(context); // close dialog
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('Service marked as complete.')));
+                      Navigator.pop(context); // Close the dialog
+
+                      // Navigate back to user home page
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(builder: (context) => UserHomePage()),
+                            (Route<dynamic> route) => false,
+                      );
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Thank you for your feedback!'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
                     }
-                  },
-                  child: const Text('Submit')),
+                  } catch (e, st) {
+                    debugPrint('❌ Error submitting review: $e');
+                    debugPrint('Stack trace: $st');
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to submit: ${e.toString()}'),
+                        ),
+                      );
+                    }
+                  }
+                },
+                child: const Text('Submit'),
+              ),
             ],
           );
         });
       },
     );
   }
+
 
   Widget _buildWaitingUI([String reason = '']) {
     if (reason.isNotEmpty) {
@@ -454,10 +490,14 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage> {
                       style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
                           minimumSize: const Size.fromHeight(48)),
-                      onPressed: _showServiceCompleteDialog,
+                      onPressed: () => _showServiceCompleteDialog(request),
+
+
                     ),
                   ),
                 ],
+
+
               );
             },
           );

@@ -21,6 +21,7 @@ import 'screens/splash/splash_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'services/message_notification_service.dart';
 import 'utils.dart';
+import 'active_emergency_route_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -216,6 +217,11 @@ class _MechFindAppState extends State<MechFindApp> {
         '/messages': (context) => const MessagesPage(),
         '/history': (context) => const HistoryPage(),
         '/settings': (context) => const SettingsProfileScreen(),
+        '/active_emergency_route': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          return ActiveEmergencyRoutePage(requestId: args['requestId'], userLocation: args['userLocation']);
+        },
+
       },
     );
   }
