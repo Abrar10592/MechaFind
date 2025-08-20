@@ -288,31 +288,8 @@ class _SignInPageState extends State<SignInPage> {
                       ),
               ),
             ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: Colors.white60),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  foregroundColor: Colors.white,
-                  backgroundColor: AppColors.primary.withOpacity(0.12),
-                ),
-                icon: Image.asset(
-                  'assets/google_logo.png',
-                  height: 24,
-                  width: 24,
-                ),
-                label: Text(
-                  'Sign in with Google',
-                  style: AppTextStyles.body.copyWith(
-                    color: Colors.white,
-                  ),
-                ),
-                onPressed: _loading ? null : _signInWithGoogle,
-              ),
-            ),
+           const SizedBox(height: 16),
+
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,

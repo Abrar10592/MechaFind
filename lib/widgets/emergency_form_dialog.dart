@@ -1,24 +1,31 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
+
 import 'package:geocoding/geocoding.dart';
+
 import 'package:geolocator/geolocator.dart';
+
 import 'package:image_picker/image_picker.dart';
+
 import 'package:latlong2/latlong.dart';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../active_emergency_route_page.dart';
-import 'package:mechfind/utils.dart'; // Update this import if needed
+
+import '../active_emergency_route_page.dart'; // kept original import
+
+import 'package:mechfind/utils.dart'; // Update import if needed
 
 class EmergencyFormDialog extends StatefulWidget {
   const EmergencyFormDialog({super.key});
 
   @override
-  State<EmergencyFormDialog> createState() => _EmergencyFormDialogState();
+  State createState() => _EmergencyFormDialogState();
 }
 
 class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
   final _vehicleController = TextEditingController();
   final _descriptionController = TextEditingController();
-
   File? _capturedImage;
   String? _location;
   Position? _coords;
@@ -37,13 +44,16 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
     super.dispose();
   }
 
-  Future<void> _fetchLocation() async {
+  Future _fetchLocation() async {
     setState(() => _loading = true);
     try {
       LocationPermission permission = await Geolocator.checkPermission();
+      print("Location permission before request: $permission");
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        print("Location permission after request: $permission");
+        if (permission == LocationPermission.denied ||
+            permission == LocationPermission.deniedForever) {
           setState(() {
             _location = 'Location permission denied';
             _loading = false;
@@ -51,24 +61,24 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
           return;
         }
       }
-
       final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
       _coords = pos;
-
       List<Placemark> placemarks = [];
       try {
         placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
-      } catch (_) {}
-
+        print("Placemarks obtained: $placemarks");
+      } catch (e) {
+        print("Reverse geocoding error: $e");
+      }
       final address = placemarks.isNotEmpty
           ? '${placemarks.first.street ?? ''}, ${placemarks.first.locality ?? ''}, ${placemarks.first.country ?? ''}'
           : 'No address found';
-
       setState(() {
         _location = address.trim().isEmpty ? "Unknown location" : address;
         _loading = false;
       });
     } catch (e) {
+      print("Fetching location error: $e");
       setState(() {
         _location = 'Failed to get location';
         _loading = false;
@@ -76,14 +86,18 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
     }
   }
 
-  Future<void> _takePicture() async {
+  Future _takePicture() async {
     final picker = ImagePicker();
     try {
       final pickedFile = await picker.pickImage(source: ImageSource.camera, imageQuality: 60);
       if (pickedFile != null) {
-        setState(() => _capturedImage = File(pickedFile.path));
+        setState(() {
+          _capturedImage = File(pickedFile.path);
+        });
+        print("Picture taken: ${pickedFile.path}");
       }
     } catch (e) {
+      print("Error taking picture: $e");
       _showMessage('Failed to take picture: $e');
     }
   }
@@ -94,73 +108,70 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
     }
   }
 
-  Future<void> _handleSubmit() async {
+  Future _handleSubmit() async {
     final vehicle = _vehicleController.text.trim();
     final desc = _descriptionController.text.trim();
 
     if (vehicle.isEmpty || desc.isEmpty || _capturedImage == null) {
-      _showMessage('Please fill all fields and take a picture.');
+      _showMessage('Please fill all fields and take a photo.');
       return;
     }
-
     if (_coords == null) {
-      _showMessage("Location not available.");
+      _showMessage('Location not available.');
       return;
     }
-
     setState(() => _loading = true);
 
     try {
-      final supabase = Supabase.instance.client;
-      final user = supabase.auth.currentUser;
+      final supabase = Supabase.instance;
+      var user = supabase.client.auth.currentUser;
+      print('Current user info: $user');
 
-      print('🔐 Current user ID: ${user?.id}');
+      String userId;
       if (user == null) {
-        _showMessage('You must be logged in to submit a request.');
-        setState(() => _loading = false);
-        return;
+        print("User is guest, inserting guest record.");
+        final response = await supabase.client
+            .from('guests')
+            .insert({'session_info': 'Guest session at ${DateTime.now().toIso8601String()}'})
+            .select()
+            .single();
+
+        if (response == null || response['id'] == null) {
+          print("Failed to insert guest session");
+          _showMessage("Failed to create guest session");
+          setState(() => _loading = false);
+          return;
+        }
+        userId = response['id'] as String;
+        print("Guest id received: $userId");
+      } else {
+        userId = user.id;
       }
 
-      final bucketName = 'request-photos'; // Your private bucket name
+      const bucketName = 'request-photos';
       final fileExt = _capturedImage!.path.split('.').last;
       final fileName = '${DateTime.now().millisecondsSinceEpoch}.$fileExt';
-      final filePath = 'requests/${user.id}/$fileName'; // <--- RELATIVE to bucket
 
-      print('🛣️ Intended file path: $filePath');
+      final filePath = 'requests/$userId/$fileName';
 
-      String uploadedPath = '';
-      try {
-        uploadedPath = await supabase.storage.from(bucketName).upload(filePath, _capturedImage!);
-        print('📦 Uploaded path from Supabase: $uploadedPath');
-      } catch (e) {
-        print('❗ Upload error: $e');
-        _showMessage('Image upload failed: $e');
-        setState(() => _loading = false);
-        return;
-      }
+      print("Uploading image to path: $filePath");
 
-      // uploadedPath should be 'requests/userid/filename.jpg'.
-      // If it starts with 'request-photos/', strip it:
+      final uploadedPath = await supabase.client.storage.from(bucketName).upload(filePath, File(_capturedImage!.path));
+      print('Uploaded path from Supabase: $uploadedPath');
+
       String relativePath = uploadedPath;
       if (relativePath.startsWith('$bucketName/')) {
-        relativePath = relativePath.replaceFirst('$bucketName/', '');
-        print('✂️ Adjusted relative path for signed URL: $relativePath');
+        relativePath = relativePath.substring(bucketName.length + 1);
+        print('Adjusted relative path for signed URL: $relativePath');
       }
 
-      String imageUrl = '';
-      try {
-        imageUrl = await supabase.storage.from(bucketName).createSignedUrl(relativePath, 86400);
-        print('🔗 Obtained signed URL: $imageUrl');
-      } catch (e) {
-        print('❗ Signed URL error: $e');
-        _showMessage('Failed to get signed URL: $e');
-        setState(() => _loading = false);
-        return;
-      }
+      final imageUrl = await supabase.client.storage.from(bucketName).createSignedUrl(relativePath, 86400);
+      print('Signed URL generated: $imageUrl');
 
-      // Insert emergency request into 'requests' table
-      final response = await supabase.from('requests').insert({
-        'user_id': user.id,
+      final requestResponse = await supabase.client
+          .from('requests')
+          .insert({
+        'user_id': userId,
         'mechanic_id': null,
         'status': 'pending',
         'vehicle': vehicle,
@@ -170,35 +181,38 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
         'lng': _coords!.longitude.toString(),
         'mech_lat': null,
         'mech_lng': null,
-      }).select('id, lat, lng');
+        'request_type': 'emergency',
+      })
+          .select()
+          .single();
 
-      if (response.isEmpty) {
-        _showMessage('Failed to submit request. Try again.');
+      print("Request insert response: $requestResponse");
+
+      if (requestResponse == null) {
+        _showMessage('Failed to submit request. Please try again.');
         setState(() => _loading = false);
         return;
       }
 
-      final Map<String, dynamic> requestRow = response.first;
-      final String requestId = requestRow['id'];
-      final double latitude = double.tryParse(requestRow['lat']) ?? _coords!.latitude;
-      final double longitude = double.tryParse(requestRow['lng']) ?? _coords!.longitude;
+      final requestId = requestResponse['id'] as String;
+      final lat = double.tryParse(requestResponse['lat'] ?? '') ?? _coords!.latitude;
+      final lng = double.tryParse(requestResponse['lng'] ?? '') ?? _coords!.longitude;
 
-      print('✅ Request inserted with ID: $requestId');
+      print("Navigating with requestId: $requestId, lat: $lat, lng: $lng");
 
-      // Navigate to the Active Emergency Route Page
       if (!mounted) return;
-      Navigator.of(context).pop(); // Close this dialog
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
+      Navigator.of(context).pop();
+      Navigator.of(context).pushReplacement(MaterialPageRoute(
           builder: (_) => ActiveEmergencyRoutePage(
             requestId: requestId,
-            userLocation: LatLng(latitude, longitude),
-          ),
-        ),
-      );
-    } catch (e) {
-      print('❗ Unexpected error: $e');
-      _showMessage('Unexpected error occurred: $e');
+            userLocation: LatLng(lat, lng),
+          )));
+    } catch (e, stackTrace) {
+      print('Exception during submission: $e\nStack trace:\n$stackTrace');
+      if (e is PostgrestException) {
+        print('PostgREST specific message: ${e.message}');
+      }
+      _showMessage('Error submitting request: $e');
     } finally {
       setState(() => _loading = false);
     }
@@ -217,10 +231,9 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
             Text(
               'Request Emergency Help',
               style: AppTextStyles.heading.copyWith(
-                color: Colors.white,
-                fontFamily: AppFonts.primaryFont,
-                fontSize: FontSizes.subHeading + 2,
-              ),
+                  color: Colors.white,
+                  fontFamily: AppFonts.primaryFont,
+                  fontSize: FontSizes.subHeading + 2),
             ),
             const SizedBox(height: 6),
             Text(
@@ -262,24 +275,21 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
               ),
             ),
             const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: AppColors.accent.withOpacity(0.7)),
-                  backgroundColor: AppColors.primary.withOpacity(0.15),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: AppColors.accent.withOpacity(0.7)),
+                backgroundColor: AppColors.primary.withOpacity(0.15),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                icon: const Icon(Icons.camera_alt, color: Colors.white),
-                label: Text(
-                  _capturedImage == null ? "Take a Photo" : "Retake Photo",
-                  style: AppTextStyles.body.copyWith(color: Colors.white),
-                ),
-                onPressed: _loading ? null : _takePicture,
               ),
+              icon: const Icon(Icons.camera_alt, color: Colors.white),
+              label: Text(
+                _capturedImage == null ? "Take Photo" : "Retake Photo",
+                style: AppTextStyles.body.copyWith(color: Colors.white),
+              ),
+              onPressed: _loading ? null : _takePicture,
             ),
             if (_capturedImage != null)
               Padding(
@@ -302,10 +312,7 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
                 child: Text(
                   _loading ? "Submitting..." : "Submit",
                   style: AppTextStyles.body.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: FontSizes.subHeading,
-                  ),
+                      color: Colors.white, fontWeight: FontWeight.bold, fontSize: FontSizes.subHeading),
                 ),
               ),
             ),
