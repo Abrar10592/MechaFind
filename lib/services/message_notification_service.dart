@@ -105,6 +105,7 @@ class MessageNotificationService extends ChangeNotifier {
     await _loadUnreadCount();
   }
 
+  @override
   void dispose() {
     if (_subscription != null) {
       _supabase.removeChannel(_subscription!);

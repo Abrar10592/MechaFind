@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:mechfind/utils.dart';
@@ -11,7 +10,6 @@ import 'services/message_notification_service.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:latlong2/latlong.dart';
 

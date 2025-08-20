@@ -12,13 +12,13 @@ class ProfileAvatar extends StatelessWidget {
   final VoidCallback? onTap;
 
   const ProfileAvatar({
-    Key? key,
+    super.key,
     this.radius = 20,
     this.profilePicUrl,
     this.showBorder = false,
     this.borderColor,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -85,12 +85,12 @@ class CurrentUserAvatar extends StatefulWidget {
   final VoidCallback? onTap;
 
   const CurrentUserAvatar({
-    Key? key,
+    super.key,
     this.radius = 20,
     this.showBorder = false,
     this.borderColor,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   State<CurrentUserAvatar> createState() => _CurrentUserAvatarState();

@@ -136,7 +136,7 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
             .select()
             .single();
 
-        if (response == null || response['id'] == null) {
+        if (response['id'] == null) {
           print("Failed to insert guest session");
           _showMessage("Failed to create guest session");
           setState(() => _loading = false);
@@ -187,12 +187,6 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
           .single();
 
       print("Request insert response: $requestResponse");
-
-      if (requestResponse == null) {
-        _showMessage('Failed to submit request. Please try again.');
-        setState(() => _loading = false);
-        return;
-      }
 
       final requestId = requestResponse['id'] as String;
       final lat = double.tryParse(requestResponse['lat'] ?? '') ?? _coords!.latitude;

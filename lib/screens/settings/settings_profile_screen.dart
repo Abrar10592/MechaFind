@@ -156,7 +156,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
               _buildSectionCard(
                 title: 'Personal Information',
                 children: [
-                  _buildInput(_nameController, 'Full Name', Icons.person),
+                  _buildInput(_nameController, 'Full Name', Icons.person, isRequired: true),
                   _buildInput(_phoneController, 'Phone Number', Icons.phone),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -268,7 +268,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
     );
   }
 
-  Widget _buildInput(TextEditingController controller, String label, IconData icon, {int maxLines = 1}) {
+  Widget _buildInput(TextEditingController controller, String label, IconData icon, {int maxLines = 1, bool isRequired = false}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
@@ -276,13 +276,13 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
         maxLines: maxLines,
         style: AppTextStyles.body,
         decoration: InputDecoration(
-          labelText: label,
+          labelText: label + (isRequired ? ' *' : ''),
           labelStyle: AppTextStyles.label,
           border: const OutlineInputBorder(),
           prefixIcon: Icon(icon),
         ),
         validator: (value) {
-          if (value == null || value.isEmpty) {
+          if (isRequired && (value == null || value.isEmpty)) {
             return 'Please enter $label';
           }
           return null;
@@ -414,53 +414,70 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
           }
         }
 
-        // Prepare update data
-        Map<String, dynamic> updateData = {
-          'full_name': _nameController.text.trim(),
-          'phone': _phoneController.text.trim(),
-        };
+        // Prepare update data - only update fields that have values
+        Map<String, dynamic> updateData = {};
 
-        // Note: Email is not updated as it's managed by auth system
+        // Only update name if it's not empty
+        if (_nameController.text.trim().isNotEmpty) {
+          updateData['full_name'] = _nameController.text.trim();
+        }
+
+        // Only update phone if it's not empty  
+        if (_phoneController.text.trim().isNotEmpty) {
+          updateData['phone'] = _phoneController.text.trim();
+        }
 
         // Add date of birth if selected
         if (_selectedDate != null) {
           updateData['dob'] = _selectedDate!.toIso8601String().split('T')[0]; // Date only
-        } else {
-          // If no date selected, set to null
-          updateData['dob'] = null;
         }
 
-        // Handle vehicle models array
-        // First, check if there's a vehicle in the input box that hasn't been added yet
+        // Handle vehicle models array - only update if there are vehicles
         String pendingVehicle = _vehicleController.text.trim();
         if (pendingVehicle.isNotEmpty && !_vehicleModels.contains(pendingVehicle)) {
           _vehicleModels.add(pendingVehicle);
           _vehicleController.clear(); // Clear the input after adding
         }
         
-        updateData['veh_model'] = _vehicleModels;
+        // Only update vehicle models if there are any
+        if (_vehicleModels.isNotEmpty) {
+          updateData['veh_model'] = _vehicleModels;
+        }
 
         // Add image URL if uploaded
         if (imageUrl != null) {
           updateData['image_url'] = imageUrl;
         }
 
-        // Update user data in database using UserService
-        final success = await UserService.updateUserProfile(updateData);
+        // Only proceed with update if there's something to update
+        if (updateData.isNotEmpty) {
+          // Update user data in database using UserService
+          final success = await UserService.updateUserProfile(updateData);
 
-        if (mounted) {
-          if (success) {
+          if (mounted) {
+            if (success) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Profile updated successfully!'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Failed to update profile. Please try again.'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+        } else {
+          // No changes to save
+          if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Profile updated successfully!'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Failed to update profile. Please try again.'),
-                backgroundColor: Colors.red,
+                content: Text('No changes to save'),
+                backgroundColor: Colors.orange,
               ),
             );
           }
