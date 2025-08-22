@@ -1,31 +1,29 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-
 import 'package:geocoding/geocoding.dart';
-
 import 'package:geolocator/geolocator.dart';
-
 import 'package:image_picker/image_picker.dart';
-
 import 'package:latlong2/latlong.dart';
-
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import 'package:flutter_map/flutter_map.dart';
+import 'package:mechfind/utils.dart';
 
-import '../active_emergency_route_page.dart'; // kept original import
+class ServiceBookingDialog extends StatefulWidget {
+  final Map<String, dynamic> mechanic;
+  final VoidCallback? onRequestSubmitted;
 
-import 'package:mechfind/utils.dart'; // Update import if needed
-
-class EmergencyFormDialog extends StatefulWidget {
-  const EmergencyFormDialog({super.key});
+  const ServiceBookingDialog({
+    super.key,
+    required this.mechanic,
+    this.onRequestSubmitted,
+  });
 
   @override
-  State createState() => _EmergencyFormDialogState();
+  State<ServiceBookingDialog> createState() => _ServiceBookingDialogState();
 }
 
-class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
+class _ServiceBookingDialogState extends State<ServiceBookingDialog> {
   final _vehicleController = TextEditingController();
   final _descriptionController = TextEditingController();
   File? _capturedImage;
@@ -135,14 +133,12 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
       ),
     );
 
-    if (selectedLocation != null) {
-      if (mounted) {
-        setState(() {
-          _selectedMapLocation = selectedLocation;
-          _useCurrentLocation = false;
-          _loading = true;
-        });
-      }
+    if (selectedLocation != null && mounted) {
+      setState(() {
+        _selectedMapLocation = selectedLocation;
+        _useCurrentLocation = false;
+        _loading = true;
+      });
       await _updateLocationDisplay(selectedLocation.latitude, selectedLocation.longitude);
     }
   }
@@ -151,12 +147,10 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
     final picker = ImagePicker();
     try {
       final pickedFile = await picker.pickImage(source: ImageSource.camera, imageQuality: 60);
-      if (pickedFile != null) {
-        if (mounted) {
-          setState(() {
-            _capturedImage = File(pickedFile.path);
-          });
-        }
+      if (pickedFile != null && mounted) {
+        setState(() {
+          _capturedImage = File(pickedFile.path);
+        });
         print("Picture taken: ${pickedFile.path}");
       }
     } catch (e) {
@@ -198,8 +192,9 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
       lng = _selectedMapLocation!.longitude;
     }
 
-    if (!mounted) return;
-    setState(() => _loading = true);
+    if (mounted) {
+      setState(() => _loading = true);
+    }
 
     try {
       final supabase = Supabase.instance;
@@ -208,35 +203,17 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
       print('🔍 User ID: ${user?.id}');
       print('🔍 User authenticated: ${user != null}');
 
-      String? userId;
-      String? guestId;
-      String folderUserId;
-      
       if (user == null) {
-        print("User is guest, inserting guest record.");
-        final response = await supabase.client
-            .from('guests')
-            .insert({'session_info': 'Guest session at ${DateTime.now().toIso8601String()}'})
-            .select()
-            .single();
-
-        if (response['id'] == null) {
-          print("Failed to insert guest session");
-          _showMessage("Failed to create guest session");
-          if (mounted) {
-            setState(() => _loading = false);
-          }
-          return;
+        _showMessage('User authentication required');
+        if (mounted) {
+          setState(() => _loading = false);
         }
-        guestId = response['id'] as String;
-        folderUserId = guestId;
-        print("Guest id received: $guestId");
-      } else {
-        userId = user.id;
-        folderUserId = userId;
-        print("🔍 Logged in user id: $userId");
-        print("🔍 Auth.uid() should match user_id for RLS: auth.uid()=${user.id} == user_id=$userId");
+        return;
       }
+
+      String userId = user.id;
+      String folderUserId = userId;
+      print("🔍 Logged in user id: $userId");
 
       const bucketName = 'request-photos';
       final fileExt = _capturedImage!.path.split('.').last;
@@ -258,31 +235,20 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
       final imageUrl = await supabase.client.storage.from(bucketName).createSignedUrl(relativePath, 86400);
       print('Signed URL generated: $imageUrl');
 
-      // Prepare the request data conditionally
+      // Prepare the request data for normal service booking
       Map<String, dynamic> requestData = {
-        'mechanic_id': null,
+        'user_id': userId,
+        'mechanic_id': widget.mechanic['id'],
         'status': 'pending',
         'vehicle': vehicle,
         'description': desc,
         'image': imageUrl,
         'lat': lat.toString(),
         'lng': lng.toString(),
-        'mech_lat': null,
-        'mech_lng': null,
-        'request_type': 'emergency',
+        'mech_lat': widget.mechanic['lat']?.toString(),
+        'mech_lng': widget.mechanic['lng']?.toString(),
+        'request_type': 'normal', // This is the key difference from emergency
       };
-
-      // Add either user_id or guest_id based on user type (clean separation)
-      if (user == null) {
-        requestData['guest_id'] = guestId;
-        print("🔍 Inserting request for guest with guest_id: $guestId");
-        print("🔍 RLS should check: EXISTS(SELECT 1 FROM guests WHERE guests.id = '$guestId')");
-      } else {
-        requestData['user_id'] = userId;
-        print("🔍 Inserting request for authenticated user with user_id: $userId");
-        print("🔍 RLS should check: auth.uid() = '$userId'");
-        print("🔍 Current auth.uid(): ${user.id}");
-      }
 
       print("🔍 Final request data being inserted: $requestData");
 
@@ -294,19 +260,22 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
 
       print("✅ Request insert successful: $requestResponse");
 
-      final requestId = requestResponse['id'] as String;
-      final responseLat = double.tryParse(requestResponse['lat'] ?? '') ?? lat;
-      final responseLng = double.tryParse(requestResponse['lng'] ?? '') ?? lng;
-
-      print("Navigating with requestId: $requestId, lat: $responseLat, lng: $responseLng");
-
       if (!mounted) return;
       Navigator.of(context).pop();
-      Navigator.of(context).pushReplacement(MaterialPageRoute(
-          builder: (_) => ActiveEmergencyRoutePage(
-            requestId: requestId,
-            userLocation: LatLng(responseLat, responseLng),
-          )));
+      
+      // Show success message
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Service request sent successfully! The mechanic will respond soon.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        
+        // Call the callback to refresh parent data
+        widget.onRequestSubmitted?.call();
+      }
     } catch (e, stackTrace) {
       print('Exception during submission: $e\nStack trace:\n$stackTrace');
       if (e is PostgrestException) {
@@ -331,13 +300,73 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Request Emergency Help',
+              'Book a Service',
               style: AppTextStyles.heading.copyWith(
                   color: Colors.white,
                   fontFamily: AppFonts.primaryFont,
                   fontSize: FontSizes.subHeading + 2),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
+            // Show mechanic info
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  widget.mechanic['image_url'] != null && widget.mechanic['image_url'].toString().isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: Image.network(
+                            widget.mechanic['image_url'],
+                            width: 40,
+                            height: 40,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[300],
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Icon(Icons.person, size: 20, color: Colors.white),
+                            ),
+                          ),
+                        )
+                      : Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Icon(Icons.person, size: 20, color: Colors.white),
+                        ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.mechanic['name'] ?? 'Unknown Mechanic',
+                          style: AppTextStyles.body.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Rating: ${widget.mechanic['rating']} • ${widget.mechanic['distance']}',
+                          style: AppTextStyles.label.copyWith(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Icon(
@@ -452,8 +481,8 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
               maxLines: 4,
               style: AppTextStyles.body.copyWith(color: Colors.white),
               decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.report_problem, color: Colors.white70),
-                hintText: "Describe your problem",
+                prefixIcon: const Icon(Icons.build, color: Colors.white70),
+                hintText: "Describe the service you need",
                 hintStyle: AppTextStyles.label.copyWith(color: Colors.white60),
                 filled: true,
                 fillColor: AppColors.primary.withOpacity(0.25),
@@ -499,7 +528,7 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
                 ),
                 onPressed: _loading ? null : _handleSubmit,
                 child: Text(
-                  _loading ? "Submitting..." : "Submit",
+                  _loading ? "Submitting..." : "Book Service",
                   style: AppTextStyles.body.copyWith(
                       color: Colors.white, fontWeight: FontWeight.bold, fontSize: FontSizes.subHeading),
                 ),
@@ -648,8 +677,8 @@ class _MapLocationPickerState extends State<_MapLocationPicker> {
                     setState(() {
                       _selectedLocation = point;
                     });
+                    _updateAddress(point);
                   }
-                  _updateAddress(point);
                 },
               ),
               children: [
@@ -671,14 +700,14 @@ class _MapLocationPickerState extends State<_MapLocationPicker> {
                           decoration: BoxDecoration(
                             gradient: RadialGradient(
                               colors: [
-                                AppColors.danger,
-                                AppColors.danger.withOpacity(0.8),
+                                AppColors.accent,
+                                AppColors.accent.withOpacity(0.8),
                               ],
                             ),
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.danger.withOpacity(0.6),
+                                color: AppColors.accent.withOpacity(0.6),
                                 spreadRadius: 4,
                                 blurRadius: 12,
                                 offset: const Offset(0, 2),
@@ -714,7 +743,7 @@ class _MapLocationPickerState extends State<_MapLocationPicker> {
             padding: const EdgeInsets.all(16),
             color: AppColors.background,
             child: Text(
-              'Tap on the map to select your emergency location',
+              'Tap on the map to select your service location',
               style: AppTextStyles.body.copyWith(
                 color: AppColors.textSecondary,
               ),
