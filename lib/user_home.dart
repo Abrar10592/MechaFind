@@ -1,20 +1,33 @@
 import 'dart:math' as math;
-
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+
 import 'package:mechfind/utils.dart';
+import 'widgets/emergency_form_dialog.dart';
+
 import 'location_service.dart';
+
 import 'widgets/emergency_button.dart';
+
 import 'widgets/bottom_navbar.dart';
+
 import 'widgets/profile_avatar.dart';
+
 import 'services/message_notification_service.dart';
+
 import 'package:geocoding/geocoding.dart';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'package:geolocator/geolocator.dart';
+
 import 'package:url_launcher/url_launcher.dart';
+
 import 'package:latlong2/latlong.dart';
 
 class UserHomePage extends StatefulWidget {
   final bool isGuest;
+
   const UserHomePage({super.key, this.isGuest = false});
 
   @override
@@ -29,7 +42,6 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
   List<Map<String, dynamic>> nearbyMechanics = [];
   List<Map<String, dynamic>> activeRequests = [];
   RealtimeChannel? _requestSubscription;
-
   final supabase = Supabase.instance.client;
 
   @override
@@ -46,7 +58,6 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Refresh data when returning to this page
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadActiveRequests();
     });
@@ -58,7 +69,6 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
     if (state == AppLifecycleState.resumed) {
       print('🔄 App resumed - refreshing active requests');
       _loadActiveRequests();
-      // Reestablish subscription if needed
       if (_requestSubscription == null) {
         _setupRealtimeActiveRequests();
       }
@@ -75,77 +85,62 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
   void _setupRealtimeActiveRequests() {
     final user = supabase.auth.currentUser;
     if (user == null) return;
-
-    // Unsubscribe existing subscription if any
     _requestSubscription?.unsubscribe();
-
-    // Initial load of active requests
     _loadActiveRequests();
-
-    // Setup real-time subscription for immediate updates
     final channelName = 'public:requests:user_${user.id}_${DateTime.now().millisecondsSinceEpoch}';
     print('🔄 Setting up real-time subscription: $channelName');
-    
     _requestSubscription = supabase
         .channel(channelName)
         .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'requests',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'user_id',
-            value: user.id,
-          ),
-          callback: (payload) {
-            print('🔄 Real-time request update: ${payload.eventType}');
-            print('🔄 Record data: ${payload.newRecord}');
-            
-            // Reload active requests when any change occurs
-            if (mounted) {
-              _loadActiveRequests();
-            }
-          },
-        )
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'requests',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'user_id',
+        value: user.id,
+      ),
+      callback: (payload) {
+        print('🔄 Real-time request update: ${payload.eventType}');
+        print('🔄 Record data: ${payload.newRecord}');
+        if (mounted) {
+          _loadActiveRequests();
+        }
+      },
+    )
         .subscribe((status, [error]) {
-          print('📡 Request subscription status: $status');
-          if (status == RealtimeSubscribeStatus.subscribed) {
-            print('✅ Real-time subscription active for user home');
-          } else if (status == RealtimeSubscribeStatus.closed) {
-            print('❌ Real-time subscription closed - attempting to reconnect');
-            // Attempt to reconnect after a delay
-            Future.delayed(const Duration(seconds: 2), () {
-              if (mounted) {
-                _setupRealtimeActiveRequests();
-              }
-            });
-          }
-          if (error != null) {
-            print('❌ Request subscription error: $error');
+      print('📡 Request subscription status: $status');
+      if (status == RealtimeSubscribeStatus.subscribed) {
+        print('✅ Real-time subscription active for user home');
+      } else if (status == RealtimeSubscribeStatus.closed) {
+        print('❌ Real-time subscription closed - attempting to reconnect');
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            _setupRealtimeActiveRequests();
           }
         });
+      }
+      if (error != null) {
+        print('❌ Request subscription error: $error');
+      }
+    });
   }
 
-  Future<void> _loadActiveRequests() async {
+  Future _loadActiveRequests() async {
     final user = supabase.auth.currentUser;
     if (user == null) return;
-
     try {
-      // Load all active requests (pending and accepted) to show their current status
       final response = await supabase
           .from('requests')
           .select('*')
           .eq('user_id', user.id)
           .or('status.eq.pending,status.eq.accepted')
           .order('created_at', ascending: false);
-
       if (mounted) {
         setState(() {
           activeRequests = List<Map<String, dynamic>>.from(response);
         });
         print('📊 Active requests loaded: ${activeRequests.length}');
-        
-        // Debug: Print the requests to see what we're getting
         for (var req in activeRequests) {
           print('🔍 Request ${req['id']}: status=${req['status']}, mechanic_id=${req['mechanic_id']}, type=${req['request_type']}');
         }
@@ -155,10 +150,9 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
     }
   }
 
-  Future<void> refreshActiveRequestsData() async {
+  Future refreshActiveRequestsData() async {
     print('🔄 Manually refreshing active requests data');
     await _loadActiveRequests();
-    // Also refresh the real-time subscription
     _setupRealtimeActiveRequests();
   }
 
@@ -198,8 +192,7 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
     try {
       final user = supabase.auth.currentUser;
       if (user == null) return;
-      final data =
-      await supabase.from('users').select('full_name').eq('id', user.id).maybeSingle();
+      final data = await supabase.from('users').select('full_name').eq('id', user.id).maybeSingle();
       setState(() {
         userName = data?['full_name'] ?? '';
       });
@@ -221,7 +214,7 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
     }
   }
 
-  Future<String> getAddressFromLatLng(double lat, double lng) async {
+  Future getAddressFromLatLng(double lat, double lng) async {
     try {
       List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
       Placemark place = placemarks.first;
@@ -237,10 +230,7 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
     final dLat = _deg2rad(lat2 - lat1);
     final dLon = _deg2rad(lon2 - lon1);
     final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(_deg2rad(lat1)) *
-            math.cos(_deg2rad(lat2)) *
-            math.sin(dLon / 2) *
-            math.sin(dLon / 2);
+        math.cos(_deg2rad(lat1)) * math.cos(_deg2rad(lat2)) * math.sin(dLon / 2) * math.sin(dLon / 2);
     final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     return R * c;
   }
@@ -251,16 +241,14 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
     if (userLat == null || userLng == null) return;
     try {
       final mechanicData = await supabase.from('mechanics').select('''
-        id,
-        rating,
-        location_x,
-        location_y,
-        users(full_name, image_url, phone),
-        mechanic_services(service_id, services(name))
-      ''');
-
+id,
+rating,
+location_x,
+location_y,
+users(full_name, image_url, phone),
+mechanic_services(service_id, services(name))
+''');
       List<Map<String, dynamic>> mechanicsList = [];
-
       for (final mech in mechanicData) {
         final mLat = mech['location_x'] is double
             ? mech['location_x']
@@ -269,14 +257,11 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
             ? mech['location_y']
             : double.tryParse(mech['location_y'].toString()) ?? 0.0;
         final distance = _calculateDistanceKm(userLat!, userLng!, mLat, mLng);
-
         if (distance <= 7.0) {
           final services = (mech['mechanic_services'] as List)
               .map((s) => s['services']?['name'] as String?)
               .whereType<String>()
               .toList();
-
-          // Change here: always use mechanic name if available
           mechanicsList.add({
             'id': mech['id'],
             'name': mech['users']?['full_name'] ?? 'Unnamed',
@@ -345,7 +330,6 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
             .select('id,rating,users(full_name,profile_pic,phone),mechanic_services(services(name))')
             .eq('id', mechanicId)
             .maybeSingle();
-
         if (data == null) throw Exception("Mechanic not found");
         final services = (data['mechanic_services'] as List)
             .map((s) => s['services']?['name'] as String?)
@@ -430,10 +414,7 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                 onPressed: () async {
                   try {
-                    await supabase
-                        .from('requests')
-                        .update({'status': 'canceled'})
-                        .eq('id', request['id']);
+                    await supabase.from('requests').update({'status': 'canceled'}).eq('id', request['id']);
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Request cancelled')),
@@ -461,37 +442,28 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
     );
   }
 
-  // You can keep your existing _showRequestServiceDialog. Not shown for brevity.
-
   List<Map<String, dynamic>> get _filteredActiveRequests {
-    // Filter requests to show pending and accepted requests
     final validActiveRequests = activeRequests.where((r) {
       final status = (r['status'] ?? '').toLowerCase();
-      
-      // Show requests that are:
-      // 1. Accepted (with mechanic assigned) - fully active
-      // 2. Pending (might have mechanic assigned or not) - waiting for mechanic
+      // Show requests that are pending or accepted
       return status == 'accepted' || status == 'pending';
     }).toList();
-    
-    // Prioritize emergency requests
+
     final emergencyReq = validActiveRequests.firstWhere(
-          (r) => (r['request_type'] ?? 'normal') == 'emergency',
-      orElse: () => {},
-    );
+            (r) => (r['request_type'] ?? 'normal') == 'emergency',
+        orElse: () => {});
+
     if (emergencyReq.isNotEmpty) {
       return [emergencyReq];
     }
-    
-    // Return normal requests
-    return validActiveRequests
-        .where((r) => (r['request_type'] ?? 'normal') == 'normal')
-        .toList();
+
+    return validActiveRequests.where((r) => (r['request_type'] ?? 'normal') == 'normal').toList();
   }
 
   Widget _activeRequestsSection() {
     final filteredRequests = _filteredActiveRequests;
     if (filteredRequests.isEmpty) return const SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -503,14 +475,13 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
         ...filteredRequests.map((req) {
           Color statusColor;
           String subtitle;
-          
+
           final status = (req['status'] ?? '').toLowerCase();
           final mechanicId = req['mechanic_id'];
-          
           switch (status) {
             case 'pending':
               statusColor = Colors.orange;
-              subtitle = mechanicId != null 
+              subtitle = mechanicId != null
                   ? "Status: Pending (Mechanic assigned)\nVehicle: ${req['vehicle'] ?? '-'}\nDescription: ${req['description'] ?? '-'}"
                   : "Status: Looking for mechanic\nVehicle: ${req['vehicle'] ?? '-'}\nDescription: ${req['description'] ?? '-'}";
               break;
@@ -522,7 +493,7 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
               statusColor = Colors.grey;
               subtitle = "Status: ${req['status']}\nVehicle: ${req['vehicle'] ?? '-'}\nDescription: ${req['description'] ?? '-'}";
           }
-          
+
           return Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: ListTile(
@@ -536,8 +507,6 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
                       'userLocation': LatLng(userLat!, userLng!),
                     },
                   );
-                  
-                  // Refresh data when returning from emergency route
                   print('🔄 Returned from emergency route, refreshing data');
                   await refreshActiveRequestsData();
                 } else {
@@ -553,13 +522,11 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
               leading: CircleAvatar(
                 backgroundColor: statusColor,
                 child: Icon(
-                  status == 'pending' && mechanicId == null 
-                      ? Icons.search 
-                      : Icons.build, 
-                  color: Colors.white
+                  status == 'pending' && mechanicId == null ? Icons.search : Icons.build,
+                  color: Colors.white,
                 ),
               ),
-              title: Text("Request for Mechanic"),
+              title: const Text("Request for Mechanic"),
               subtitle: Text(
                 subtitle,
                 maxLines: 3,
@@ -568,10 +535,10 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
               isThreeLine: true,
               trailing: status == 'pending' && mechanicId == null
                   ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
                   : null,
             ),
           );
@@ -587,16 +554,67 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
     setState(() {});
   }
 
+  // The new Emergency Button onPressed handler checking multiple emergency requests:
+  void onEmergencyButtonTap() async {
+    HapticFeedback.heavyImpact();
+
+    await _loadActiveRequests();
+
+    bool hasPendingEmergency = activeRequests.any((req) =>
+    (req['request_type'] ?? '').toString().toLowerCase() == 'emergency' &&
+        (req['status'] ?? '').toString().toLowerCase() == 'pending'
+    );
+
+    if (hasPendingEmergency) {
+      // Show popup that user has pending emergency request already
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text("Emergency Request in Progress"),
+          content: const Text(
+              "You already have a pending emergency request. Please wait until it is resolved before creating a new one."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text("OK"),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => const EmergencyFormDialog(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final greetingText = widget.isGuest ? "Welcome" : "Welcome ${userName ?? ''}";
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.primary,
-        title: Text(
-          greetingText,
-          style: AppTextStyles.heading.copyWith(color: Colors.white),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Welcome',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18, // adjust as you prefer
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            if (!widget.isGuest)
+              Text(
+                userName ?? '',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15, // adjust for slightly smaller
+                ),
+              ),
+          ],
         ),
         actions: [
           if (!widget.isGuest)
@@ -638,9 +656,11 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
                 ],
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: EmergencyButton(),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: EmergencyButton(
+                onPressed: onEmergencyButtonTap, // Use the new handler
+              ),
             ),
             const SizedBox(height: 20),
             Padding(
@@ -731,7 +751,6 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
                             onPressed: (hasPending || hasAccepted)
                                 ? null
                                 : () {
-                              // GUEST CAN'T REQUEST
                               if (widget.isGuest) {
                                 _showLoginRequiredDialog();
                               } else {
@@ -774,104 +793,95 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
     );
   }
 
-// Keep your _showServiceCompleteDialog and _showRequestServiceDialog as before (no changes here for guest logic)
-
-
-void _showServiceCompleteDialog(Map request) {
+  void _showServiceCompleteDialog(Map request) {
     double rating = 0;
     final TextEditingController reviewController = TextEditingController();
-
     showDialog(
-        context: context,
-        builder: (context) {
-          return StatefulBuilder(builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('Rate the Service'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (index) {
-                      return IconButton(
-                        icon: Icon(
-                          index < rating ? Icons.star : Icons.star_border,
-                          color: Colors.amber,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            rating = index + 1.0;
-                          });
-                        },
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: reviewController,
-                    minLines: 2,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                      labelText: 'Write a review',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Rate the Service'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    return IconButton(
+                      icon: Icon(
+                        index < rating ? Icons.star : Icons.star_border,
+                        color: Colors.amber,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          rating = index + 1.0;
+                        });
+                      },
+                    );
+                  }),
                 ),
-                ElevatedButton(
-                  onPressed: () async {
-                    if (rating == 0) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Please give a rating')));
-                      return;
-                    }
-                    try {
-                      // 1. Update request status to completed
-                      await supabase
-                          .from('requests')
-                          .update({'status': 'completed'})
-                          .eq('id', request['id']);
-
-                      // 2. Insert review record
-                      await supabase.from('reviews').insert({
-                        'request_id': request['id'],
-                        'user_id': request['user_id'],
-                        'mechanic_id': request['mechanic_id'],
-                        'rating': rating.toInt(),
-                        'comment': reviewController.text.trim(),
-                      });
-
-                      if (mounted) {
-                        Navigator.pop(context); // Close dialog
-                        await _refreshHomePage(); // Refresh home page data
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('Thank you for your feedback!'),
-                          duration: Duration(seconds: 2),
-                        ));
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text('Failed to submit: ${e.toString()}')));
-                      }
-                    }
-                  },
-                  child: const Text('Submit'),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: reviewController,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Write a review',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
               ],
-            );
-          });
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  if (rating == 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please give a rating')));
+                    return;
+                  }
+                  try {
+                    await supabase
+                        .from('requests')
+                        .update({'status': 'completed'})
+                        .eq('id', request['id']);
+                    await supabase.from('reviews').insert({
+                      'request_id': request['id'],
+                      'user_id': request['user_id'],
+                      'mechanic_id': request['mechanic_id'],
+                      'rating': rating.toInt(),
+                      'comment': reviewController.text.trim(),
+                    });
+                    if (mounted) {
+                      Navigator.pop(context);
+                      await _refreshHomePage();
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('Thank you for your feedback!'),
+                        duration: Duration(seconds: 2),
+                      ));
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text('Failed to submit: ${e.toString()}')));
+                    }
+                  }
+                },
+                child: const Text('Submit'),
+              ),
+            ],
+          );
         });
+      },
+    );
   }
 
-}
-
-class _showRequestServiceDialog {
-  _showRequestServiceDialog(Map<String, dynamic> mech);
-    
+  void _showRequestServiceDialog(Map mech) {
+    // Your existing logic for showing request service dialog
+  }
 }

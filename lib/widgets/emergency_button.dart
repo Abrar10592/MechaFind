@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import 'emergency_form_dialog.dart';
 
 class EmergencyButton extends StatelessWidget {
-  const EmergencyButton({super.key});
+  final VoidCallback? onPressed;
+
+  const EmergencyButton({super.key, this.onPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -17,13 +20,14 @@ class EmergencyButton extends StatelessWidget {
         minimumSize: const Size.fromHeight(90), // optional
         padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
       ),
-      onPressed: () {
-        HapticFeedback.heavyImpact();
-        showDialog(
-          context: context,
-          builder: (context) => const EmergencyFormDialog(),
-        );
-      },
+      onPressed: onPressed ??
+              () {
+            HapticFeedback.heavyImpact();
+            showDialog(
+              context: context,
+              builder: (context) => const EmergencyFormDialog(),
+            );
+          },
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -44,7 +48,7 @@ class EmergencyButton extends StatelessWidget {
                 ),
                 SizedBox(height: 7),
                 Text(
-                  'Press this button to send an urgent request to nearby mechanics.\nUse only in real roadside emergencies.',
+                  'Press this button to send an urgent request to nearby mechanics.\nUse only in true emergencies.',
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 15,
