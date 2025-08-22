@@ -122,16 +122,13 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      print('App resumed, reinitializing location setup');
       _initLocationSetup();
     }
   }
 
   Future<void> _initLocationSetup() async {
-    print('Initializing location setup...');
     bool serviceEnabled = await _locationController.serviceEnabled();
     if (!serviceEnabled) {
-      print('Location service disabled, requesting...');
       serviceEnabled = await _locationController.requestService();
       if (!serviceEnabled) {
         setState(() {
@@ -139,7 +136,6 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
           _isLoading = false;
           _isInitialLoad = false;
         });
-        print('Location service still disabled');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Location services are required to show nearby requests'),
@@ -152,11 +148,9 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         return;
       }
     }
-    print('Location service enabled');
 
     PermissionStatus permissionGranted = await _locationController.hasPermission();
     if (permissionGranted == PermissionStatus.denied) {
-      print('Location permission denied, requesting...');
       permissionGranted = await _locationController.requestPermission();
       if (permissionGranted != PermissionStatus.granted) {
         setState(() {
@@ -164,7 +158,6 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
           _isLoading = false;
           _isInitialLoad = false;
         });
-        print('Location permission status: $permissionGranted');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Location permission is required to show nearby requests'),
@@ -177,7 +170,6 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         return;
       }
     }
-    print('Location permission granted');
 
     try {
       final locationData = await _locationController.getLocation().timeout(
@@ -196,13 +188,11 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
             _currentPosition = newPosition;
             _errorMessage = null; // Clear any previous errors
           });
-          print('One-time location fetched: ${_currentPosition!.latitude}, ${_currentPosition!.longitude}');
           
           // Now that we have location, fetch mechanic data with distance filtering
           _fetchMechanicData();
         }
       } else {
-        print('Invalid one-time location data: $locationData');
         if (mounted) {
           setState(() {
             _errorMessage = 'Unable to get precise location';
@@ -210,7 +200,6 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         }
       }
     } catch (e) {
-      print('Error fetching one-time location: $e');
       String userFriendlyError;
       if (e.toString().contains('timeout') || e.toString().contains('timed out')) {
         userFriendlyError = 'Location access is taking longer than usual. Please check your GPS signal.';
@@ -246,7 +235,6 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
     }
 
     if (!_hasListenerAttached) {
-      print('Setting up location listener...');
       _locationController.onLocationChanged.listen((locationData) {
         if (locationData.latitude != null && locationData.longitude != null) {
           final newPosition = LatLng(
@@ -257,18 +245,14 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
             setState(() {
               _currentPosition = newPosition;
             });
-            print('Location updated: ${_currentPosition!.latitude}, ${_currentPosition!.longitude}');
             
             // Refetch data when location changes significantly
             _fetchMechanicData();
           }
-        } else {
-          print('Invalid location data from stream: $locationData');
         }
       });
       _hasListenerAttached = true;
     }
-    print('Current position after setup: $_currentPosition');
   }
 
   bool _isSignificantChange(LatLng newPosition, LatLng oldPosition) {
@@ -279,7 +263,6 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
 
   Future<void> _updateMechanicLocation(String requestId, LatLng position) async {
     if (requestId.isEmpty) {
-      print('Error: Cannot update location - requestId is empty');
       return;
     }
     
@@ -289,15 +272,11 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         'mech_lng': position.longitude.toString(),
       };
       
-      print('🔄 Updating mechanic location for request $requestId: $updateData');
-      
       await supabase
           .from('requests')
           .update(updateData)
           .eq('id', requestId);
-      print('✅ Mechanic location updated for request $requestId: ${position.latitude}, ${position.longitude}');
     } catch (e) {
-      print('❌ Error updating mechanic location for request $requestId: $e');
       // Don't show error to user for location updates as it's background operation
       // Only log the error for debugging
     }
@@ -310,7 +289,6 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
     _locationUpdateTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
       if (_acceptedRequestId == null || _acceptedRequestId!.isEmpty || !mounted) {
         timer.cancel();
-        print('Location update timer canceled: No active request or widget disposed');
         return;
       }
       // Check if the request is still active
@@ -327,24 +305,18 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
           _activeRequest = null;
           _isModalMinimized = false;
         });
-        print('Location update timer canceled: Request status is ${request['status']}');
         return;
       }
       if (_currentPosition != null && _lastUpdatedPosition != null) {
         if (_isSignificantChange(_currentPosition!, _lastUpdatedPosition!)) {
           await _updateMechanicLocation(_acceptedRequestId!, _currentPosition!);
           _lastUpdatedPosition = _currentPosition;
-        } else {
-          print('No significant location change for request $_acceptedRequestId');
         }
       } else if (_currentPosition != null) {
         await _updateMechanicLocation(_acceptedRequestId!, _currentPosition!);
         _lastUpdatedPosition = _currentPosition;
-      } else {
-        print('No current position available for request $_acceptedRequestId');
       }
     });
-    print('Started location update timer for request $requestId');
   }
 
   Future<void> _fetchMechanicData() async {
@@ -354,7 +326,6 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         _errorMessage = 'User not logged in';
         _isLoading = false;
       });
-      print('Error: User not logged in');
       return;
     }
 
@@ -376,21 +347,6 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
           .gte('created_at', startOfDay.toIso8601String())
           .count();
 
-      print('Completed today count: ${completedResponse.count}');
-
-      // First, let's check if there are any pending requests at all (this might be blocked by RLS)
-      try {
-        final allPendingResponse = await supabase
-            .from('requests')
-            .select('id, status, mechanic_id')
-            .eq('status', 'pending');
-        
-        print('🔍 ALL pending requests in database: ${allPendingResponse.length}');
-        print('🔍 Sample pending requests: $allPendingResponse');
-      } catch (e) {
-        print('❌ Error fetching all pending requests (likely RLS issue): $e');
-      }
-
       // Try to fetch requests without RLS restrictions by using a more permissive query
       final pendingResponse = await supabase
           .from('requests')
@@ -399,15 +355,10 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
           .eq('request_type', 'emergency')
           .filter('mechanic_id', 'is', null);
 
-      print('🔍 Pending response after mechanic_id filter: ${pendingResponse.length}');
-      print('🔍 Pending response raw: $pendingResponse');
-
       final reviewsResponse = await supabase
           .from('reviews')
           .select('rating')
           .eq('mechanic_id', user.id);
-
-      print('Reviews fetched: ${reviewsResponse.length}');
 
       // Fetch ignored requests for this mechanic
       final ignoredResponse = await supabase
@@ -416,8 +367,6 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
           .eq('mechanic_id', user.id);
 
       final ignoredRequestIds = ignoredResponse.map((item) => item['request_id'].toString()).toSet();
-      print('📋 Ignored requests for mechanic ${user.id}: ${ignoredRequestIds.length} requests');
-      print('📋 Ignored request IDs: $ignoredRequestIds');
 
       List<Map<String, dynamic>> filteredRequests = [];
       const double maxDistanceKm = 10.0;
@@ -427,9 +376,7 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
       latlng.LatLng? currentLatLng;
       if (_currentPosition != null) {
         currentLatLng = latlng.LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
-        print('🔄 Current position converted: ${currentLatLng.latitude}, ${currentLatLng.longitude}');
       } else {
-        print('❌ _currentPosition is null - this will prevent any requests from being shown');
         // If we have no location, show an error and return
         setState(() {
           _errorMessage = 'Location required to show nearby requests';
@@ -438,23 +385,14 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         return;
       }
       
-      print('🔍 Processing ${pendingResponse.length} requests for distance filtering...');
-      
       for (var request in pendingResponse) {
-        print('🔍 Processing request: ${request['id']}');
-        
         // Skip ignored requests
         if (ignoredRequestIds.contains(request['id'].toString())) {
-          print('🚫 Request ${request['id']} SKIPPED (ignored by mechanic)');
           continue;
         }
         
-        print('🔍 Request data: $request');
         final lat = double.tryParse(request['lat']?.toString() ?? '') ?? 0.0;
         final lng = double.tryParse(request['lng']?.toString() ?? '') ?? 0.0;
-        
-        print('🎯 Parsed coordinates: lat=$lat, lng=$lng');
-        print('🎯 Validation check: lat != 0.0 = ${lat != 0.0}, lng != 0.0 = ${lng != 0.0}');
         
         // Calculate distance between mechanic and SOS request using the same logic as mechanic_map
         if (lat != 0.0 && lng != 0.0) {
@@ -465,12 +403,8 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
             point,
           );
           
-          print('Request ${request['id']}: Distance = ${distance.toStringAsFixed(2)} km');
-          
           // Only add requests within 10 km radius
           if (distance <= maxDistanceKm) {
-            print('✅ Request ${request['id']} ADDED (within ${maxDistanceKm}km)');
-            
             // Handle both guest and authenticated user requests
             Map<String, dynamic> processedRequest = {
               'id': request['id'],
@@ -495,12 +429,6 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
               processedRequest['user_name'] = fullName ?? 'Unknown User';
               processedRequest['phone'] = phone ?? 'N/A';
               processedRequest['image_url'] = imageUrl;
-              
-              print('✅ Authenticated user request:');
-              print('   - full_name: $fullName');
-              print('   - phone: $phone');
-              print('   - image_url: $imageUrl');
-              print('   - final user_name: ${processedRequest['user_name']}');
             } else if (request['guest_id'] != null) {
               // Guest request
               processedRequest['user_id'] = null;
@@ -508,31 +436,16 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
               processedRequest['user_name'] = 'Guest User';
               processedRequest['phone'] = 'Contact via app';
               processedRequest['image_url'] = null;
-              print('✅ Guest request: Guest User (guest_id: ${request['guest_id']})');
             } else {
               // Invalid request - skip
-              print('❌ Request ${request['id']} SKIPPED (no user_id or guest_id)');
               continue;
             }
             
-            print('🔍 Final processed request data: $processedRequest');
-            
             filteredRequests.add(processedRequest);
-          } else {
-            print('❌ Request ${request['id']} REJECTED (${distance.toStringAsFixed(2)}km > ${maxDistanceKm}km)');
           }
-        } else {
-          print('❌ Request ${request['id']} REJECTED (invalid location data)');
         }
         // If location data is missing, don't show the request
       }
-
-      print('📊 Distance Filtering Summary:');
-      print('   Total requests from database: ${pendingResponse.length}');
-      print('   Ignored requests: ${ignoredRequestIds.length}');
-      print('   Filtered requests (within ${maxDistanceKm}km and not ignored): ${filteredRequests.length}');
-      print('   Current mechanic location: ${_currentPosition?.latitude}, ${_currentPosition?.longitude}');
-      print('📊 Filtered requests details: $filteredRequests');
 
       double totalRating = 0.0;
       int reviewCount = reviewsResponse.length;
@@ -555,14 +468,12 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         _isLoading = false;
         _isInitialLoad = false;
       });
-      print('Error fetching data: $e');
     }
   }
 
   void _setupRealtimeSubscription() {
     final user = supabase.auth.currentUser;
     if (user == null) {
-      print('Cannot set up subscription: User not logged in');
       return;
     }
 
@@ -578,7 +489,6 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
             value: 'pending',
           ),
           callback: (payload) {
-            print('Realtime event: ${payload.eventType}, Payload: $payload');
             _debounceTimer?.cancel();
             _debounceTimer = Timer(const Duration(milliseconds: 500), () {
               _fetchMechanicData();
@@ -595,7 +505,6 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
             value: user.id,
           ),
           callback: (payload) {
-            print('Realtime event for mechanic requests: ${payload.eventType}, Payload: $payload');
             if (payload.newRecord['status'] == 'completed' || payload.newRecord['status'] == 'canceled') {
               _locationUpdateTimer?.cancel();
               _acceptedRequestId = null;
@@ -604,16 +513,13 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
                 _activeRequest = null;
                 _isModalMinimized = false;
               });
-              print('Cleared active request and stopped location updates for request ${payload.newRecord['id']} due to status: ${payload.newRecord['status']}');
             }
           },
         )
         .subscribe((status, [error]) {
-          print('Subscription status: $status, Error: $error');
           if (status == 'SUBSCRIPTION_ERROR' && error != null) {
             // Don't show technical subscription errors to users
             // Just log them and continue with app functionality
-            print('Subscription error occurred: $error');
             setState(() {
               _errorMessage = 'Connection issue. Some features may be limited.';
             });
@@ -627,31 +533,29 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please log in to accept requests')),
       );
-      print('Error: User not logged in during accept request');
       return;
     }
 
-    // Check if mechanic already has an active request
+    // Check if mechanic already has an active emergency request
     try {
       final existingActiveRequest = await supabase
           .from('requests')
           .select('id, status')
           .eq('mechanic_id', user.id)
           .eq('status', 'accepted')
+          .eq('request_type', 'emergency')
           .maybeSingle();
 
       if (existingActiveRequest != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('You already have an active request. Please complete it first.'),
+            content: Text('You already have an active emergency request. Please complete it first.'),
             backgroundColor: Colors.orange,
           ),
         );
-        print('Mechanic ${user.id} already has active request: ${existingActiveRequest['id']}');
         return;
       }
     } catch (e) {
-      print('Error checking for existing active requests: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Unable to verify active requests. Please try again.'),
@@ -669,20 +573,13 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
       if (_currentPosition != null) {
         updateData['mech_lat'] = _currentPosition!.latitude.toString();
         updateData['mech_lng'] = _currentPosition!.longitude.toString();
-      } else {
-        print('Warning: No current position available when accepting request $requestId');
       }
-
-      print('🔄 Attempting to update request $requestId with data: $updateData');
-      print('🔄 Current user ID: ${user.id}');
       
       final updateResponse = await supabase
           .from('requests')
           .update(updateData)
           .eq('id', requestId)
           .select();
-
-      print('✅ Update response: $updateResponse');
       
       if (updateResponse.isEmpty) {
         throw Exception('No rows were updated. This might be due to RLS policy restrictions.');
@@ -703,7 +600,6 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
           backgroundColor: Colors.green,
         ),
       );
-      print('Request $requestId accepted');
 
       if (_currentPosition != null) {
         _startLocationUpdateTimer(requestId);
@@ -714,18 +610,13 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
             duration: Duration(seconds: 3),
           ),
         );
-        print('Cannot start location update timer: No current position');
       }
     } catch (e) {
-      print('❌ Error accepting request $requestId: $e');
-      
       String errorMessage;
       if (e.toString().contains('row-level security') || e.toString().contains('RLS') || e.toString().contains('policy')) {
         errorMessage = 'Permission denied: Unable to update request. RLS policy issue detected.';
-        print('🚨 RLS POLICY ERROR: Mechanic ${user.id} cannot update request $requestId due to Row Level Security policy restrictions');
       } else if (e.toString().contains('No rows were updated')) {
         errorMessage = 'Request could not be updated. This may be due to database security policies.';
-        print('🚨 NO ROWS UPDATED: Possible RLS policy blocking update operation');
       } else if (e.toString().contains('network') || e.toString().contains('connection')) {
         errorMessage = 'Network error. Please check your connection and try again.';
       } else if (e.toString().contains('permission') || e.toString().contains('auth')) {
@@ -745,7 +636,6 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
           ),
         ),
       );
-      print('Error accepting request $requestId: $e');
     }
   }
 
@@ -773,12 +663,10 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Request rejected')),
       );
-      print('Request $requestId rejected');
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error rejecting request: $e')),
       );
-      print('Error rejecting request $requestId: $e');
     }
   }
 
@@ -813,19 +701,15 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Request ignored permanently')),
       );
-      print('Request $requestId ignored permanently by mechanic ${user.id}');
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error ignoring request: $e')),
       );
-      print('Error ignoring request $requestId: $e');
     }
   }
 
   void _showDirectionModal() {
     if (_activeRequest == null) return;
-    
-    print('🔍 Active request data in _showDirectionModal: $_activeRequest');
     
     // Safely extract values with proper null handling
     final userId = _activeRequest!['user_id']?.toString() ?? '';
@@ -835,9 +719,6 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
     final phone = _activeRequest!['phone']?.toString() ?? 'Contact via app';
     final userName = _activeRequest!['user_name']?.toString() ?? 'Unknown User';
     final imageUrl = _activeRequest!['image_url']?.toString() ?? '';
-    
-    print('🔍 Extracted values: userId=$userId, guestId=$guestId, effectiveUserId=$effectiveUserId');
-    print('🔍 Other values: phone=$phone, userName=$userName, imageUrl=$imageUrl');
     
     // Validate required data
     if (requestId.isEmpty) {
@@ -1370,7 +1251,6 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
                   itemCount: _sosRequests.length,
                   itemBuilder: (context, index) {
                     final request = _sosRequests[index];
-                    print('Rendering SOS card: $request, current_location: $_currentPosition');
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       decoration: BoxDecoration(
@@ -1437,132 +1317,6 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
               color: AppColors.textSecondary,
               fontSize: FontSizes.body,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildModernSosCard(Map<String, dynamic> request, int index) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.white,
-            Colors.red.withOpacity(0.02),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.red.withOpacity(0.2),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.red.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 25,
-                backgroundImage: (request['users']?['image_url'] != null)
-                    ? NetworkImage(request['users']['image_url'])
-                    : const AssetImage('zob_assets/user_icon.png') as ImageProvider,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      request['users']?['full_name'] ?? 'Unknown User',
-                      style: AppTextStyles.heading.copyWith(
-                        fontSize: FontSizes.body + 2,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    Text(
-                      request['vehicle'] ?? 'Unknown Vehicle',
-                      style: AppTextStyles.body.copyWith(
-                        color: AppColors.textSecondary,
-                        fontSize: FontSizes.caption,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  'URGENT',
-                  style: TextStyle(
-                    color: Colors.red,
-                    fontSize: FontSizes.caption,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    _acceptRequest(request['id']).then((_) {
-                      _showDirectionModal();
-                    });
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: const Text(
-                    'Accept',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              OutlinedButton(
-                onPressed: () => _ignoreRequest(request['id']),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: Colors.grey.shade300),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-                ),
-                child: Text(
-                  'Ignore',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
           ),
         ],
       ),
