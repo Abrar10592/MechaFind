@@ -59,5 +59,9 @@
   "real_time_tracking": "Real-time Tracking",
   "track_mechanic_location_description": "Track your mechanic's location in real-time and stay updated on their arrival.",
   "good_morning": "Good morning, {name}!",
-  "nearby_mechanics": "Nearby Mechanics"
+  "nearby_mechanics": "Nearby Mechanics",
+  "messages": "Messages",
+  "no_conversations_yet": "No conversations yet",
+  "no_conversations_description": "When users message you about their vehicle issues, conversations will appear here",
+  "yesterday": "Yesterday"
 }

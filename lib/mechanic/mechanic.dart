@@ -128,7 +128,7 @@ class _MechanicState extends State<Mechanic> {
           ),
           BottomNavigationBarItem(
             icon: _buildChatTabWithBadge(),
-            label: 'Chat'.tr(),
+            label: 'messages'.tr(),
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.person),

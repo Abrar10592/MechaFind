@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils.dart';
 
 class MechanicSettings extends StatefulWidget {
   const MechanicSettings({super.key});
@@ -9,39 +10,92 @@ class MechanicSettings extends StatefulWidget {
   State<MechanicSettings> createState() => _MechanicSettingsState();
 }
 
-class _MechanicSettingsState extends State<MechanicSettings> {
+class _MechanicSettingsState extends State<MechanicSettings> with TickerProviderStateMixin {
   bool pushNotifications = true;
   bool locationAccess = true;
-  bool autoAcceptRequests = false;
   String selectedLanguage = 'en';
-  
-  // Privacy & Security settings
-  bool otpForUnknownLogin = true;
-  bool twoFactorAuth = false;
   
   // Service area
   String selectedServiceArea = '';
 
+  // Animation controllers
+  late AnimationController _fadeController;
+  late AnimationController _slideController;
+  late AnimationController _pulseController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+  late Animation<double> _pulseAnimation;
+
   @override
   void initState() {
     super.initState();
+    _initAnimations();
     _loadSettings();
+  }
+
+  void _initAnimations() {
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    
+    _pulseController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+    
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeOut,
+    ));
+    
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeOutQuart,
+    ));
+    
+    _pulseAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.05,
+    ).animate(CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeInOut,
+    ));
+    
+    // Start animations
+    _fadeController.forward();
+    _slideController.forward();
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _slideController.dispose();
+    _pulseController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       selectedLanguage = context.locale.languageCode;
-      otpForUnknownLogin = prefs.getBool('otp_unknown_login') ?? true;
-      twoFactorAuth = prefs.getBool('two_factor_auth') ?? false;
       selectedServiceArea = prefs.getString('service_area') ?? 'ঢাকা, বাংলাদেশ';
     });
   }
 
   Future<void> _saveSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('otp_unknown_login', otpForUnknownLogin);
-    await prefs.setBool('two_factor_auth', twoFactorAuth);
     await prefs.setString('service_area', selectedServiceArea);
   }
 
@@ -158,76 +212,6 @@ class _MechanicSettingsState extends State<MechanicSettings> {
             child: Text(context.locale.languageCode == 'en' ? 'Close' : 'বন্ধ'),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showPrivacySecurity() {
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(context.locale.languageCode == 'en' ? 'Privacy & Security' : 'গোপনীয়তা ও নিরাপত্তা'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SwitchListTile(
-                title: Text(
-                  context.locale.languageCode == 'en' 
-                    ? 'OTP for Unknown Login' 
-                    : 'অজানা লগইনের জন্য OTP',
-                  style: TextStyle(fontSize: 14),
-                ),
-                subtitle: Text(
-                  context.locale.languageCode == 'en'
-                    ? 'Receive OTP when logging from new device'
-                    : 'নতুন ডিভাইস থেকে লগইন করার সময় OTP পান',
-                  style: TextStyle(fontSize: 12),
-                ),
-                value: otpForUnknownLogin,
-                onChanged: (value) {
-                  setDialogState(() {
-                    otpForUnknownLogin = value;
-                  });
-                  setState(() {
-                    otpForUnknownLogin = value;
-                  });
-                  _saveSettings();
-                },
-              ),
-              SwitchListTile(
-                title: Text(
-                  context.locale.languageCode == 'en' 
-                    ? 'Two-Factor Authentication' 
-                    : 'দ্বি-ফ্যাক্টর প্রমাণীকরণ',
-                  style: TextStyle(fontSize: 14),
-                ),
-                subtitle: Text(
-                  context.locale.languageCode == 'en'
-                    ? 'Extra security with SMS verification'
-                    : 'SMS যাচাইকরণের সাথে অতিরিক্ত নিরাপত্তা',
-                  style: TextStyle(fontSize: 12),
-                ),
-                value: twoFactorAuth,
-                onChanged: (value) {
-                  setDialogState(() {
-                    twoFactorAuth = value;
-                  });
-                  setState(() {
-                    twoFactorAuth = value;
-                  });
-                  _saveSettings();
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(context.locale.languageCode == 'en' ? 'Close' : 'বন্ধ'),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -366,84 +350,208 @@ class _MechanicSettingsState extends State<MechanicSettings> {
 
   @override
   Widget build(BuildContext context) {
+    final isEnglish = context.locale.languageCode == 'en';
+    
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: Text(context.locale.languageCode == 'en' ? 'Settings' : 'সেটিংস'),
-        centerTitle: true
+        title: Text(
+          isEnglish ? 'Settings' : 'সেটিংস',
+          style: AppTextStyles.heading.copyWith(
+            color: Colors.white,
+            fontFamily: AppFonts.primaryFont,
+          ),
+        ),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.primary,
+                AppColors.gradientStart,
+              ],
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
-          _buildSectionTitle(context.locale.languageCode == 'en' ? 'Settings' : 'সেটিংস'),
-          _buildToggleItem(
-            context.locale.languageCode == 'en' ? 'Push Notifications' : 'পুশ নোটিফিকেশন',
-            pushNotifications,
-            (value) {
-              setState(() {
-                pushNotifications = value;
-              });
-            }
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.primary.withOpacity(0.1),
+              Colors.white,
+              AppColors.primary.withOpacity(0.05),
+            ],
           ),
-          _buildToggleItem(
-            context.locale.languageCode == 'en' ? 'Location Access' : 'অবস্থান অ্যাক্সেস',
-            locationAccess,
-            (value) {
-              setState(() {
-                locationAccess = value;
-              });
-            }
-          ),
-          const SizedBox(height: 20),
-          _buildSectionTitle(context.locale.languageCode == 'en' ? 'Language' : 'ভাষা'),
-          _buildLanguageSelector(),
-          const SizedBox(height: 20),
-          _buildSectionTitle(context.locale.languageCode == 'en' ? 'Work Preferences' : 'কাজের পছন্দ'),
-          _buildToggleItem(
-            context.locale.languageCode == 'en' ? 'Auto Accept Requests' : 'স্বয়ংক্রিয় অনুরোধ গ্রহণ',
-            autoAcceptRequests,
-            (value) {
-              setState(() {
-                autoAcceptRequests = value;
-              });
-            }
-          ),
-          _buildClickableListItem(
-            context.locale.languageCode == 'en' ? 'Service Area' : 'সেবা এলাকা',
-            context.locale.languageCode == 'en' 
-              ? 'Currently: ${selectedServiceArea.split(',')[0]}' 
-              : 'বর্তমান: ${selectedServiceArea.split(',')[0]}',
-            _showServiceAreaSelection
-          ),
-          const SizedBox(height: 20),
-          _buildSectionTitle(context.locale.languageCode == 'en' ? 'Account' : 'অ্যাকাউন্ট'),
-          _buildClickableListItem(
-            context.locale.languageCode == 'en' ? 'Miscellaneous Info' : 'বিবিধ তথ্য',
-            context.locale.languageCode == 'en' ? 'Blood group, secondary contact' : 'রক্তের গ্রুপ, দ্বিতীয় যোগাযোগ',
-            _showMiscellaneousInfo
-          ),
-          _buildClickableListItem(
-            context.locale.languageCode == 'en' ? 'Privacy & Security' : 'গোপনীয়তা ও নিরাপত্তা',
-            context.locale.languageCode == 'en' ? 'OTP, 2FA settings' : 'OTP, 2FA সেটিংস',
-            _showPrivacySecurity
-          ),
-          const SizedBox(height: 20),
-          _buildSectionTitle(context.locale.languageCode == 'en' ? 'Support' : 'সহায়তা'),
-          _buildClickableListItem(
-            context.locale.languageCode == 'en' ? 'Help & Support' : 'সাহায্য ও সহায়তা',
-            context.locale.languageCode == 'en' ? 'FAQs and common questions' : 'সাধারণ জিজ্ঞাসা ও প্রশ্ন',
-            _showHelpSupport
-          ),
-          _buildClickableListItem(
-            context.locale.languageCode == 'en' ? 'Contact Support' : 'সহায়তা যোগাযোগ',
-            context.locale.languageCode == 'en' ? 'Official contact details' : 'অফিসিয়াল যোগাযোগের তথ্য',
-            _showContactSupport
-          ),
-          const SizedBox(height: 20),
-          _buildSignOutButton(context),
-          const SizedBox(height: 10),
-          _buildDeleteButton(context),
-          const SizedBox(height: 10),
-        ],
+        ),
+        child: Stack(
+          children: [
+            // Background decorative elements
+            Positioned(
+              top: -100,
+              right: -100,
+              child: AnimatedBuilder(
+                animation: _pulseAnimation,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: _pulseAnimation.value,
+                    child: Container(
+                      width: 300,
+                      height: 300,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            AppColors.primary.withOpacity(0.08),
+                            AppColors.primary.withOpacity(0.04),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            Positioned(
+              bottom: -150,
+              left: -150,
+              child: AnimatedBuilder(
+                animation: _pulseAnimation,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: 1.1 - (_pulseAnimation.value - 1.0),
+                    child: Container(
+                      width: 250,
+                      height: 250,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            AppColors.tealPrimary.withOpacity(0.06),
+                            AppColors.tealPrimary.withOpacity(0.03),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            // Main content
+            FadeTransition(
+              opacity: _fadeAnimation,
+              child: SlideTransition(
+                position: _slideAnimation,
+                child: ListView(
+                  padding: const EdgeInsets.all(24.0),
+                  children: [
+                    // Settings Section
+                    _buildModernSectionCard(
+                      title: isEnglish ? 'App Settings' : 'অ্যাপ সেটিংস',
+                      icon: Icons.settings_outlined,
+                      children: [
+                        _buildModernToggleItem(
+                          title: isEnglish ? 'Push Notifications' : 'পুশ নোটিফিকেশন',
+                          subtitle: isEnglish ? 'Receive alerts and updates' : 'সতর্কতা এবং আপডেট পান',
+                          icon: Icons.notifications_outlined,
+                          value: pushNotifications,
+                          onChanged: (value) {
+                            setState(() {
+                              pushNotifications = value;
+                            });
+                          },
+                        ),
+                        _buildModernToggleItem(
+                          title: isEnglish ? 'Location Access' : 'অবস্থান অ্যাক্সেস',
+                          subtitle: isEnglish ? 'Allow location tracking' : 'অবস্থান ট্র্যাকিং অনুমতি দিন',
+                          icon: Icons.location_on_outlined,
+                          value: locationAccess,
+                          onChanged: (value) {
+                            setState(() {
+                              locationAccess = value;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Language Section
+                    _buildModernSectionCard(
+                      title: isEnglish ? 'Language' : 'ভাষা',
+                      icon: Icons.language_outlined,
+                      children: [
+                        _buildModernLanguageSelector(isEnglish),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Work Preferences Section
+                    _buildModernSectionCard(
+                      title: isEnglish ? 'Work Preferences' : 'কাজের পছন্দ',
+                      icon: Icons.work_outline,
+                      children: [
+                        _buildModernClickableItem(
+                          title: isEnglish ? 'Service Area' : 'সেবা এলাকা',
+                          subtitle: isEnglish 
+                            ? 'Currently: ${selectedServiceArea.split(',')[0]}' 
+                            : 'বর্তমান: ${selectedServiceArea.split(',')[0]}',
+                          icon: Icons.map_outlined,
+                          onTap: _showServiceAreaSelection,
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Support Section
+                    _buildModernSectionCard(
+                      title: isEnglish ? 'Support' : 'সহায়তা',
+                      icon: Icons.help_outline,
+                      children: [
+                        _buildModernClickableItem(
+                          title: isEnglish ? 'Help & Support' : 'সাহায্য ও সহায়তা',
+                          subtitle: isEnglish ? 'FAQs and common questions' : 'সাধারণ জিজ্ঞাসা ও প্রশ্ন',
+                          icon: Icons.quiz_outlined,
+                          onTap: _showHelpSupport,
+                        ),
+                        _buildModernClickableItem(
+                          title: isEnglish ? 'Contact Support' : 'সহায়তা যোগাযোগ',
+                          subtitle: isEnglish ? 'Get in touch with our team' : 'আমাদের দলের সাথে যোগাযোগ করুন',
+                          icon: Icons.contact_support_outlined,
+                          onTap: _showContactSupport,
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 32),
+                    
+                    // Action Buttons
+                    _buildModernSignOutButton(isEnglish),
+                    const SizedBox(height: 16),
+                    _buildModernDeleteButton(isEnglish),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -618,6 +726,542 @@ class _MechanicSettingsState extends State<MechanicSettings> {
             : 'ভাষা বাংলায় পরিবর্তিত হয়েছে'
         ),
         duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // Modern UI Components
+  Widget _buildModernSectionCard({
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.primary.withOpacity(0.1),
+                  AppColors.tealPrimary.withOpacity(0.05),
+                ],
+              ),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: AppColors.primary,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  title,
+                  style: AppTextStyles.heading.copyWith(
+                    color: AppColors.textPrimary,
+                    fontFamily: AppFonts.primaryFont,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 18,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+            child: Column(
+              children: children,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernToggleItem({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool value,
+    required Function(bool) onChanged,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: value ? AppColors.primary.withOpacity(0.05) : Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: value ? AppColors.primary.withOpacity(0.3) : Colors.grey.shade200,
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: value ? AppColors.primary.withOpacity(0.1) : Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              color: value ? AppColors.primary : Colors.grey.shade600,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: AppTextStyles.body.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: AppTextStyles.label.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          AnimatedBuilder(
+            animation: _pulseAnimation,
+            builder: (context, child) {
+              return Transform.scale(
+                scale: value ? _pulseAnimation.value : 1.0,
+                child: Switch.adaptive(
+                  value: value,
+                  onChanged: onChanged,
+                  activeColor: AppColors.primary,
+                  activeTrackColor: AppColors.primary.withOpacity(0.3),
+                  inactiveThumbColor: Colors.grey.shade400,
+                  inactiveTrackColor: Colors.grey.shade200,
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernClickableItem({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.grey.shade200,
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.tealPrimary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: AppColors.tealPrimary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: AppTextStyles.body.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: AppTextStyles.label.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  color: AppColors.textSecondary,
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernLanguageSelector(bool isEnglish) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.grey.shade200,
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _changeLanguage('en'),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                decoration: BoxDecoration(
+                  color: selectedLanguage == 'en' ? AppColors.primary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: selectedLanguage == 'en' ? [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ] : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '🇺🇸',
+                      style: const TextStyle(fontSize: 20),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'English',
+                      style: AppTextStyles.body.copyWith(
+                        color: selectedLanguage == 'en' ? Colors.white : AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _changeLanguage('bn'),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                decoration: BoxDecoration(
+                  color: selectedLanguage == 'bn' ? AppColors.primary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: selectedLanguage == 'bn' ? [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ] : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '🇧🇩',
+                      style: const TextStyle(fontSize: 20),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'বাংলা',
+                      style: AppTextStyles.body.copyWith(
+                        color: selectedLanguage == 'bn' ? Colors.white : AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernSignOutButton(bool isEnglish) {
+    return AnimatedBuilder(
+      animation: _pulseAnimation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _pulseAnimation.value,
+          child: Container(
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.danger,
+                  AppColors.danger.withOpacity(0.8),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.danger.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: ElevatedButton.icon(
+              onPressed: () => _showSignOutConfirmation(context, isEnglish),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              icon: const Icon(
+                Icons.logout_outlined,
+                color: Colors.white,
+                size: 20,
+              ),
+              label: Text(
+                isEnglish ? 'Sign Out' : 'সাইন আউট',
+                style: AppTextStyles.body.copyWith(
+                  color: Colors.white,
+                  fontFamily: AppFonts.primaryFont,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildModernDeleteButton(bool isEnglish) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.danger.withOpacity(0.3), width: 2),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: ElevatedButton.icon(
+        onPressed: () => _showDeleteConfirmation(context, isEnglish),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 16),
+        ),
+        icon: Icon(
+          Icons.delete_outline,
+          color: AppColors.danger,
+          size: 20,
+        ),
+        label: Text(
+          isEnglish ? 'Delete Account' : 'অ্যাকাউন্ট মুছুন',
+          style: AppTextStyles.body.copyWith(
+            color: AppColors.danger,
+            fontFamily: AppFonts.primaryFont,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSignOutConfirmation(BuildContext context, bool isEnglish) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.logout_outlined, color: AppColors.danger),
+            const SizedBox(width: 12),
+            Text(
+              isEnglish ? 'Sign Out' : 'সাইন আউট',
+              style: AppTextStyles.heading.copyWith(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          isEnglish 
+            ? 'Are you sure you want to sign out?' 
+            : 'আপনি কি নিশ্চিত যে আপনি সাইন আউট করতে চান?',
+          style: AppTextStyles.body.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              isEnglish ? 'Cancel' : 'বাতিল',
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Add sign out logic here
+              Navigator.pushReplacementNamed(context, '/signin');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              isEnglish ? 'Sign Out' : 'সাইন আউট',
+              style: AppTextStyles.body.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(BuildContext context, bool isEnglish) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.delete_outline, color: AppColors.danger),
+            const SizedBox(width: 12),
+            Text(
+              isEnglish ? 'Delete Account' : 'অ্যাকাউন্ট মুছুন',
+              style: AppTextStyles.heading.copyWith(
+                color: AppColors.danger,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          isEnglish 
+            ? 'Are you sure you want to delete your account? This action cannot be undone.' 
+            : 'আপনি কি নিশ্চিত যে আপনি আপনার অ্যাকাউন্ট মুছতে চান? এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না।',
+          style: AppTextStyles.body.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              isEnglish ? 'Cancel' : 'বাতিল',
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Add delete account logic here
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    isEnglish 
+                      ? 'Account deletion requested' 
+                      : 'অ্যাকাউন্ট মুছে ফেলার অনুরোধ করা হয়েছে',
+                  ),
+                  backgroundColor: AppColors.danger,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              isEnglish ? 'Delete' : 'মুছুন',
+              style: AppTextStyles.body.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
