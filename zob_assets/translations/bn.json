@@ -59,5 +59,9 @@
   "real_time_tracking": "রিয়েল-টাইম ট্র্যাকিং",
   "track_mechanic_location_description": "আপনার মেকানিকের অবস্থান রিয়েল-টাইমে ট্র্যাক করুন এবং তাদের আগমনের বিষয়ে আপডেট থাকুন।",
   "good_morning": "সুপ্রভাত, {name}!",
-  "nearby_mechanics": "কাছাকাছি মেকানিক"
+  "nearby_mechanics": "কাছাকাছি মেকানিক",
+  "messages": "বার্তা",
+  "no_conversations_yet": "এখনো কোনো কথোপকথন নেই",
+  "no_conversations_description": "যখন ব্যবহারকারীরা তাদের গাড়ির সমস্যা নিয়ে আপনাকে বার্তা পাঠাবেন, কথোপকথনগুলো এখানে প্রদর্শিত হবে",
+  "yesterday": "গতকাল"
 }

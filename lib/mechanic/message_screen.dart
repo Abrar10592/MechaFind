@@ -241,7 +241,7 @@ class _MessagesScreenState extends State<MessagesScreen>
     if (messageDate == today) {
       return DateFormat('HH:mm').format(dateTime);
     } else if (messageDate == today.subtract(const Duration(days: 1))) {
-      return 'Yesterday';
+      return 'yesterday'.tr();
     } else if (now.difference(dateTime).inDays < 7) {
       return DateFormat('EEEE').format(dateTime);
     } else {
@@ -269,7 +269,7 @@ class _MessagesScreenState extends State<MessagesScreen>
           ),
         ),
         title: Text(
-          'Messages',
+          'messages'.tr(),
           style: AppTextStyles.heading.copyWith(
             color: Colors.white,
             fontFamily: AppFonts.primaryFont,
@@ -755,7 +755,7 @@ class _MessagesScreenState extends State<MessagesScreen>
             ),
             const SizedBox(height: 32),
             Text(
-              'No conversations yet',
+              'no_conversations_yet'.tr(),
               style: AppTextStyles.heading.copyWith(
                 fontSize: FontSizes.subHeading,
                 fontFamily: AppFonts.primaryFont,
@@ -767,7 +767,7 @@ class _MessagesScreenState extends State<MessagesScreen>
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 40),
               child: Text(
-                'When users message you about their vehicle issues, conversations will appear here',
+                'no_conversations_description'.tr(),
                 style: AppTextStyles.body.copyWith(
                   fontSize: FontSizes.body,
                   fontFamily: AppFonts.secondaryFont,
