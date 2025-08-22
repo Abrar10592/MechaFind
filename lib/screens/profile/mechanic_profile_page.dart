@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/mechanic.dart';
 import '../chat/chat_screen.dart';
 import '../../utils/page_transitions.dart';
+import '../../services/find_mechanic_service.dart';
 
 class MechanicProfilePage extends StatefulWidget {
   final Mechanic mechanic;
@@ -309,66 +310,153 @@ class _MechanicProfilePageState extends State<MechanicProfilePage>
   }
 
   Widget _buildReviewsTab() {
-    // Mock reviews data
-    final reviews = [
-      {'user': 'John Doe', 'rating': 5.0, 'comment': 'Excellent service! Very professional and quick.'},
-      {'user': 'Jane Smith', 'rating': 4.5, 'comment': 'Great work, arrived on time and fixed the issue.'},
-      {'user': 'Mike Johnson', 'rating': 4.0, 'comment': 'Good service, reasonable pricing.'},
-    ];
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: FindMechanicService.getMechanicReviews(widget.mechanic.id),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: reviews.length,
-      itemBuilder: (context, index) {
-        final review = reviews[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
+        if (snapshot.hasError) {
+          return Center(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundColor: Colors.grey[300],
-                      child: const Icon(Icons.person),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            review['user'] as String,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          RatingBarIndicator(
-                            rating: review['rating'] as double,
-                            itemBuilder: (context, index) => const Icon(
-                              Icons.star,
-                              color: Colors.amber,
-                            ),
-                            itemCount: 5,
-                            itemSize: 16.0,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: Colors.grey[400],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 Text(
-                  review['comment'] as String,
+                  'Error loading reviews',
                   style: TextStyle(
-                    color: Colors.grey[700],
+                    color: Colors.grey[600],
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final reviews = snapshot.data ?? [];
+
+        if (reviews.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.star_border,
+                  size: 64,
+                  color: Colors.grey[400],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No reviews yet',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Be the first to review this mechanic!',
+                  style: TextStyle(
+                    color: Colors.grey[500],
                     fontSize: 14,
                   ),
                 ),
               ],
             ),
-          ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: reviews.length,
+          itemBuilder: (context, index) {
+            final review = reviews[index];
+            final reviewDate = DateTime.tryParse(review['created_at'] ?? '');
+            final formattedDate = reviewDate != null 
+                ? '${reviewDate.day}/${reviewDate.month}/${reviewDate.year}'
+                : '';
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: 16),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundColor: Colors.grey[300],
+                          backgroundImage: review['user_image'] != null 
+                              ? NetworkImage(review['user_image'])
+                              : null,
+                          child: review['user_image'] == null 
+                              ? const Icon(Icons.person)
+                              : null,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      review['user_name'] ?? 'Anonymous User',
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  if (formattedDate.isNotEmpty)
+                                    Text(
+                                      formattedDate,
+                                      style: TextStyle(
+                                        color: Colors.grey[500],
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              RatingBarIndicator(
+                                rating: review['rating']?.toDouble() ?? 0.0,
+                                itemBuilder: (context, index) => const Icon(
+                                  Icons.star,
+                                  color: Colors.amber,
+                                ),
+                                itemCount: 5,
+                                itemSize: 16.0,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (review['review'] != null && review['review'].toString().isNotEmpty)
+                      Text(
+                        review['review'].toString(),
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: 14,
+                          height: 1.4,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );

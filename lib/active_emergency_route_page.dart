@@ -620,7 +620,7 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage>
               ),
             ),
             titlePadding: EdgeInsets.zero,
-            content: Container(
+            content: SizedBox(
               width: double.maxFinite,
               child: Column(
                 mainAxisSize: MainAxisSize.min,

@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:mechfind/utils.dart';
 import 'package:mechfind/services/message_notification_service.dart';
-import 'package:intl/intl.dart';
 import 'chat_screen.dart';
 
 class MessagesScreen extends StatefulWidget {

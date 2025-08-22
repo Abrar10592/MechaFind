@@ -3,28 +3,64 @@ import '../models/mechanic.dart';
 class MechanicService {
   static Mechanic convertToMechanic(Map<String, dynamic> data) {
     return Mechanic(
-      id: data['id'] ?? '${data['name']}_${DateTime.now().millisecondsSinceEpoch}',
-      name: data['name'] ?? '',
-      address: data['address'] ?? '',
-      distance: (data['distance'] as String? ?? '0').replaceAll(' km', '').replaceAll(',', '').isNotEmpty
-          ? double.tryParse((data['distance'] as String).replaceAll(' km', '')) ?? 0.0
-          : 0.0,
-      rating: (data['rating'] ?? 0.0).toDouble(),
-      reviews: data['reviews'] ?? 0,
-      responseTime: data['response'] ?? '',
-      services: List<String>.from(data['services'] ?? []),
-      isOnline: data['online'] ?? false,
-      phoneNumber: data['phoneNumber'] ?? '+1234567890',
-      profileImage: data['profileImage'] ?? '',
-      description: data['description'] ?? 'Professional mechanic with years of experience.',
-      certifications: data['certifications'] ?? ['ASE Certified', 'Factory Trained'],
-      experience: data['experience'] ?? '5+ years of experience',
-      hourlyRate: (data['hourlyRate'] ?? 75.0).toDouble(),
+      id: data['id']?.toString() ?? '${data['name']}_${DateTime.now().millisecondsSinceEpoch}',
+      name: data['name']?.toString() ?? '',
+      address: data['address']?.toString() ?? '',
+      distance: _parseDistance(data['distance']),
+      rating: _parseDouble(data['rating']),
+      reviews: _parseInt(data['reviews']),
+      responseTime: data['response']?.toString() ?? data['responseTime']?.toString() ?? '',
+      services: _parseServices(data['services']),
+      isOnline: data['online'] ?? data['isOnline'] ?? false,
+      phoneNumber: data['phone']?.toString() ?? data['phoneNumber']?.toString() ?? '+1234567890',
+      profileImage: data['image_url']?.toString() ?? data['profileImage']?.toString() ?? '',
+      description: data['description']?.toString() ?? 'Professional mechanic with years of experience.',
+      certifications: _parseCertifications(data['certifications']),
+      experience: data['experience']?.toString() ?? '5+ years of experience',
+      hourlyRate: _parseDouble(data['hourlyRate'] ?? 75.0),
       location: Location(
-        latitude: data['latitude'] ?? 37.7749,
-        longitude: data['longitude'] ?? -122.4194,
+        latitude: _parseDouble(data['latitude'] ?? data['location_x'] ?? 37.7749),
+        longitude: _parseDouble(data['longitude'] ?? data['location_y'] ?? -122.4194),
       ),
     );
+  }
+
+  static double _parseDistance(dynamic distance) {
+    if (distance is double) return distance;
+    if (distance is int) return distance.toDouble();
+    if (distance is String) {
+      final cleanDistance = distance.replaceAll(RegExp(r'[^\d.]'), '');
+      return double.tryParse(cleanDistance) ?? 0.0;
+    }
+    return 0.0;
+  }
+
+  static double _parseDouble(dynamic value) {
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
+  static int _parseInt(dynamic value) {
+    if (value is int) return value;
+    if (value is double) return value.round();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  static List<String> _parseServices(dynamic services) {
+    if (services is List) {
+      return services.map((s) => s?.toString() ?? '').where((s) => s.isNotEmpty).toList();
+    }
+    return [];
+  }
+
+  static List<String> _parseCertifications(dynamic certifications) {
+    if (certifications is List) {
+      return certifications.map((c) => c?.toString() ?? '').where((c) => c.isNotEmpty).toList();
+    }
+    return ['ASE Certified', 'Factory Trained'];
   }
 
   static List<Mechanic> getMockMechanics() {

@@ -1634,7 +1634,7 @@ mechanic_services(service_id, services(name))
                   
                   // Loading indicator or status
                   if (status == 'pending' && mechanicId == null)
-                    Container(
+                    SizedBox(
                       width: 24,
                       height: 24,
                       child: CircularProgressIndicator(

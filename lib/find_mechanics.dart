@@ -1,68 +1,126 @@
 import 'package:flutter/material.dart';
 import 'detailed_mechanic_card.dart';
 import 'widgets/bottom_navbar.dart';
+import 'services/find_mechanic_service.dart';
+import 'location_service.dart';
 
-class FindMechanicsPage extends StatelessWidget {
+class FindMechanicsPage extends StatefulWidget {
   const FindMechanicsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final mechanics = [
-      {
-        'name': 'AutoCare Plus',
-        'address': '123 Main St, Downtown',
-        'distance': '0.8 km',
-        'rating': 4.9,
-        'reviews': 156,
-        'response': '5 min',
-        'services': ['Engine Repair', 'Brake Service', 'Oil Change'],
-        'online': true,
-      },
-      {
-        'name': 'QuickFix Motors',
-        'address': '456 Oak Ave, Midtown',
-        'distance': '1.2 km',
-        'rating': 4.7,
-        'reviews': 89,
-        'response': '8 min',
-        'services': ['Towing', 'Jump Start', 'Tire Change'],
-        'online': true,
-      },
-      {
-        'name': 'Elite Auto Workshop',
-        'address': '',
-        'distance': '',
-        'rating': null,
-        'reviews': null,
-        'response': '',
-        'services': [],
-        'online': false,
-      },
-    ];
+  State<FindMechanicsPage> createState() => _FindMechanicsPageState();
+}
 
+class _FindMechanicsPageState extends State<FindMechanicsPage> {
+  List<Map<String, dynamic>> mechanics = [];
+  bool isLoading = true;
+  String searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMechanics();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadMechanics() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // Try to get user's current location (optional now)
+      double? userLat;
+      double? userLng;
+      
+      try {
+        final locationString = await LocationService.getCurrentLocation(context);
+        if (locationString != null) {
+          final locationParts = locationString.split(', ');
+          userLat = double.tryParse(locationParts[0]);
+          userLng = double.tryParse(locationParts[1]);
+        }
+      } catch (e) {
+        // Continue without location - we'll show all mechanics
+      }
+
+      // Fetch all registered mechanics from database
+      final fetchedMechanics = await FindMechanicService.fetchAllMechanics(
+        userLat: userLat,
+        userLng: userLng,
+        searchQuery: searchQuery.isNotEmpty ? searchQuery : null,
+      );
+      
+      setState(() {
+        mechanics = fetchedMechanics;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading mechanics: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
+  }
+
+  Future<void> _performSearch() async {
+    setState(() {
+      searchQuery = _searchController.text;
+    });
+    await _loadMechanics();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Find Mechanics'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadMechanics,
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: ListView(
+        child: Column(
           children: [
-            const TextField(
+            // Search field
+            TextField(
+              controller: _searchController,
               decoration: InputDecoration(
-                prefixIcon: Icon(Icons.search),
+                prefixIcon: const Icon(Icons.search),
                 hintText: 'Search by name or service',
-                suffixIcon: Icon(Icons.filter_list),
-                border: OutlineInputBorder(
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.search),
+                  onPressed: _performSearch,
+                ),
+                border: const OutlineInputBorder(
                   borderRadius: BorderRadius.all(Radius.circular(12)),
                 ),
               ),
+              onSubmitted: (_) => _performSearch(),
             ),
             const SizedBox(height: 20),
-            Text('${mechanics.length} mechanics found near you',
-                style: const TextStyle(fontSize: 16)),
-            const SizedBox(height: 10),
-            ...mechanics.map((mech) => DetailedMechanicCard(mechanic: mech)),
+            
+            // Content
+            Expanded(
+              child: _buildContent(),
+            ),
           ],
         ),
       ),
@@ -90,6 +148,82 @@ class FindMechanicsPage extends StatelessWidget {
           }
         },
       ),
+    );
+  }
+
+  Widget _buildContent() {
+    if (isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Loading mechanics...'),
+          ],
+        ),
+      );
+    }
+
+    if (mechanics.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.search_off,
+              size: 64,
+              color: Colors.grey,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              searchQuery.isEmpty 
+                ? 'No mechanics found'
+                : 'No mechanics found for "$searchQuery"',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              searchQuery.isEmpty
+                ? 'No mechanics are registered yet'
+                : 'Try clearing the search filter',
+              textAlign: TextAlign.center,
+            ),
+            if (searchQuery.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  _searchController.clear();
+                  setState(() {
+                    searchQuery = '';
+                  });
+                  _loadMechanics();
+                },
+                child: const Text('Clear Search'),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '${mechanics.length} mechanics found',
+          style: const TextStyle(fontSize: 16),
+        ),
+        const SizedBox(height: 10),
+        Expanded(
+          child: ListView.builder(
+            itemCount: mechanics.length,
+            itemBuilder: (context, index) {
+              return DetailedMechanicCard(mechanic: mechanics[index]);
+            },
+          ),
+        ),
+      ],
     );
   }
 }
