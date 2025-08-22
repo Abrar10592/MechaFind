@@ -1,9 +1,11 @@
 import 'dart:math' as math;
+import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mechfind/utils.dart';
 import 'widgets/emergency_form_dialog.dart';
+import 'widgets/service_booking_dialog.dart';
 
 import 'location_service.dart';
 
@@ -34,7 +36,7 @@ class UserHomePage extends StatefulWidget {
   State createState() => _UserHomePageState();
 }
 
-class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver {
+class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver, TickerProviderStateMixin {
   String? userName;
   String currentLocation = 'Getting location...';
   double? userLat;
@@ -44,15 +46,72 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
   RealtimeChannel? _requestSubscription;
   final supabase = Supabase.instance.client;
 
+  // Animation controllers for beautiful UI
+  late AnimationController _fadeController;
+  late AnimationController _slideController;
+  late AnimationController _pulseController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+  late Animation<double> _pulseAnimation;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    
+    // Initialize beautiful animations
+    _initAnimations();
+    
     _checkLocationServiceAndLoad();
     _setupRealtimeActiveRequests();
     if (supabase.auth.currentUser != null) {
       MessageNotificationService().refresh();
     }
+  }
+  
+  void _initAnimations() {
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
+    
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    
+    _pulseController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+    
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeOut,
+    ));
+    
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeOutQuart,
+    ));
+    
+    _pulseAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.05,
+    ).animate(CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeInOut,
+    ));
+    
+    // Start animations
+    _fadeController.forward();
+    _slideController.forward();
   }
 
   @override
@@ -79,16 +138,30 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _requestSubscription?.unsubscribe();
+    _periodicRefreshTimer?.cancel();
+    
+    // Dispose animation controllers
+    _fadeController.dispose();
+    _slideController.dispose();
+    _pulseController.dispose();
+    
     super.dispose();
   }
 
   void _setupRealtimeActiveRequests() {
     final user = supabase.auth.currentUser;
     if (user == null) return;
+    
+    // Unsubscribe existing subscription
     _requestSubscription?.unsubscribe();
+    
+    // Load active requests first
     _loadActiveRequests();
+    
+    // Create unique channel name with timestamp
     final channelName = 'public:requests:user_${user.id}_${DateTime.now().millisecondsSinceEpoch}';
     print('🔄 Setting up real-time subscription: $channelName');
+    
     _requestSubscription = supabase
         .channel(channelName)
         .onPostgresChanges(
@@ -103,8 +176,15 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
       callback: (payload) {
         print('🔄 Real-time request update: ${payload.eventType}');
         print('🔄 Record data: ${payload.newRecord}');
+        print('🔄 Request type: ${payload.newRecord['request_type']}');
+        
+        // Force immediate refresh when any change is detected
         if (mounted) {
+          print('🔄 Triggering _loadActiveRequests due to real-time update');
           _loadActiveRequests();
+          
+          // Also refresh mechanics to update button states
+          _fetchMechanicsFromDB();
         }
       },
     )
@@ -122,6 +202,23 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
       }
       if (error != null) {
         print('❌ Request subscription error: $error');
+      }
+    });
+    
+    // Also set up a periodic refresh as a fallback
+    _setupPeriodicRefresh();
+  }
+
+  Timer? _periodicRefreshTimer;
+  
+  void _setupPeriodicRefresh() {
+    _periodicRefreshTimer?.cancel();
+    _periodicRefreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      if (mounted) {
+        print('🔄 Periodic refresh of active requests');
+        _loadActiveRequests();
+      } else {
+        timer.cancel();
       }
     });
   }
@@ -442,111 +539,6 @@ mechanic_services(service_id, services(name))
     );
   }
 
-  List<Map<String, dynamic>> get _filteredActiveRequests {
-    final validActiveRequests = activeRequests.where((r) {
-      final status = (r['status'] ?? '').toLowerCase();
-      // Show requests that are pending or accepted
-      return status == 'accepted' || status == 'pending';
-    }).toList();
-
-    final emergencyReq = validActiveRequests.firstWhere(
-            (r) => (r['request_type'] ?? 'normal') == 'emergency',
-        orElse: () => {});
-
-    if (emergencyReq.isNotEmpty) {
-      return [emergencyReq];
-    }
-
-    return validActiveRequests.where((r) => (r['request_type'] ?? 'normal') == 'normal').toList();
-  }
-
-  Widget _activeRequestsSection() {
-    final filteredRequests = _filteredActiveRequests;
-    if (filteredRequests.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.all(16),
-          child: Text("Active Requests",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        ),
-        ...filteredRequests.map((req) {
-          Color statusColor;
-          String subtitle;
-
-          final status = (req['status'] ?? '').toLowerCase();
-          final mechanicId = req['mechanic_id'];
-          switch (status) {
-            case 'pending':
-              statusColor = Colors.orange;
-              subtitle = mechanicId != null
-                  ? "Status: Pending (Mechanic assigned)\nVehicle: ${req['vehicle'] ?? '-'}\nDescription: ${req['description'] ?? '-'}"
-                  : "Status: Looking for mechanic\nVehicle: ${req['vehicle'] ?? '-'}\nDescription: ${req['description'] ?? '-'}";
-              break;
-            case 'accepted':
-              statusColor = Colors.green;
-              subtitle = "Status: Accepted\nVehicle: ${req['vehicle'] ?? '-'}\nDescription: ${req['description'] ?? '-'}";
-              break;
-            default:
-              statusColor = Colors.grey;
-              subtitle = "Status: ${req['status']}\nVehicle: ${req['vehicle'] ?? '-'}\nDescription: ${req['description'] ?? '-'}";
-          }
-
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            child: ListTile(
-              onTap: () async {
-                if ((req['request_type'] ?? 'normal') == 'emergency') {
-                  await Navigator.pushNamed(
-                    context,
-                    '/active_emergency_route',
-                    arguments: {
-                      'requestId': req['id'],
-                      'userLocation': LatLng(userLat!, userLng!),
-                    },
-                  );
-                  print('🔄 Returned from emergency route, refreshing data');
-                  await refreshActiveRequestsData();
-                } else {
-                  if (mechanicId != null) {
-                    _showActiveRequestMechanicDetails(req);
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Still looking for a mechanic...')),
-                    );
-                  }
-                }
-              },
-              leading: CircleAvatar(
-                backgroundColor: statusColor,
-                child: Icon(
-                  status == 'pending' && mechanicId == null ? Icons.search : Icons.build,
-                  color: Colors.white,
-                ),
-              ),
-              title: const Text("Request for Mechanic"),
-              subtitle: Text(
-                subtitle,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-              ),
-              isThreeLine: true,
-              trailing: status == 'pending' && mechanicId == null
-                  ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-                  : null,
-            ),
-          );
-        }),
-      ],
-    );
-  }
-
   Future _refreshHomePage() async {
     await _checkLocationServiceAndLoad();
     await _fetchUserName();
@@ -593,180 +585,140 @@ mechanic_services(service_id, services(name))
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
+        title: Text(
+          'MechFind',
+          style: AppTextStyles.heading.copyWith(
+            color: Colors.white,
+            fontFamily: AppFonts.primaryFont,
+          ),
+        ),
         backgroundColor: AppColors.primary,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Welcome',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18, // adjust as you prefer
-                fontWeight: FontWeight.bold,
-              ),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        automaticallyImplyLeading: false, // This removes the back button
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.primary,
+                AppColors.gradientStart,
+              ],
             ),
-            if (!widget.isGuest)
-              Text(
-                userName ?? '',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15, // adjust for slightly smaller
-                ),
-              ),
-          ],
+          ),
         ),
         actions: [
           if (!widget.isGuest)
-            Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: CurrentUserAvatar(
-                radius: 18,
-                showBorder: true,
-                borderColor: Colors.white,
-                onTap: () {
-                  Navigator.pushNamed(context, '/settings');
+            AnimatedBuilder(
+              animation: _pulseAnimation,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _pulseAnimation.value,
+                  child: IconButton(
+                    icon: const Icon(Icons.notifications_outlined),
+                    color: Colors.white,
+                    onPressed: () {
+                      // Handle notifications
+                    },
+                  ),
+                );
+              },
+            ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.primary.withOpacity(0.1),
+              Colors.white,
+              AppColors.primary.withOpacity(0.05),
+            ],
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Background decorative elements
+            Positioned(
+              top: -100,
+              right: -100,
+              child: AnimatedBuilder(
+                animation: _pulseAnimation,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: _pulseAnimation.value,
+                    child: Container(
+                      width: 300,
+                      height: 300,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            AppColors.primary.withOpacity(0.08),
+                            AppColors.primary.withOpacity(0.04),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
                 },
               ),
             ),
-        ],
-      ),
-      backgroundColor: AppColors.background,
-      body: RefreshIndicator(
-        onRefresh: _refreshHomePage,
-        child: ListView(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.location_on,
-                    size: 20,
-                    color: AppColors.textSecondary,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      currentLocation,
-                      style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: EmergencyButton(
-                onPressed: onEmergencyButtonTap, // Use the new handler
-              ),
-            ),
-            const SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'Nearby Mechanics',
-                style: AppTextStyles.heading.copyWith(fontSize: FontSizes.subHeading),
-              ),
-            ),
-            const SizedBox(height: 10),
-            if (nearbyMechanics.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text("No mechanics found."),
-              )
-            else
-              Column(
-                children: nearbyMechanics.map((mech) {
-                  final hasPending = _isRequestActiveForMechanic(mech['id'], 'pending');
-                  final hasAccepted = _isRequestActiveForMechanic(mech['id'], 'accepted');
-                  Color btnColor = AppColors.accent;
-                  String btnText = "Request Service";
-                  if (hasPending) {
-                    btnColor = Colors.orange;
-                    btnText = "Request Pending";
-                  } else if (hasAccepted) {
-                    btnColor = Colors.green;
-                    btnText = "Request Accepted";
-                  }
-                  return Container(
-                    margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                    padding: const EdgeInsets.all(16),
-                    color: Colors.white,
-                    child: Column(
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            mech['image_url'] != null && mech['image_url'].toString().isNotEmpty
-                                ? ClipRRect(
-                              borderRadius: BorderRadius.circular(40),
-                              child: Image.network(
-                                mech['image_url'],
-                                width: 80,
-                                height: 80,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
-                                  width: 80,
-                                  height: 80,
-                                  color: Colors.grey[300],
-                                  child: const Icon(Icons.person, size: 40, color: Colors.white),
-                                ),
-                              ),
-                            )
-                                : Container(
-                              width: 80,
-                              height: 80,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[300],
-                                borderRadius: BorderRadius.circular(40),
-                              ),
-                              child: const Icon(Icons.person, size: 40, color: Colors.white),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    mech['name'],
-                                    style: AppTextStyles.heading.copyWith(
-                                        fontSize: 18, fontWeight: FontWeight.bold),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text('Distance: ${mech['distance']}'),
-                                  Text('Rating: ${mech['rating']}'),
-                                  Text('Services: ${mech['services']?.join(', ')}'),
-                                ],
-                              ),
-                            ),
+            Positioned(
+              bottom: -150,
+              left: -150,
+              child: AnimatedBuilder(
+                animation: _pulseAnimation,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: 1.1 - (_pulseAnimation.value - 1.0),
+                    child: Container(
+                      width: 250,
+                      height: 250,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            AppColors.tealPrimary.withOpacity(0.06),
+                            AppColors.tealPrimary.withOpacity(0.03),
+                            Colors.transparent,
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: btnColor),
-                            onPressed: (hasPending || hasAccepted)
-                                ? null
-                                : () {
-                              if (widget.isGuest) {
-                                _showLoginRequiredDialog();
-                              } else {
-                                _showRequestServiceDialog(mech);
-                              }
-                            },
-                            child: Text(btnText),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   );
-                }).toList(),
+                },
               ),
-            const SizedBox(height: 20),
-            _activeRequestsSection(),
+            ),
+            // Main content
+            SafeArea(
+              child: RefreshIndicator(
+                onRefresh: _refreshHomePage,
+                color: AppColors.tealPrimary,
+                child: ListView(
+                  physics: const BouncingScrollPhysics(),
+                  children: [
+                    _buildModernHeader(),
+                    const SizedBox(height: 20),
+                    _buildLocationSection(),
+                    const SizedBox(height: 24),
+                    _buildEmergencySection(),
+                    const SizedBox(height: 32),
+                    _buildNearbyMechanicsSection(),
+                    const SizedBox(height: 24),
+                    _buildActiveRequestsSection(),
+                    const SizedBox(height: 80), // Extra space for bottom navigation
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -789,6 +741,918 @@ mechanic_services(service_id, services(name))
               break;
           }
         },
+      ),
+    );
+  }
+
+  Widget _buildModernHeader() {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Welcome back,',
+                      style: AppTextStyles.body.copyWith(
+                        color: Colors.white.withOpacity(0.9),
+                        fontFamily: AppFonts.secondaryFont,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    if (!widget.isGuest)
+                      Text(
+                        userName ?? 'User',
+                        style: AppTextStyles.heading.copyWith(
+                          color: Colors.white,
+                          fontFamily: AppFonts.primaryFont,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      )
+                    else
+                      Text(
+                        'Guest User',
+                        style: AppTextStyles.heading.copyWith(
+                          color: Colors.white,
+                          fontFamily: AppFonts.primaryFont,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (!widget.isGuest)
+                AnimatedBuilder(
+                  animation: _pulseAnimation,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: _pulseAnimation.value,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.3),
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.white.withOpacity(0.2),
+                              blurRadius: 15,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: CurrentUserAvatar(
+                          radius: 24,
+                          showBorder: false,
+                          onTap: () {
+                            Navigator.pushNamed(context, '/settings');
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationSection() {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white,
+              Colors.white.withOpacity(0.95),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.15),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+              spreadRadius: 2,
+            ),
+          ],
+          border: Border.all(
+            color: AppColors.tealPrimary.withOpacity(0.2),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.tealPrimary,
+                    AppColors.tealSecondary,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.tealPrimary.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.location_on,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Current Location',
+                    style: AppTextStyles.label.copyWith(
+                      color: AppColors.textSecondary,
+                      fontFamily: AppFonts.secondaryFont,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    currentLocation,
+                    style: AppTextStyles.body.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: AppFonts.primaryFont,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmergencySection() {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '🚨 Emergency Services',
+                style: AppTextStyles.heading.copyWith(
+                  color: AppColors.primary,
+                  fontFamily: AppFonts.primaryFont,
+                  fontSize: 20,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Need immediate assistance? Our mechanics are ready to help 24/7',
+                style: AppTextStyles.body.copyWith(
+                  color: AppColors.textSecondary,
+                  fontFamily: AppFonts.secondaryFont,
+                ),
+              ),
+              const SizedBox(height: 16),
+              EmergencyButton(
+                onPressed: onEmergencyButtonTap,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNearbyMechanicsSection() {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.orangePrimary,
+                        AppColors.orangeSecondary,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.engineering,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Nearby Mechanics',
+                        style: AppTextStyles.heading.copyWith(
+                          color: AppColors.primary,
+                          fontFamily: AppFonts.primaryFont,
+                          fontSize: 20,
+                        ),
+                      ),
+                      Text(
+                        '${nearbyMechanics.length} mechanics available',
+                        style: AppTextStyles.label.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (nearbyMechanics.isEmpty)
+            _buildEmptyMechanicsState()
+          else
+            Column(
+              children: nearbyMechanics.asMap().entries.map((entry) {
+                int index = entry.key;
+                Map mech = entry.value;
+                return _buildModernMechanicCard(mech, index);
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyMechanicsState() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white,
+            Colors.white.withOpacity(0.95),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.1),
+            blurRadius: 15,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.textSecondary.withOpacity(0.1),
+                  AppColors.textSecondary.withOpacity(0.05),
+                ],
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.search_off,
+              size: 48,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No mechanics found nearby',
+            style: AppTextStyles.heading.copyWith(
+              color: AppColors.textPrimary,
+              fontSize: 18,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Try refreshing or check back later',
+            style: AppTextStyles.body.copyWith(
+              color: AppColors.textSecondary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernMechanicCard(Map mech, int index) {
+    final hasPending = _isRequestActiveForMechanic(mech['id'], 'pending');
+    final hasAccepted = _isRequestActiveForMechanic(mech['id'], 'accepted');
+    
+    Color btnColor = AppColors.tealPrimary;
+    String btnText = "Request Service";
+    IconData btnIcon = Icons.build;
+    
+    if (hasPending) {
+      btnColor = AppColors.orangePrimary;
+      btnText = "Request Pending";
+      btnIcon = Icons.pending;
+    } else if (hasAccepted) {
+      btnColor = AppColors.greenPrimary;
+      btnText = "Request Accepted";
+      btnIcon = Icons.check_circle;
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white,
+            Colors.white.withOpacity(0.95),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.12),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: 2,
+          ),
+        ],
+        border: Border.all(
+          color: AppColors.tealPrimary.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () {
+              if (hasPending || hasAccepted) return;
+              if (widget.isGuest) {
+                _showLoginRequiredDialog();
+              } else {
+                _showRequestServiceDialog(mech);
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Profile Image
+                      Hero(
+                        tag: 'mechanic_${mech['id']}',
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [
+                                AppColors.tealPrimary.withOpacity(0.1),
+                                AppColors.tealSecondary.withOpacity(0.1),
+                              ],
+                            ),
+                            border: Border.all(
+                              color: AppColors.tealPrimary,
+                              width: 2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.tealPrimary.withOpacity(0.3),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: mech['image_url'] != null && mech['image_url'].toString().isNotEmpty
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(40),
+                                  child: Image.network(
+                                    mech['image_url'],
+                                    width: 80,
+                                    height: 80,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      width: 80,
+                                      height: 80,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            AppColors.textSecondary.withOpacity(0.3),
+                                            AppColors.textSecondary.withOpacity(0.1),
+                                          ],
+                                        ),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        Icons.person,
+                                        size: 40,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  width: 80,
+                                  height: 80,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        AppColors.textSecondary.withOpacity(0.3),
+                                        AppColors.textSecondary.withOpacity(0.1),
+                                      ],
+                                    ),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.person,
+                                    size: 40,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      
+                      // Mechanic Details
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              mech['name'],
+                              style: AppTextStyles.heading.copyWith(
+                                fontFamily: AppFonts.primaryFont,
+                                color: AppColors.primary,
+                                fontSize: 18,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            
+                            // Distance & Rating Row
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        AppColors.tealPrimary.withOpacity(0.1),
+                                        AppColors.tealSecondary.withOpacity(0.1),
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.location_on,
+                                        size: 14,
+                                        color: AppColors.tealPrimary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        mech['distance'],
+                                        style: AppTextStyles.label.copyWith(
+                                          color: AppColors.tealPrimary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.amber.shade600,
+                                        Colors.amber.shade500,
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.star, color: Colors.white, size: 14),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '${mech['rating'] ?? '0.0'}',
+                                        style: AppTextStyles.label.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            
+                            const SizedBox(height: 12),
+                            
+                            // Services
+                            if (mech['services'] != null && mech['services'].isNotEmpty)
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: (mech['services'] as List).take(3).map((service) =>
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.background,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: AppColors.tealPrimary.withOpacity(0.3),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      service.toString(),
+                                      style: AppTextStyles.label.copyWith(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ).toList(),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 20),
+                  
+                  // Action Button
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          btnColor,
+                          btnColor.withOpacity(0.8),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: btnColor.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton.icon(
+                      icon: Icon(btnIcon, size: 20),
+                      label: Text(
+                        btnText,
+                        style: AppTextStyles.body.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        foregroundColor: Colors.white,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        elevation: 0,
+                      ),
+                      onPressed: (hasPending || hasAccepted) ? null : () {
+                        if (widget.isGuest) {
+                          _showLoginRequiredDialog();
+                        } else {
+                          _showRequestServiceDialog(mech);
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActiveRequestsSection() {
+    if (activeRequests.isEmpty) return const SizedBox.shrink();
+
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.greenPrimary,
+                        AppColors.greenSecondary,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.assignment,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Active Requests',
+                        style: AppTextStyles.heading.copyWith(
+                          color: AppColors.primary,
+                          fontFamily: AppFonts.primaryFont,
+                          fontSize: 20,
+                        ),
+                      ),
+                      Text(
+                        '${activeRequests.length} ongoing requests',
+                        style: AppTextStyles.label.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...activeRequests.map((req) => _buildModernActiveRequestCard(req)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernActiveRequestCard(Map request) {
+    final status = (request['status'] ?? '').toLowerCase();
+    final mechanicId = request['mechanic_id'];
+    final isEmergency = (request['request_type'] ?? 'normal') == 'emergency';
+    
+    Color statusColor;
+    String statusText;
+    IconData statusIcon;
+    
+    switch (status) {
+      case 'pending':
+        statusColor = mechanicId != null ? AppColors.orangePrimary : AppColors.tealPrimary;
+        statusText = mechanicId != null ? "Mechanic Assigned" : "Finding Mechanic";
+        statusIcon = mechanicId != null ? Icons.person_pin : Icons.search;
+        break;
+      case 'accepted':
+        statusColor = AppColors.greenPrimary;
+        statusText = "En Route";
+        statusIcon = Icons.directions_car;
+        break;
+      default:
+        statusColor = AppColors.textSecondary;
+        statusText = status;
+        statusIcon = Icons.info;
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white,
+            Colors.white.withOpacity(0.95),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: isEmergency 
+              ? AppColors.danger.withOpacity(0.15)
+              : AppColors.primary.withOpacity(0.1),
+            blurRadius: 15,
+            offset: const Offset(0, 6),
+          ),
+        ],
+        border: Border.all(
+          color: isEmergency 
+            ? AppColors.danger.withOpacity(0.3)
+            : AppColors.tealPrimary.withOpacity(0.2),
+          width: isEmergency ? 2 : 1,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () async {
+              if (isEmergency) {
+                await Navigator.pushNamed(
+                  context,
+                  '/active_emergency_route',
+                  arguments: {
+                    'requestId': request['id'],
+                    'userLocation': LatLng(userLat!, userLng!),
+                  },
+                );
+                print('🔄 Returned from emergency route, refreshing data');
+                await refreshActiveRequestsData();
+              } else {
+                if (mechanicId != null) {
+                  _showActiveRequestMechanicDetails(request);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Still looking for a mechanic...')),
+                  );
+                }
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  // Status Icon
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          statusColor,
+                          statusColor.withOpacity(0.8),
+                        ],
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: statusColor.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      statusIcon,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  
+                  const SizedBox(width: 16),
+                  
+                  // Request Details
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                isEmergency ? '🚨 Emergency Request' : 'Service Request',
+                                style: AppTextStyles.heading.copyWith(
+                                  fontSize: 16,
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (isEmergency) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.danger,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'URGENT',
+                                  style: AppTextStyles.label.copyWith(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          statusText,
+                          style: AppTextStyles.body.copyWith(
+                            color: statusColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        if (request['vehicle'] != null)
+                          Text(
+                            'Vehicle: ${request['vehicle']}',
+                            style: AppTextStyles.label.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        if (request['description'] != null)
+                          Text(
+                            request['description'],
+                            style: AppTextStyles.label.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Loading indicator or status
+                  if (status == 'pending' && mechanicId == null)
+                    Container(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                      ),
+                    )
+                  else
+                    Icon(
+                      Icons.arrow_forward_ios,
+                      color: AppColors.textSecondary,
+                      size: 16,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -882,6 +1746,17 @@ mechanic_services(service_id, services(name))
   }
 
   void _showRequestServiceDialog(Map mech) {
-    // Your existing logic for showing request service dialog
+    showDialog(
+      context: context,
+      builder: (context) => ServiceBookingDialog(
+        mechanic: Map<String, dynamic>.from(mech),
+        onRequestSubmitted: () {
+          // Force refresh when a request is submitted
+          print('🔄 Request submitted callback - refreshing data');
+          _loadActiveRequests();
+          _fetchMechanicsFromDB();
+        },
+      ),
+    );
   }
 }

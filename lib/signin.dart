@@ -89,7 +89,7 @@ class _SignInPageState extends State<SignInPage> {
             'id': userId,
             'location_x': null,
             'location_y': null,
-            'expertise': [],
+            
             'rating': 0.0,
             'image_url': null,
           });

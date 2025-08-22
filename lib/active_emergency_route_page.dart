@@ -3,6 +3,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'user_home.dart';
 import 'utils.dart';
 class ActiveEmergencyRoutePage extends StatefulWidget {
@@ -15,7 +17,7 @@ class ActiveEmergencyRoutePage extends StatefulWidget {
   });
 
   @override
-  State createState() => _ActiveEmergencyRoutePageState();
+  State<ActiveEmergencyRoutePage> createState() => _ActiveEmergencyRoutePageState();
 }
 
 class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage> 
@@ -28,6 +30,14 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage>
   // Local state for immediate UI updates
   Map<String, dynamic>? _currentRequestData;
   bool _mechanicRemoved = false;
+  
+  // Dynamic user location based on database coordinates
+  LatLng? _actualUserLocation;
+  
+  // Route data for displaying actual driving routes
+  List<List<LatLng>> _routes = [];
+  double? _distanceInMeters;
+  bool _isLoadingRoute = false;
   
   // Sheet height constraints
   static const double _minSheetHeight = 0.16; // 1/6 of screen
@@ -66,6 +76,19 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage>
         final row = events.first;
         debugPrint('📡 Row keys: ${row.keys}');
         debugPrint('📡 Row data: $row');
+        
+        // Extract user location from database coordinates
+        final latStr = row['lat']?.toString();
+        final lngStr = row['lng']?.toString();
+        if (latStr != null && lngStr != null) {
+          final lat = double.tryParse(latStr);
+          final lng = double.tryParse(lngStr);
+          if (lat != null && lng != null) {
+            _actualUserLocation = LatLng(lat, lng);
+            debugPrint('📍 Updated user location from DB: $_actualUserLocation');
+          }
+        }
+        
         return row;
       }
       return null;
@@ -95,24 +118,42 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage>
             final status = newRecord['status']?.toString().toLowerCase().trim() ?? '';
             final mechanicId = newRecord['mechanic_id'];
             
+            // Update user location from real-time data
+            final latStr = newRecord['lat']?.toString();
+            final lngStr = newRecord['lng']?.toString();
+            if (latStr != null && lngStr != null) {
+              final lat = double.tryParse(latStr);
+              final lng = double.tryParse(lngStr);
+              if (lat != null && lng != null) {
+                _actualUserLocation = LatLng(lat, lng);
+                debugPrint('📍 Updated user location from real-time: $_actualUserLocation');
+              }
+            }
+            
             debugPrint('🔄 Real-time status update: $status, mechanic_id: $mechanicId');
             
             if (status == 'pending' && mechanicId == null) {
               debugPrint('✅ Mechanic removed - request back to pending status');
-              // Force UI refresh to show waiting state
+              // Clear routes when mechanic is removed
               if (mounted) {
                 setState(() {
                   _mechanicRemoved = true;
                   _currentRequestData = Map<String, dynamic>.from(newRecord);
+                  _routes.clear();
+                  _distanceInMeters = null;
+                  _isLoadingRoute = false;
                 });
               }
             } else if (status == 'accepted' && mechanicId != null) {
               debugPrint('✅ New mechanic assigned - resetting removal flag');
-              // New mechanic assigned, reset the removal flag
+              // New mechanic assigned, reset the removal flag and clear old routes
               if (mounted) {
                 setState(() {
                   _mechanicRemoved = false;
                   _currentRequestData = Map<String, dynamic>.from(newRecord);
+                  _routes.clear();
+                  _distanceInMeters = null;
+                  _isLoadingRoute = false;
                 });
               }
             }
@@ -131,6 +172,69 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage>
     _pulseController.dispose();
     _realtimeSubscription?.unsubscribe();
     super.dispose();
+  }
+
+  // Fetch actual driving routes using Mapbox Directions API
+  Future<void> _fetchRoutes(LatLng start, LatLng end) async {
+    setState(() {
+      _isLoadingRoute = true;
+    });
+
+    final accessToken = 'pk.eyJ1IjoiYWRpbDQyMCIsImEiOiJjbWRrN3dhb2wwdXRnMmxvZ2dhNmY2Nzc3In0.yrzJJ09yyfdT4Zg4Y_CJhQ';
+    final url = 'https://api.mapbox.com/directions/v5/mapbox/driving/'
+        '${start.longitude},${start.latitude};'
+        '${end.longitude},${end.latitude}'
+        '?geometries=geojson&overview=full&alternatives=true&access_token=$accessToken';
+
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final routes = data['routes'] as List;
+
+        if (routes.isEmpty) {
+          debugPrint('No routes found');
+          setState(() {
+            _isLoadingRoute = false;
+          });
+          return;
+        }
+
+        List<List<LatLng>> parsedRoutes = [];
+        double? minDistance;
+
+        for (var route in routes) {
+          final coords = route['geometry']['coordinates'] as List;
+          final points = coords
+              .map((c) => LatLng(c[1] as double, c[0] as double))
+              .toList();
+          parsedRoutes.add(points);
+
+          final dist = route['distance'] as double;
+          if (minDistance == null || dist < minDistance) {
+            minDistance = dist;
+          }
+        }
+
+        setState(() {
+          _routes = parsedRoutes;
+          _distanceInMeters = minDistance;
+          _isLoadingRoute = false;
+        });
+
+        debugPrint('✅ Routes fetched: ${parsedRoutes.length} routes, shortest: ${(minDistance! / 1000).toStringAsFixed(1)} km');
+      } else {
+        debugPrint('Failed to get routes: ${response.statusCode}');
+        setState(() {
+          _isLoadingRoute = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching routes: $e');
+      setState(() {
+        _isLoadingRoute = false;
+      });
+    }
   }
 
   // Modern animated marker widget with app color scheme
@@ -421,6 +525,9 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage>
           'mechanic_id': null,
           'mech_lat': null,
           'mech_lng': null,
+          // Preserve user location coordinates
+          'lat': _actualUserLocation?.latitude.toString() ?? _currentRequestData?['lat'],
+          'lng': _actualUserLocation?.longitude.toString() ?? _currentRequestData?['lng'],
         };
       });
       
@@ -717,6 +824,13 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage>
     required LatLng userPos,
     LatLng? mechPos,
   }) {
+    // Fetch routes when mechanic position is available and routes are not yet loaded
+    if (mechPos != null && _routes.isEmpty && !_isLoadingRoute) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _fetchRoutes(userPos, mechPos);
+      });
+    }
+
     return FlutterMap(
       options: MapOptions(
         initialCenter: mechPos != null 
@@ -736,14 +850,21 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage>
             'id': 'mapbox.mapbox-traffic-v1',
           },
         ),
-        if (mechPos != null)
-          PolylineLayer(polylines: [
-            Polyline(
-              points: [userPos, mechPos],
-              color: AppColors.tealPrimary,
-              strokeWidth: 5,
-            ),
-          ]),
+        // Display actual driving routes instead of straight lines
+        for (int i = 0; i < _routes.length; i++)
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: _routes[i],
+                color: i == 0 
+                  ? AppColors.tealPrimary // Primary route
+                  : AppColors.tealPrimary.withOpacity(0.6), // Alternative routes
+                strokeWidth: i == 0 ? 6 : 4,
+                borderColor: Colors.white,
+                borderStrokeWidth: i == 0 ? 2 : 1,
+              ),
+            ],
+          ),
         MarkerLayer(markers: [
           Marker(
             point: userPos,
@@ -1595,7 +1716,7 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: Text(
           'Emergency Request Status',
@@ -1624,14 +1745,57 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage>
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: StreamBuilder<Map<String, dynamic>?>(
-        stream: _requestStream,
-        builder: (context, snapshot) {
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.primary.withOpacity(0.1),
+              Colors.white,
+              AppColors.primary.withOpacity(0.05),
+            ],
+          ),
+        ),
+        child: StreamBuilder<Map<String, dynamic>?>(
+          stream: _requestStream,
+          builder: (context, snapshot) {
           // Handle loading state
           if (snapshot.connectionState == ConnectionState.waiting) {
+            // Use actual user location if available, otherwise fallback to constructor location
+            final loadingUserPos = _actualUserLocation ?? widget.userLocation;
+            debugPrint('📍 Loading state using user position: $loadingUserPos');
+            
             return Stack(
               children: [
-                _buildFullScreenMap(userPos: widget.userLocation),
+                // Background decorative elements
+                Positioned(
+                  top: -100,
+                  right: -100,
+                  child: AnimatedBuilder(
+                    animation: _pulseAnimation,
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _pulseAnimation.value,
+                        child: Container(
+                          width: 300,
+                          height: 300,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: RadialGradient(
+                              colors: [
+                                AppColors.primary.withOpacity(0.1),
+                                AppColors.primary.withOpacity(0.05),
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                _buildFullScreenMap(userPos: loadingUserPos),
                 _buildDraggableBottomSheet(isWaiting: true),
               ],
             );
@@ -1652,9 +1816,13 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage>
           
           // Handle no request data
           if (request == null) {
+            // Use actual user location if available, otherwise fallback to constructor location
+            final noDataUserPos = _actualUserLocation ?? widget.userLocation;
+            debugPrint('📍 No data state using user position: $noDataUserPos');
+            
             return Stack(
               children: [
-                _buildFullScreenMap(userPos: widget.userLocation),
+                _buildFullScreenMap(userPos: noDataUserPos),
                 _buildDraggableBottomSheet(isWaiting: true),
               ],
             );
@@ -1672,28 +1840,41 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage>
               request['mech_lng'] == null ||
               _mechanicRemoved) {
             debugPrint('🔄 Showing waiting UI - Status: $status, Removed: $_mechanicRemoved');
+            
+            // Use actual user location from database for waiting state too
+            final waitingUserLat = _actualUserLocation?.latitude ?? 
+                double.tryParse(request['lat']?.toString() ?? '') ??
+                widget.userLocation.latitude;
+            final waitingUserLng = _actualUserLocation?.longitude ?? 
+                double.tryParse(request['lng']?.toString() ?? '') ??
+                widget.userLocation.longitude;
+            final waitingUserPos = LatLng(waitingUserLat, waitingUserLng);
+            
+            debugPrint('📍 Waiting state using user position: $waitingUserPos');
+            
             return Stack(
               children: [
-                _buildFullScreenMap(userPos: widget.userLocation),
+                _buildFullScreenMap(userPos: waitingUserPos),
                 _buildDraggableBottomSheet(isWaiting: true),
               ],
             );
           }
 
-          // Parse coordinates
-          final userLat = double.tryParse(
-              request['user_lat']?.toString() ??
-                  widget.userLocation.latitude.toString()) ??
+          // Parse coordinates - use database coordinates for user location
+          final userLat = _actualUserLocation?.latitude ?? 
+              double.tryParse(request['lat']?.toString() ?? '') ??
               widget.userLocation.latitude;
-          final userLng = double.tryParse(
-              request['user_lng']?.toString() ??
-                  widget.userLocation.longitude.toString()) ??
+          final userLng = _actualUserLocation?.longitude ?? 
+              double.tryParse(request['lng']?.toString() ?? '') ??
               widget.userLocation.longitude;
           final mechLat = double.tryParse(request['mech_lat']?.toString() ?? '0') ?? 0.0;
           final mechLng = double.tryParse(request['mech_lng']?.toString() ?? '0') ?? 0.0;
 
           final userCurrentPos = LatLng(userLat, userLng);
           final mechanicPos = LatLng(mechLat, mechLng);
+          
+          debugPrint('📍 Using user position: $userCurrentPos (from ${_actualUserLocation != null ? 'cached' : 'database'})');
+          debugPrint('📍 Using mechanic position: $mechanicPos');
 
           // Handle accepted request with mechanic
           return FutureBuilder<Map<String, dynamic>?>(
@@ -1708,6 +1889,8 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage>
                       mechPos: mechanicPos,
                     ),
                     _buildDraggableBottomSheet(isWaiting: true),
+                    // Distance and route loading indicator
+                    _buildRouteInfoOverlay(),
                   ],
                 );
               }
@@ -1721,6 +1904,8 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage>
                       mechPos: mechanicPos,
                     ),
                     _buildDraggableBottomSheet(isWaiting: true),
+                    // Distance and route loading indicator
+                    _buildRouteInfoOverlay(),
                   ],
                 );
               }
@@ -1737,11 +1922,111 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage>
                     mechanic: mechanicSnap.data!,
                     isWaiting: false,
                   ),
+                  // Distance and route loading indicator
+                  _buildRouteInfoOverlay(),
                 ],
               );
             },
           );
         },
+      ),
+    ));
+  }
+
+  // Route information overlay widget
+  Widget _buildRouteInfoOverlay() {
+    return Positioned(
+      top: 100,
+      left: 16,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Distance indicator
+          if (_distanceInMeters != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white,
+                    Colors.grey.shade50,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.straighten,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${(_distanceInMeters! / 1000).toStringAsFixed(1)} km',
+                    style: AppTextStyles.body.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          
+          const SizedBox(height: 8),
+          
+          // Loading indicator for route fetching
+          if (_isLoadingRoute)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white,
+                    Colors.grey.shade50,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Finding best route...',
+                    style: AppTextStyles.body.copyWith(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
