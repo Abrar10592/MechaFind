@@ -17,13 +17,14 @@ class MechanicLandingScreen extends StatefulWidget {
 }
 
 class _MechanicLandingScreenState extends State<MechanicLandingScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, TickerProviderStateMixin {
   final Location _locationController = Location();
   final SupabaseClient supabase = Supabase.instance.client;
   LatLng? _currentPosition;
   bool _hasListenerAttached = false;
   List<Map<String, dynamic>> _sosRequests = [];
   bool _isLoading = true;
+  bool _isInitialLoad = true;
   String _completedToday = '0';
   String _activeRequests = '0';
   String _rating = '0.0';
@@ -36,13 +37,70 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
   Map<String, dynamic>? _activeRequest; // Store active request details for bubble
   bool _isModalMinimized = false; // Track if modal is minimized to bubble
 
+  // Animation controllers
+  late AnimationController _fadeController;
+  late AnimationController _slideController;
+  late AnimationController _pulseController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+  late Animation<double> _pulseAnimation;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    
+    // Initialize animations
+    _initAnimations();
+    
     _initLocationSetup();
     // Don't call _fetchMechanicData() here - it will be called after location is ready
     _setupRealtimeSubscription();
+  }
+  
+  void _initAnimations() {
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
+    
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    
+    _pulseController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+    
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeOut,
+    ));
+    
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeOutQuart,
+    ));
+    
+    _pulseAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.05,
+    ).animate(CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeInOut,
+    ));
+    
+    // Start animations
+    _fadeController.forward();
+    _slideController.forward();
   }
 
   @override
@@ -52,6 +110,12 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
     _debounceTimer?.cancel();
     _locationUpdateTimer?.cancel();
     _locationController.onLocationChanged.drain();
+    
+    // Dispose animation controllers
+    _fadeController.dispose();
+    _slideController.dispose();
+    _pulseController.dispose();
+    
     super.dispose();
   }
 
@@ -73,6 +137,7 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         setState(() {
           _errorMessage = 'Please enable location services to receive nearby requests';
           _isLoading = false;
+          _isInitialLoad = false;
         });
         print('Location service still disabled');
         ScaffoldMessenger.of(context).showSnackBar(
@@ -97,6 +162,7 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         setState(() {
           _errorMessage = 'Location permission is required to show nearby requests';
           _isLoading = false;
+          _isInitialLoad = false;
         });
         print('Location permission status: $permissionGranted');
         ScaffoldMessenger.of(context).showSnackBar(
@@ -160,6 +226,7 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         setState(() {
           _errorMessage = userFriendlyError;
           _isLoading = false;
+          _isInitialLoad = false;
         });
         
         // Only show snackbar for critical errors, not timeouts
@@ -217,16 +284,20 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
     }
     
     try {
+      final updateData = {
+        'mech_lat': position.latitude.toString(),
+        'mech_lng': position.longitude.toString(),
+      };
+      
+      print('🔄 Updating mechanic location for request $requestId: $updateData');
+      
       await supabase
           .from('requests')
-          .update({
-            'mech_lat': position.latitude.toString(),
-            'mech_lng': position.longitude.toString(),
-          })
+          .update(updateData)
           .eq('id', requestId);
-      print('Mechanic location updated for request $requestId: ${position.latitude}, ${position.longitude}');
+      print('✅ Mechanic location updated for request $requestId: ${position.latitude}, ${position.longitude}');
     } catch (e) {
-      print('Error updating mechanic location for request $requestId: $e');
+      print('❌ Error updating mechanic location for request $requestId: $e');
       // Don't show error to user for location updates as it's background operation
       // Only log the error for debugging
     }
@@ -288,7 +359,9 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
     }
 
     setState(() {
-      _isLoading = true;
+      if (_isInitialLoad) {
+        _isLoading = true;
+      }
       _errorMessage = null;
     });
 
@@ -305,13 +378,29 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
 
       print('Completed today count: ${completedResponse.count}');
 
+      // First, let's check if there are any pending requests at all (this might be blocked by RLS)
+      try {
+        final allPendingResponse = await supabase
+            .from('requests')
+            .select('id, status, mechanic_id')
+            .eq('status', 'pending');
+        
+        print('🔍 ALL pending requests in database: ${allPendingResponse.length}');
+        print('🔍 Sample pending requests: $allPendingResponse');
+      } catch (e) {
+        print('❌ Error fetching all pending requests (likely RLS issue): $e');
+      }
+
+      // Try to fetch requests without RLS restrictions by using a more permissive query
       final pendingResponse = await supabase
           .from('requests')
-          .select('id, user_id, vehicle, description, image, lat, lng, users!left(full_name, phone, image_url)')
+          .select('id, user_id, guest_id, vehicle, description, image, lat, lng, request_type, users!left(full_name, phone, image_url)')
           .eq('status', 'pending')
+          .eq('request_type', 'emergency')
           .filter('mechanic_id', 'is', null);
 
-      print('Pending response raw: $pendingResponse');
+      print('🔍 Pending response after mechanic_id filter: ${pendingResponse.length}');
+      print('🔍 Pending response raw: $pendingResponse');
 
       final reviewsResponse = await supabase
           .from('reviews')
@@ -319,6 +408,16 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
           .eq('mechanic_id', user.id);
 
       print('Reviews fetched: ${reviewsResponse.length}');
+
+      // Fetch ignored requests for this mechanic
+      final ignoredResponse = await supabase
+          .from('ignored_requests')
+          .select('request_id')
+          .eq('mechanic_id', user.id);
+
+      final ignoredRequestIds = ignoredResponse.map((item) => item['request_id'].toString()).toSet();
+      print('📋 Ignored requests for mechanic ${user.id}: ${ignoredRequestIds.length} requests');
+      print('📋 Ignored request IDs: $ignoredRequestIds');
 
       List<Map<String, dynamic>> filteredRequests = [];
       const double maxDistanceKm = 10.0;
@@ -330,19 +429,35 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         currentLatLng = latlng.LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
         print('🔄 Current position converted: ${currentLatLng.latitude}, ${currentLatLng.longitude}');
       } else {
-        print('❌ _currentPosition is null');
+        print('❌ _currentPosition is null - this will prevent any requests from being shown');
+        // If we have no location, show an error and return
+        setState(() {
+          _errorMessage = 'Location required to show nearby requests';
+          _isLoading = false;
+        });
+        return;
       }
       
+      print('🔍 Processing ${pendingResponse.length} requests for distance filtering...');
+      
       for (var request in pendingResponse) {
-        print('Request data: $request');
+        print('🔍 Processing request: ${request['id']}');
+        
+        // Skip ignored requests
+        if (ignoredRequestIds.contains(request['id'].toString())) {
+          print('🚫 Request ${request['id']} SKIPPED (ignored by mechanic)');
+          continue;
+        }
+        
+        print('🔍 Request data: $request');
         final lat = double.tryParse(request['lat']?.toString() ?? '') ?? 0.0;
         final lng = double.tryParse(request['lng']?.toString() ?? '') ?? 0.0;
         
         print('🎯 Parsed coordinates: lat=$lat, lng=$lng');
-        print('🎯 Validation check: currentLatLng != null = ${currentLatLng != null}, lat != 0.0 = ${lat != 0.0}, lng != 0.0 = ${lng != 0.0}');
+        print('🎯 Validation check: lat != 0.0 = ${lat != 0.0}, lng != 0.0 = ${lng != 0.0}');
         
         // Calculate distance between mechanic and SOS request using the same logic as mechanic_map
-        if (currentLatLng != null && lat != 0.0 && lng != 0.0) {
+        if (lat != 0.0 && lng != 0.0) {
           final point = latlng.LatLng(lat, lng);
           final distance = distanceCalc.as(
             latlng.LengthUnit.Kilometer,
@@ -355,18 +470,54 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
           // Only add requests within 10 km radius
           if (distance <= maxDistanceKm) {
             print('✅ Request ${request['id']} ADDED (within ${maxDistanceKm}km)');
-            filteredRequests.add({
+            
+            // Handle both guest and authenticated user requests
+            Map<String, dynamic> processedRequest = {
               'id': request['id'],
-              'user_id': request['user_id'],
-              'vehicle': request['vehicle']?.toString() ?? 'Unknown',
-              'description': request['description']?.toString() ?? 'No description',
-              'image': request['image']?.toString(),
-              'lat': lat,
-              'lng': lng,
-              'user_name': request['users']?['full_name']?.toString() ?? 'Unknown',
-              'phone': request['users']?['phone']?.toString() ?? 'N/A',
-              'image_url': request['users']?['image_url']?.toString(),
-            });
+              'vehicle': request['vehicle'],
+              'description': request['description'],
+              'image': request['image'],
+              'lat': lat, // Use parsed double values
+              'lng': lng, // Use parsed double values
+              'request_type': request['request_type'] ?? 'normal',
+              'distance': distance,
+            };
+            
+            // Check if it's a guest request or authenticated user request
+            if (request['user_id'] != null) {
+              // Authenticated user request
+              processedRequest['user_id'] = request['user_id'];
+              processedRequest['guest_id'] = null;
+              final fullName = request['users']?['full_name'];
+              final phone = request['users']?['phone'];
+              final imageUrl = request['users']?['image_url'];
+              
+              processedRequest['user_name'] = fullName ?? 'Unknown User';
+              processedRequest['phone'] = phone ?? 'N/A';
+              processedRequest['image_url'] = imageUrl;
+              
+              print('✅ Authenticated user request:');
+              print('   - full_name: $fullName');
+              print('   - phone: $phone');
+              print('   - image_url: $imageUrl');
+              print('   - final user_name: ${processedRequest['user_name']}');
+            } else if (request['guest_id'] != null) {
+              // Guest request
+              processedRequest['user_id'] = null;
+              processedRequest['guest_id'] = request['guest_id'];
+              processedRequest['user_name'] = 'Guest User';
+              processedRequest['phone'] = 'Contact via app';
+              processedRequest['image_url'] = null;
+              print('✅ Guest request: Guest User (guest_id: ${request['guest_id']})');
+            } else {
+              // Invalid request - skip
+              print('❌ Request ${request['id']} SKIPPED (no user_id or guest_id)');
+              continue;
+            }
+            
+            print('🔍 Final processed request data: $processedRequest');
+            
+            filteredRequests.add(processedRequest);
           } else {
             print('❌ Request ${request['id']} REJECTED (${distance.toStringAsFixed(2)}km > ${maxDistanceKm}km)');
           }
@@ -378,8 +529,10 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
 
       print('📊 Distance Filtering Summary:');
       print('   Total requests from database: ${pendingResponse.length}');
-      print('   Filtered requests (within ${maxDistanceKm}km): ${filteredRequests.length}');
-      print('Filtered requests: $filteredRequests');
+      print('   Ignored requests: ${ignoredRequestIds.length}');
+      print('   Filtered requests (within ${maxDistanceKm}km and not ignored): ${filteredRequests.length}');
+      print('   Current mechanic location: ${_currentPosition?.latitude}, ${_currentPosition?.longitude}');
+      print('📊 Filtered requests details: $filteredRequests');
 
       double totalRating = 0.0;
       int reviewCount = reviewsResponse.length;
@@ -394,11 +547,13 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         _rating = averageRating.toStringAsFixed(1);
         _sosRequests = filteredRequests;
         _isLoading = false;
+        _isInitialLoad = false;
       });
     } catch (e) {
       setState(() {
         _errorMessage = 'Error fetching data: $e';
         _isLoading = false;
+        _isInitialLoad = false;
       });
       print('Error fetching data: $e');
     }
@@ -476,8 +631,38 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
       return;
     }
 
+    // Check if mechanic already has an active request
     try {
-      final updateData = {
+      final existingActiveRequest = await supabase
+          .from('requests')
+          .select('id, status')
+          .eq('mechanic_id', user.id)
+          .eq('status', 'accepted')
+          .maybeSingle();
+
+      if (existingActiveRequest != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You already have an active request. Please complete it first.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        print('Mechanic ${user.id} already has active request: ${existingActiveRequest['id']}');
+        return;
+      }
+    } catch (e) {
+      print('Error checking for existing active requests: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to verify active requests. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final updateData = <String, dynamic>{
         'mechanic_id': user.id,
         'status': 'accepted',
       };
@@ -488,10 +673,20 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         print('Warning: No current position available when accepting request $requestId');
       }
 
-      await supabase
+      print('🔄 Attempting to update request $requestId with data: $updateData');
+      print('🔄 Current user ID: ${user.id}');
+      
+      final updateResponse = await supabase
           .from('requests')
           .update(updateData)
-          .eq('id', requestId);
+          .eq('id', requestId)
+          .select();
+
+      print('✅ Update response: $updateResponse');
+      
+      if (updateResponse.isEmpty) {
+        throw Exception('No rows were updated. This might be due to RLS policy restrictions.');
+      }
 
       // Store active request details
       final request = _sosRequests.firstWhere((req) => req['id'] == requestId);
@@ -522,8 +717,16 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         print('Cannot start location update timer: No current position');
       }
     } catch (e) {
+      print('❌ Error accepting request $requestId: $e');
+      
       String errorMessage;
-      if (e.toString().contains('network') || e.toString().contains('connection')) {
+      if (e.toString().contains('row-level security') || e.toString().contains('RLS') || e.toString().contains('policy')) {
+        errorMessage = 'Permission denied: Unable to update request. RLS policy issue detected.';
+        print('🚨 RLS POLICY ERROR: Mechanic ${user.id} cannot update request $requestId due to Row Level Security policy restrictions');
+      } else if (e.toString().contains('No rows were updated')) {
+        errorMessage = 'Request could not be updated. This may be due to database security policies.';
+        print('🚨 NO ROWS UPDATED: Possible RLS policy blocking update operation');
+      } else if (e.toString().contains('network') || e.toString().contains('connection')) {
         errorMessage = 'Network error. Please check your connection and try again.';
       } else if (e.toString().contains('permission') || e.toString().contains('auth')) {
         errorMessage = 'Authentication error. Please log in again.';
@@ -568,9 +771,9 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         _lastUpdatedPosition = null;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Request ignored')),
+        const SnackBar(content: Text('Request rejected')),
       );
-      print('Request $requestId ignored');
+      print('Request $requestId rejected');
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error rejecting request: $e')),
@@ -579,8 +782,74 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
     }
   }
 
+  Future<void> _ignoreRequest(String requestId) async {
+    final user = supabase.auth.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to ignore requests')),
+      );
+      return;
+    }
+
+    try {
+      // Store the ignored request in the database
+      await supabase.from('ignored_requests').insert({
+        'mechanic_id': user.id,
+        'request_id': requestId,
+        'ignored_at': DateTime.now().toIso8601String(),
+      });
+
+      // Remove from local UI
+      setState(() {
+        _sosRequests.removeWhere((request) => request['id'] == requestId);
+        _activeRequests = _sosRequests.length.toString();
+        _activeRequest = null;
+        _isModalMinimized = false;
+        _locationUpdateTimer?.cancel();
+        _acceptedRequestId = null;
+        _lastUpdatedPosition = null;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Request ignored permanently')),
+      );
+      print('Request $requestId ignored permanently by mechanic ${user.id}');
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error ignoring request: $e')),
+      );
+      print('Error ignoring request $requestId: $e');
+    }
+  }
+
   void _showDirectionModal() {
     if (_activeRequest == null) return;
+    
+    print('🔍 Active request data in _showDirectionModal: $_activeRequest');
+    
+    // Safely extract values with proper null handling
+    final userId = _activeRequest!['user_id']?.toString() ?? '';
+    final guestId = _activeRequest!['guest_id']?.toString() ?? '';
+    final effectiveUserId = userId.isNotEmpty ? userId : guestId;
+    final requestId = _activeRequest!['id']?.toString() ?? '';
+    final phone = _activeRequest!['phone']?.toString() ?? 'Contact via app';
+    final userName = _activeRequest!['user_name']?.toString() ?? 'Unknown User';
+    final imageUrl = _activeRequest!['image_url']?.toString() ?? '';
+    
+    print('🔍 Extracted values: userId=$userId, guestId=$guestId, effectiveUserId=$effectiveUserId');
+    print('🔍 Other values: phone=$phone, userName=$userName, imageUrl=$imageUrl');
+    
+    // Validate required data
+    if (requestId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid request data. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -595,16 +864,16 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
         snapSizes: const [0.0, 0.95],
         builder: (context, scrollController) {
           return DirectionPopup(
-            user_id: _activeRequest!['user_id'],
-            requestId: _activeRequest!['id'],
+            user_id: effectiveUserId,
+            requestId: requestId,
             requestLocation: latlng.LatLng(
-              _activeRequest!['lat'],
-              _activeRequest!['lng'],
+              _activeRequest!['lat'] ?? 0.0,
+              _activeRequest!['lng'] ?? 0.0,
             ),
-            phone: _activeRequest!['phone'],
-            name: _activeRequest!['user_name'],
-            imageUrl: _activeRequest!['image_url'],
-            onReject: () => _rejectRequest(_activeRequest!['id']),
+            phone: phone,
+            name: userName,
+            imageUrl: imageUrl,
+            onReject: () => _rejectRequest(requestId),
             onMinimize: () {
               setState(() {
                 _isModalMinimized = true;
@@ -628,129 +897,292 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
     final isEnglish = currentLang == 'en';
 
     return Scaffold(
-      appBar: AppBar(
-        elevation: 2.0,
-        title: Text(
-          isEnglish ? "Mechanic Dashboard" : "মেকানিক ড্যাশবোর্ড",
-          style: AppTextStyles.heading.copyWith(
-            color: Colors.white,
-            fontSize: FontSizes.heading,
-            fontFamily: AppFonts.primaryFont,
+      backgroundColor: Colors.grey.shade50,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.primary.withOpacity(0.1),
+              Colors.white,
+              AppColors.primary.withOpacity(0.05),
+            ],
           ),
         ),
-        centerTitle: true,
-        backgroundColor: AppColors.primary,
-      ),
-      backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _errorMessage != null
-                  ? Center(child: Text(_errorMessage!, style: AppTextStyles.body))
-                  : Padding(
-                      padding: const EdgeInsets.all(15),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                  child: _buildStatCard(
-                                      _completedToday, isEnglish ? "Completed Today" : "আজ সম্পন্ন")),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                  child: _buildStatCard(
-                                      _activeRequests, isEnglish ? "Active Request" : "সক্রিয় অনুরোধ")),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                  child: _buildStatCard(
-                                      _rating, isEnglish ? "Rating" : "রেটিং")),
+        child: SafeArea(
+          child: Stack(
+            children: [
+              // Background decorative elements
+              Positioned(
+                top: -100,
+                right: -100,
+                child: AnimatedBuilder(
+                  animation: _pulseAnimation,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: _pulseAnimation.value,
+                      child: Container(
+                        width: 300,
+                        height: 300,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              AppColors.primary.withOpacity(0.1),
+                              AppColors.primary.withOpacity(0.05),
+                              Colors.transparent,
                             ],
                           ),
-                          const SizedBox(height: 20),
-                          Text(
-                            isEnglish ? "Active SOS Signals" : "সক্রিয় এসওএস সংকেত",
-                            style: AppTextStyles.heading.copyWith(
-                              fontSize: FontSizes.subHeading,
-                              fontFamily: AppFonts.primaryFont,
-                              color: AppColors.textPrimary,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              
+              // Main content
+              _isLoading
+                  ? _buildLoadingState()
+                  : _errorMessage != null
+                      ? _buildErrorState(isEnglish)
+                      : FadeTransition(
+                          opacity: _fadeAnimation,
+                          child: SlideTransition(
+                            position: _slideAnimation,
+                            child: CustomScrollView(
+                              slivers: [
+                                // App Bar
+                                SliverAppBar(
+                                  expandedHeight: 120,
+                                  floating: false,
+                                  pinned: true,
+                                  elevation: 0,
+                                  backgroundColor: Colors.transparent,
+                                  flexibleSpace: FlexibleSpaceBar(
+                                    background: Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            AppColors.primary,
+                                            AppColors.primary.withOpacity(0.8),
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        borderRadius: const BorderRadius.only(
+                                          bottomLeft: Radius.circular(30),
+                                          bottomRight: Radius.circular(30),
+                                        ),
+                                      ),
+                                      child: Stack(
+                                        children: [
+                                          // Decorative circles
+                                          Positioned(
+                                            top: 20,
+                                            right: 30,
+                                            child: Container(
+                                              width: 60,
+                                              height: 60,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: Colors.white.withOpacity(0.1),
+                                              ),
+                                            ),
+                                          ),
+                                          Positioned(
+                                            top: 40,
+                                            right: 80,
+                                            child: Container(
+                                              width: 30,
+                                              height: 30,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: Colors.white.withOpacity(0.15),
+                                              ),
+                                            ),
+                                          ),
+                                          // Title
+                                          Align(
+                                            alignment: Alignment.centerLeft,
+                                            child: Padding(
+                                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                              child: Column(
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    isEnglish ? "Welcome Back!" : "স্বাগতম!",
+                                                    style: TextStyle(
+                                                      color: Colors.white.withOpacity(0.9),
+                                                      fontSize: FontSizes.body,
+                                                      fontWeight: FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    isEnglish ? "Mechanic Dashboard" : "মেকানিক ড্যাশবোর্ড",
+                                                    style: AppTextStyles.heading.copyWith(
+                                                      color: Colors.white,
+                                                      fontSize: FontSizes.heading,
+                                                      fontFamily: AppFonts.primaryFont,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                
+                                // Content
+                                SliverToBoxAdapter(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(20),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        // Stats Cards
+                                        _buildStatsSection(isEnglish),
+                                        
+                                        const SizedBox(height: 30),
+                                        
+                                        // SOS Requests Section
+                                        _buildSosSection(isEnglish),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          Expanded(
-                            child: _sosRequests.isEmpty
-                                ? Center(
-                                    child: Text(
-                                      isEnglish ? "No active requests" : "কোন সক্রিয় অনুরোধ নেই",
-                                      style: AppTextStyles.body,
-                                    ),
-                                  )
-                                : ListView.builder(
-                                    itemCount: _sosRequests.length,
-                                    itemBuilder: (context, index) {
-                                      final request = _sosRequests[index];
-                                      print('Rendering SOS card: $request, current_location: $_currentPosition');
-                                      return SosCard(
-                                        request: request,
-                                        current_location: _currentPosition,
-                                        onIgnore: () => _rejectRequest(request['id']),
-                                        onAccept: () {
-                                          _acceptRequest(request['id']).then((_) {
-                                            _showDirectionModal();
-                                          });
-                                        },
-                                      );
-                                    },
-                                  ),
-                          ),
-                        ],
-                      ),
-                    ),
-          if (_isModalMinimized && _activeRequest != null)
-            Positioned(
-              bottom: 16,
-              right: 16,
-              child: FloatingActionButton(
-                onPressed: _showDirectionModal,
-                backgroundColor: AppColors.primary,
-                tooltip: isEnglish ? 'Open Request' : 'অনুরোধ খুলুন',
-                child: const Icon(Icons.map, color: Colors.white),
-              ),
-            ),
-        ],
+                        ),
+              
+              // Floating bubble for minimized modal
+              if (_isModalMinimized && _activeRequest != null)
+                Positioned(
+                  bottom: 16,
+                  right: 16,
+                  child: _buildFloatingBubble(),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildStatCard(String number, String label) {
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: Colors.white,
-      child: SizedBox(
-        height: 120,
+  Widget _buildLoadingState() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primary.withOpacity(0.1),
+            Colors.white,
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.2),
+                    blurRadius: 20,
+                    spreadRadius: 5,
+                  ),
+                ],
+              ),
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                strokeWidth: 3,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Loading your dashboard...',
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: FontSizes.body,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(bool isEnglish) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.red.withOpacity(0.1),
+            Colors.white,
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: Center(
         child: Padding(
-          padding: const EdgeInsets.all(7.0),
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                number,
-                style: AppTextStyles.heading.copyWith(
-                  fontSize: 28,
-                  color: AppColors.primary,
-                  fontFamily: AppFonts.primaryFont,
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.red.withOpacity(0.2),
+                      blurRadius: 20,
+                      spreadRadius: 5,
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.error_outline,
+                  size: 60,
+                  color: Colors.red,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 24),
               Text(
-                label,
+                _errorMessage!,
                 textAlign: TextAlign.center,
-                style: AppTextStyles.label.copyWith(
+                style: AppTextStyles.body.copyWith(
+                  color: AppColors.textPrimary,
                   fontSize: FontSizes.body,
-                  fontFamily: AppFonts.secondaryFont,
-                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () => _initLocationSetup(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                ),
+                child: Text(
+                  isEnglish ? 'Retry' : 'পুনঃচেষ্টা',
+                  style: const TextStyle(color: Colors.white),
                 ),
               ),
             ],
@@ -759,4 +1191,421 @@ class _MechanicLandingScreenState extends State<MechanicLandingScreen>
       ),
     );
   }
+
+  Widget _buildStatsSection(bool isEnglish) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          isEnglish ? "Your Performance" : "আপনার কার্যক্রম",
+          style: AppTextStyles.heading.copyWith(
+            fontSize: FontSizes.subHeading,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildEnhancedStatCard(
+                _completedToday,
+                isEnglish ? "Completed\nToday" : "আজ সম্পন্ন",
+                Icons.check_circle_outline,
+                Colors.green,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildEnhancedStatCard(
+                _activeRequests,
+                isEnglish ? "Active\nRequests" : "সক্রিয়\nঅনুরোধ",
+                Icons.pending_actions,
+                Colors.orange,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildEnhancedStatCard(
+                _rating,
+                isEnglish ? "Your\nRating" : "আপনার\nরেটিং",
+                Icons.assessment,
+                Colors.amber,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEnhancedStatCard(String number, String label, IconData icon, Color color) {
+    return AnimatedBuilder(
+      animation: _pulseAnimation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: 1.0 + (_pulseAnimation.value - 1.0) * 0.02,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.white,
+                  color.withOpacity(0.05),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.2),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: Colors.white,
+                  blurRadius: 15,
+                  offset: const Offset(0, -4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    icon,
+                    color: color,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  number,
+                  style: AppTextStyles.heading.copyWith(
+                    fontSize: 28,
+                    color: color,
+                    fontFamily: AppFonts.primaryFont,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.label.copyWith(
+                    fontSize: FontSizes.caption,
+                    fontFamily: AppFonts.secondaryFont,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSosSection(bool isEnglish) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                isEnglish ? "Emergency Requests" : "জরুরি অনুরোধসমূহ",
+                style: AppTextStyles.heading.copyWith(
+                  fontSize: FontSizes.subHeading,
+                  fontFamily: AppFonts.primaryFont,
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Text(
+                '${_sosRequests.length}',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: FontSizes.body,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          height: 400,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: _sosRequests.isEmpty
+              ? _buildEmptyRequestsState(isEnglish)
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _sosRequests.length,
+                  itemBuilder: (context, index) {
+                    final request = _sosRequests[index];
+                    print('Rendering SOS card: $request, current_location: $_currentPosition');
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.08),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: SosCard(
+                        request: request,
+                        current_location: _currentPosition,
+                        onIgnore: () => _ignoreRequest(request['id']),
+                        onAccept: () {
+                          _acceptRequest(request['id']).then((_) {
+                            _showDirectionModal();
+                          });
+                        },
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyRequestsState(bool isEnglish) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.search_off,
+              size: 60,
+              color: AppColors.primary.withOpacity(0.7),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            isEnglish ? "No Active Requests" : "কোন সক্রিয় অনুরোধ নেই",
+            style: AppTextStyles.heading.copyWith(
+              fontSize: FontSizes.subHeading,
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isEnglish 
+                ? "You're all caught up! New emergency\nrequests will appear here."
+                : "আপনি সব কাজ শেষ করেছেন! নতুন জরুরি\nঅনুরোধ এখানে দেখা যাবে।",
+            textAlign: TextAlign.center,
+            style: AppTextStyles.body.copyWith(
+              color: AppColors.textSecondary,
+              fontSize: FontSizes.body,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernSosCard(Map<String, dynamic> request, int index) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.white,
+            Colors.red.withOpacity(0.02),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.red.withOpacity(0.2),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.red.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 25,
+                backgroundImage: (request['users']?['image_url'] != null)
+                    ? NetworkImage(request['users']['image_url'])
+                    : const AssetImage('zob_assets/user_icon.png') as ImageProvider,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      request['users']?['full_name'] ?? 'Unknown User',
+                      style: AppTextStyles.heading.copyWith(
+                        fontSize: FontSizes.body + 2,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      request['vehicle'] ?? 'Unknown Vehicle',
+                      style: AppTextStyles.body.copyWith(
+                        color: AppColors.textSecondary,
+                        fontSize: FontSizes.caption,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'URGENT',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontSize: FontSizes.caption,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    _acceptRequest(request['id']).then((_) {
+                      _showDirectionModal();
+                    });
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text(
+                    'Accept',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton(
+                onPressed: () => _ignoreRequest(request['id']),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: Colors.grey.shade300),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                ),
+                child: Text(
+                  'Ignore',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFloatingBubble() {
+    return AnimatedBuilder(
+      animation: _pulseAnimation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _pulseAnimation.value,
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.primary,
+                  AppColors.primary.withOpacity(0.8),
+                ],
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withOpacity(0.4),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: FloatingActionButton(
+              onPressed: _showDirectionModal,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              child: const Icon(
+                Icons.directions,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
 }

@@ -6,7 +6,6 @@ import 'package:latlong2/latlong.dart' as latlng;
 import 'package:location/location.dart';
 import 'package:http/http.dart' as http;
 import 'package:mechfind/mechanic/chat_screen.dart';
-
 import 'package:mechfind/utils.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -37,7 +36,8 @@ class DirectionPopup extends StatefulWidget {
   State<DirectionPopup> createState() => _DirectionPopupState();
 }
 
-class _DirectionPopupState extends State<DirectionPopup> {
+class _DirectionPopupState extends State<DirectionPopup> 
+    with TickerProviderStateMixin {
   final MapController _mapController = MapController();
   final Location _location = Location();
   final SupabaseClient supabase = Supabase.instance.client;
@@ -52,10 +52,73 @@ class _DirectionPopupState extends State<DirectionPopup> {
   bool _isLoadingRoute = false;
   double? _mechanicHeading; // Direction the mechanic is facing
 
+  // Animation controllers
+  late AnimationController _slideController;
+  late AnimationController _pulseController;
+  late AnimationController _buttonController;
+  late Animation<Offset> _slideAnimation;
+  late Animation<double> _pulseAnimation;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
+
   @override
   void initState() {
     super.initState();
+    _initAnimations();
     _initLocation();
+  }
+
+  void _initAnimations() {
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    
+    _pulseController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+    
+    _buttonController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeOutCubic,
+    ));
+    
+    _pulseAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.2,
+    ).animate(CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeInOut,
+    ));
+    
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: const Interval(0.3, 1.0, curve: Curves.easeOut),
+    ));
+    
+    _scaleAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _buttonController,
+      curve: Curves.elasticOut,
+    ));
+    
+    // Start animations
+    _slideController.forward();
+    _buttonController.forward();
   }
 
   Future<void> _initLocation() async {
@@ -210,6 +273,9 @@ class _DirectionPopupState extends State<DirectionPopup> {
 
   @override
   void dispose() {
+    _slideController.dispose();
+    _pulseController.dispose();
+    _buttonController.dispose();
     _locationSubscription?.cancel();
     super.dispose();
   }
@@ -218,6 +284,7 @@ class _DirectionPopupState extends State<DirectionPopup> {
   Widget build(BuildContext context) {
     final accessToken =
         'pk.eyJ1IjoiYWRpbDQyMCIsImEiOiJjbWRrN3dhb2wwdXRnMmxvZ2dhNmY2Nzc3In0.yrzJJ09yyfdT4Zg4Y_CJhQ';
+    
     return NotificationListener<DraggableScrollableNotification>(
       onNotification: (notification) {
         if (notification.extent <= 0.1) {
@@ -235,313 +302,613 @@ class _DirectionPopupState extends State<DirectionPopup> {
       child: SafeArea(
         child: Scaffold(
           backgroundColor: Colors.transparent,
-          body: Container(
-            height: MediaQuery.of(context).size.height * 0.95,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: Stack(
-              children: [
-                Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0, right: 8.0),
-                      child: Align(
-                        alignment: Alignment.topRight,
-                        child: IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: _showConfirmationDialog,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Listener(
-                        onPointerDown: (_) => _userMovedMap = true,
-                        child: FlutterMap(
-                          mapController: _mapController,
-                          options: MapOptions(
-                            initialCenter:
-                                _mechanicLocation ?? widget.requestLocation,
-                            initialZoom: _currentZoom,
-                            onPositionChanged:
-                                (MapCamera camera, bool hasGesture) {
-                                  if (hasGesture) {
-                                    _currentZoom = camera.zoom;
-                                  }
-                                },
-                          ),
-                          children: [
-                            TileLayer(
-                              urlTemplate:
-                                  "https://api.mapbox.com/styles/v1/adil420/cmdkaqq33007y01sj85a2gpa5/tiles/256/{z}/{x}/{y}@2x?access_token=$accessToken",
-                              additionalOptions: {
-                                'accessToken': accessToken,
-                                'id': 'mapbox.mapbox-traffic-v1',
-                              },
+          body: SlideTransition(
+            position: _slideAnimation,
+            child: Container(
+              height: MediaQuery.of(context).size.height * 0.95,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white,
+                    Colors.grey.shade50,
+                    AppColors.primary.withOpacity(0.02),
+                  ],
+                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 20,
+                    offset: const Offset(0, -10),
+                  ),
+                ],
+              ),
+              child: Stack(
+                children: [
+                  // Header with gradient
+                  _buildModernHeader(),
+                  
+                  // Main map content
+                  Positioned.fill(
+                    top: 80,
+                    bottom: 90,
+                    child: FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: Container(
+                        margin: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 15,
+                              offset: const Offset(0, 5),
                             ),
-                            MarkerLayer(
-                              markers: [
-                                Marker(
-                                  point: widget.requestLocation,
-                                  width: 60,
-                                  height: 60,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.amber.shade700,
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(
-                                            alpha: 0.4,
-                                          ),
-                                          blurRadius: 4,
-                                          offset: const Offset(2, 2),
-                                        ),
-                                      ],
-                                      border: Border.all(
-                                        color: Colors.white,
-                                        width: 2,
-                                      ),
-                                    ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Image.asset(
-                                        'zob_assets/user_icon.png',
-                                      ),
-                                    ),
-                                  ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: Listener(
+                            onPointerDown: (_) => _userMovedMap = true,
+                            child: FlutterMap(
+                              mapController: _mapController,
+                              options: MapOptions(
+                                initialCenter:
+                                    _mechanicLocation ?? widget.requestLocation,
+                                initialZoom: _currentZoom,
+                                onPositionChanged:
+                                    (MapCamera camera, bool hasGesture) {
+                                      if (hasGesture) {
+                                        _currentZoom = camera.zoom;
+                                      }
+                                    },
+                              ),
+                              children: [
+                                TileLayer(
+                                  urlTemplate:
+                                      "https://api.mapbox.com/styles/v1/adil420/cmdkaqq33007y01sj85a2gpa5/tiles/256/{z}/{x}/{y}@2x?access_token=$accessToken",
+                                  additionalOptions: {
+                                    'accessToken': accessToken,
+                                    'id': 'mapbox.mapbox-traffic-v1',
+                                  },
                                 ),
-                                if (_mechanicLocation != null)
-                                  Marker(
-                                    point: _mechanicLocation!,
-                                    width: 60,
-                                    height: 60,
-                                    child: Stack(
-                                      children: [
-                                        // Blue shadow indicating direction (background layer)
-                                        if (_mechanicHeading != null && _mechanicHeading! >= 0)
-                                          Transform.rotate(
-                                            angle: (_mechanicHeading! * 3.14159) / 180,
+                                MarkerLayer(
+                                  markers: [
+                                    // User location marker - modern and smaller
+                                    Marker(
+                                      point: widget.requestLocation,
+                                      width: 40,
+                                      height: 40,
+                                      child: AnimatedBuilder(
+                                        animation: _pulseAnimation,
+                                        builder: (context, child) {
+                                          return Transform.scale(
+                                            scale: _pulseAnimation.value,
                                             child: Container(
-                                              width: 60,
-                                              height: 60,
                                               decoration: BoxDecoration(
-                                                gradient: RadialGradient(
-                                                  center: const Alignment(0, -0.3), // Offset towards heading direction
-                                                  radius: 0.8,
+                                                gradient: LinearGradient(
                                                   colors: [
-                                                    Colors.blue.withOpacity(0.4),
-                                                    Colors.blue.withOpacity(0.2),
-                                                    Colors.blue.withOpacity(0.1),
-                                                    Colors.transparent,
+                                                    Colors.red.shade400,
+                                                    Colors.red.shade600,
                                                   ],
-                                                  stops: const [0.0, 0.4, 0.7, 1.0],
                                                 ),
                                                 shape: BoxShape.circle,
-                                              ),
-                                            ),
-                                          ),
-                                        // Main mechanic marker (foreground layer)
-                                        Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.blueAccent,
-                                            shape: BoxShape.circle,
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.black.withValues(
-                                                  alpha: 0.4,
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.red.withOpacity(0.4),
+                                                    blurRadius: 10,
+                                                    spreadRadius: 2,
+                                                  ),
+                                                ],
+                                                border: Border.all(
+                                                  color: Colors.white,
+                                                  width: 3,
                                                 ),
-                                                blurRadius: 4,
-                                                offset: const Offset(2, 2),
                                               ),
-                                            ],
-                                            border: Border.all(
-                                              color: Colors.white,
-                                              width: 2,
+                                              child: const Icon(
+                                                Icons.person_pin_circle,
+                                                color: Colors.white,
+                                                size: 20,
+                                              ),
                                             ),
-                                          ),
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(8.0),
-                                            child: Image.asset(
-                                              'zob_assets/mechanic_icon.png',
-                                            ),
-                                          ),
-                                        ),
-                                        // Direction arrow (top layer)
-                                        if (_mechanicHeading != null && _mechanicHeading! >= 0)
-                                          Positioned(
-                                            top: -5,
-                                            right: -5,
-                                            child: Transform.rotate(
-                                              angle: (_mechanicHeading! * 3.14159) / 180, // Convert degrees to radians
-                                              child: Container(
-                                                width: 25,
-                                                height: 25,
-                                                decoration: BoxDecoration(
-                                                  color: Colors.orange,
-                                                  shape: BoxShape.circle,
-                                                  border: Border.all(
-                                                    color: Colors.white,
-                                                    width: 1,
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    // Mechanic location marker - modern and smaller
+                                    if (_mechanicLocation != null)
+                                      Marker(
+                                        point: _mechanicLocation!,
+                                        width: 40,
+                                        height: 40,
+                                        child: Stack(
+                                          children: [
+                                            // Direction indicator background
+                                            if (_mechanicHeading != null && _mechanicHeading! >= 0)
+                                              Transform.rotate(
+                                                angle: (_mechanicHeading! * 3.14159) / 180,
+                                                child: Container(
+                                                  width: 40,
+                                                  height: 40,
+                                                  decoration: BoxDecoration(
+                                                    gradient: RadialGradient(
+                                                      center: const Alignment(0, -0.3),
+                                                      radius: 0.8,
+                                                      colors: [
+                                                        AppColors.primary.withOpacity(0.3),
+                                                        AppColors.primary.withOpacity(0.1),
+                                                        Colors.transparent,
+                                                      ],
+                                                    ),
+                                                    shape: BoxShape.circle,
                                                   ),
                                                 ),
-                                                child: const Icon(
-                                                  Icons.navigation,
+                                              ),
+                                            // Main mechanic marker
+                                            Container(
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  colors: [
+                                                    AppColors.primary,
+                                                    AppColors.primary.withOpacity(0.8),
+                                                  ],
+                                                ),
+                                                shape: BoxShape.circle,
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: AppColors.primary.withOpacity(0.4),
+                                                    blurRadius: 10,
+                                                    spreadRadius: 2,
+                                                  ),
+                                                ],
+                                                border: Border.all(
                                                   color: Colors.white,
-                                                  size: 16,
+                                                  width: 3,
                                                 ),
                                               ),
+                                              child: const Icon(
+                                                Icons.build_circle,
+                                                color: Colors.white,
+                                                size: 20,
+                                              ),
                                             ),
-                                          ),
-                                      ],
-                                    ),
+                                            // Direction arrow
+                                            if (_mechanicHeading != null && _mechanicHeading! >= 0)
+                                              Positioned(
+                                                top: -2,
+                                                right: -2,
+                                                child: Transform.rotate(
+                                                  angle: (_mechanicHeading! * 3.14159) / 180,
+                                                  child: Container(
+                                                    width: 16,
+                                                    height: 16,
+                                                    decoration: BoxDecoration(
+                                                      gradient: LinearGradient(
+                                                        colors: [
+                                                          Colors.orange.shade400,
+                                                          Colors.orange.shade600,
+                                                        ],
+                                                      ),
+                                                      shape: BoxShape.circle,
+                                                      border: Border.all(
+                                                        color: Colors.white,
+                                                        width: 1,
+                                                      ),
+                                                    ),
+                                                    child: const Icon(
+                                                      Icons.navigation,
+                                                      color: Colors.white,
+                                                      size: 10,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                // Modern route lines
+                                for (final route in _routes)
+                                  PolylineLayer(
+                                    polylines: [
+                                      Polyline(
+                                        points: route,
+                                        strokeWidth: 4.0,
+                                        color: route == _routes.first
+                                            ? AppColors.primary
+                                            : AppColors.primary.withOpacity(0.4),
+                                        borderColor: Colors.white,
+                                        borderStrokeWidth: 1.5,
+                                      ),
+                                    ],
                                   ),
                               ],
                             ),
-                            for (final route in _routes)
-                              PolylineLayer(
-                                polylines: [
-                                  Polyline(
-                                    points: route,
-                                    strokeWidth: 5.0,
-                                    color: route == _routes.first
-                                        ? AppColors.accent
-                                        : AppColors.accent.withValues(
-                                            alpha: 0.3,
-                                          ),
-                                    borderColor: Colors.white,
-                                    borderStrokeWidth: 1.0,
-                                  ),
-                                ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  // Distance indicator
+                  if (_distanceInMeters != null)
+                    Positioned(
+                      top: 100,
+                      left: 30,
+                      child: FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.white,
+                                Colors.grey.shade50,
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 70),
-                  ],
-                ),
-                if (_distanceInMeters != null)
-                  Positioned(
-                    top: 60,
-                    left: 20,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black26, blurRadius: 4),
-                        ],
-                      ),
-                      child: Text(
-                        '${(_distanceInMeters! / 1000).toStringAsFixed(2)} km',
-                        style: AppTextStyles.body.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                // Loading indicator for route calculation
-                if (_isLoadingRoute)
-                  Positioned(
-                    top: 100,
-                    left: 20,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black26, blurRadius: 4),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                AppColors.accent,
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.straighten,
+                                color: AppColors.primary,
+                                size: 18,
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Calculating route...',
-                            style: AppTextStyles.body.copyWith(
-                              fontSize: 14,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                Positioned(
-                  bottom: 100,
-                  right: 16,
-                  child: FloatingActionButton(
-                    onPressed: () {
-                      if (_mechanicLocation != null) {
-                        _userMovedMap = false;
-                        _mapController.move(_mechanicLocation!, _currentZoom);
-                      }
-                    },
-                    backgroundColor: Colors.white,
-                    child: const Icon(Icons.my_location, color: Colors.blue),
-                  ),
-                ),
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => _launchPhoneCall(widget.phone),
-                            icon: const Icon(Icons.call),
-                            label: Text('Call'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              textStyle: AppTextStyles.label,
-                            ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${(_distanceInMeters! / 1000).toStringAsFixed(1)} km',
+                                style: AppTextStyles.body.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ChatScreen(
-                                    receiverId: widget.user_id,
-                                    receiverName: widget.name,
-                                    receiverImageUrl:widget.imageUrl,
-                                        
+                      ),
+                    ),
+                  
+                  // Loading indicator
+                  if (_isLoadingRoute)
+                    Positioned(
+                      top: 160,
+                      left: 30,
+                      child: FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.white,
+                                Colors.grey.shade50,
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppColors.primary,
                                   ),
                                 ),
-                              );
-                            },
-                            icon: const Icon(Icons.message),
-                            label: const Text("Message"),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Finding best route...',
+                                style: AppTextStyles.body.copyWith(
+                                  fontSize: 14,
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
+                    ),
+                  
+                  // Location button
+                  Positioned(
+                    bottom: 180,
+                    right: 30,
+                    child: ScaleTransition(
+                      scale: _scaleAnimation,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.primary,
+                              AppColors.primary.withOpacity(0.8),
+                            ],
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.4),
+                              blurRadius: 15,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: FloatingActionButton(
+                          onPressed: () {
+                            if (_mechanicLocation != null) {
+                              _userMovedMap = false;
+                              _mapController.move(_mechanicLocation!, _currentZoom);
+                            }
+                          },
+                          backgroundColor: Colors.transparent,
+                          elevation: 0,
+                          child: const Icon(
+                            Icons.my_location_rounded,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  // Bottom action buttons
+                  _buildModernBottomActions(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernHeader() {
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        height: 80,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              AppColors.primary,
+              AppColors.primary.withOpacity(0.8),
+            ],
+          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          child: Row(
+            children: [
+              // Handle bar
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Spacer(),
+              // Title
+              FadeTransition(
+                opacity: _fadeAnimation,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Navigation to ${widget.name}',
+                      style: AppTextStyles.heading.copyWith(
+                        color: Colors.white,
+                        fontSize: FontSizes.body,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Emergency Service Request',
+                      style: AppTextStyles.body.copyWith(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: FontSizes.caption,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              // Close button
+              ScaleTransition(
+                scale: _scaleAnimation,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white),
+                    onPressed: _showConfirmationDialog,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernBottomActions() {
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 1),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(
+          parent: _buttonController,
+          curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
+        )),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.white.withOpacity(0.9),
+                Colors.white,
+              ],
+            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, -10),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            child: Row(
+              children: [
+                Expanded(
+                  child: ScaleTransition(
+                    scale: _scaleAnimation,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.green.shade400,
+                            Colors.green.shade600,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.green.withOpacity(0.4),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton.icon(
+                        onPressed: () => _launchPhoneCall(widget.phone),
+                        icon: const Icon(Icons.phone_rounded, size: 22),
+                        label: Text(
+                          'Call Customer',
+                          style: AppTextStyles.body.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ScaleTransition(
+                    scale: _scaleAnimation,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.primary,
+                            AppColors.primary.withOpacity(0.8),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.4),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(
+                                receiverId: widget.user_id,
+                                receiverName: widget.name,
+                                receiverImageUrl: widget.imageUrl,
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.chat_bubble_rounded, size: 22),
+                        label: Text(
+                          'Message',
+                          style: AppTextStyles.body.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),

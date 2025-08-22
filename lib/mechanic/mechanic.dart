@@ -6,6 +6,7 @@ import 'package:mechfind/mechanic/mechanic_landing_screen.dart';
 import 'package:mechfind/mechanic/mechanic_map.dart';
 import 'package:mechfind/mechanic/mechanic_profile.dart';
 import 'package:mechfind/mechanic/mechanic_settings.dart';
+import 'package:mechfind/services/message_notification_service.dart';
 
 
 class Mechanic extends StatefulWidget {
@@ -17,6 +18,13 @@ class Mechanic extends StatefulWidget {
 
 class _MechanicState extends State<Mechanic> {
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize the message notification service
+    MessageNotificationService().initialize();
+  }
 
   Widget _getPage(int index) {
     switch (index) {
@@ -40,6 +48,55 @@ class _MechanicState extends State<Mechanic> {
     setState(() {
       _selectedIndex = index;
     });
+    
+    // If user taps on messages tab, mark messages as read after a short delay
+    if (index == 2) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        MessageNotificationService().refresh();
+      });
+    }
+  }
+
+  Widget _buildChatTabWithBadge() {
+    return ListenableBuilder(
+      listenable: MessageNotificationService(),
+      builder: (context, child) {
+        final hasUnread = MessageNotificationService().hasUnreadMessages;
+        final unreadCount = MessageNotificationService().unreadCount;
+        
+        return Stack(
+          children: [
+            const Icon(Icons.chat_rounded),
+            if (hasUnread)
+              Positioned(
+                right: 0,
+                top: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: AppColors.danger,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white, width: 1),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  child: Text(
+                    unreadCount > 99 ? '99+' : unreadCount.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -70,7 +127,7 @@ class _MechanicState extends State<Mechanic> {
             label: 'map'.tr(),
           ),
           BottomNavigationBarItem(
-            icon: const Icon(Icons.chat_rounded),
+            icon: _buildChatTabWithBadge(),
             label: 'Chat'.tr(),
           ),
           BottomNavigationBarItem(

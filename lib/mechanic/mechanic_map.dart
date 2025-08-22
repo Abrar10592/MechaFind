@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' as latlng;
 import 'package:mechfind/utils.dart';
@@ -18,7 +17,7 @@ class MechanicMap extends StatefulWidget {
   State<MechanicMap> createState() => _MechanicMapState();
 }
 
-class _MechanicMapState extends State<MechanicMap> {
+class _MechanicMapState extends State<MechanicMap> with TickerProviderStateMixin {
   final MapController _mapController = MapController();
   final SupabaseClient supabase = Supabase.instance.client;
   latlng.LatLng? _currentLatLng;
@@ -26,11 +25,41 @@ class _MechanicMapState extends State<MechanicMap> {
   final String _mapboxAccessToken = 'pk.eyJ1IjoiYWRpbDQyMCIsImEiOiJjbWRrN3dhb2wwdXRnMmxvZ2dhNmY2Nzc3In0.yrzJJ09yyfdT4Zg4Y_CJhQ';
   bool _isLocationLoading = true;
   bool _isRequestsLoading = false;
+  
+  // Store request data for markers
+  List<Map<String, dynamic>> _sosRequestsData = [];
+  
+  // Animation controllers for pulsating effect
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
+    
+    // Initialize pulse animation
+    _pulseController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    );
+    
+    _pulseAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.2,
+    ).animate(CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeInOut,
+    ));
+    
+    _pulseController.repeat(reverse: true);
+    
     _getUserLocation();
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
   }
 
   Future<void> _getUserLocation() async {
@@ -159,39 +188,58 @@ class _MechanicMapState extends State<MechanicMap> {
       const double maxDistanceKm = 10.0;
       final latlng.Distance distanceCalc = const latlng.Distance();
 
-      List<Marker> filteredMarkers = response
-          .map<Marker?>((request) {
-            try {
-              final lat = double.tryParse(request['lat']?.toString() ?? '') ?? 0.0;
-              final lng = double.tryParse(request['lng']?.toString() ?? '') ?? 0.0;
-              
-              if (lat == 0.0 || lng == 0.0) return null;
-              
-              final point = latlng.LatLng(lat, lng);
-              final distance = distanceCalc.as(
-                latlng.LengthUnit.Kilometer,
-                _currentLatLng!,
-                point,
-              );
+      List<Marker> filteredMarkers = [];
+      List<Map<String, dynamic>> filteredRequestsData = [];
 
-              if (distance <= maxDistanceKm) {
-                return Marker(
-                  point: point,
-                  width: 60,
-                  height: 60,
-                  child: GestureDetector(
-                    onTap: () {
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        builder: (_) => _buildRequestDetails(request),
-                      );
-                    },
+      for (var request in response) {
+        try {
+          final lat = double.tryParse(request['lat']?.toString() ?? '') ?? 0.0;
+          final lng = double.tryParse(request['lng']?.toString() ?? '') ?? 0.0;
+          
+          if (lat == 0.0 || lng == 0.0) continue;
+          
+          final point = latlng.LatLng(lat, lng);
+          final distance = distanceCalc.as(
+            latlng.LengthUnit.Kilometer,
+            _currentLatLng!,
+            point,
+          );
+
+          if (distance <= maxDistanceKm) {
+            // Store request data
+            filteredRequestsData.add(request);
+            
+            // Create marker
+            filteredMarkers.add(
+              Marker(
+                point: point,
+                width: 50,
+                height: 50,
+                child: GestureDetector(
+                  onTap: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => _buildEnhancedRequestDetails(request),
+                    );
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.red.withOpacity(0.3),
+                          blurRadius: 8,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
                     child: CircleAvatar(
                       backgroundColor: Colors.white,
-                      radius: 30,
+                      radius: 23,
                       child: CircleAvatar(
-                        radius: 27,
+                        radius: 20,
                         backgroundImage: (request['users']?['image_url'] != null && 
                             request['users']['image_url'].toString().isNotEmpty)
                             ? NetworkImage(request['users']['image_url'])
@@ -199,19 +247,18 @@ class _MechanicMapState extends State<MechanicMap> {
                       ),
                     ),
                   ),
-                );
-              }
-              return null;
-            } catch (e) {
-              print('Error processing request marker: $e');
-              return null;
-            }
-          })
-          .whereType<Marker>()
-          .toList();
+                ),
+              ),
+            );
+          }
+        } catch (e) {
+          print('Error processing request marker: $e');
+        }
+      }
 
       setState(() {
         _sosMarkers = filteredMarkers;
+        _sosRequestsData = filteredRequestsData;
         _isRequestsLoading = false;
       });
       print('Filtered SOS markers: ${filteredMarkers.length}');
@@ -247,112 +294,295 @@ class _MechanicMapState extends State<MechanicMap> {
     }
   }
 
-  Widget _buildRequestDetails(Map<String, dynamic> data) {
+  Widget _buildEnhancedRequestDetails(Map<String, dynamic> data) {
     final lat = double.tryParse(data['lat']?.toString() ?? '') ?? 0.0;
     final lng = double.tryParse(data['lng']?.toString() ?? '') ?? 0.0;
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Image.network(
-                data['image'] ?? data['users']?['image_url'] ?? 'https://via.placeholder.com/300',
-                width: double.infinity,
-                height: 220,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Image.asset(
-                  'zob_assets/user_icon.png',
-                  width: double.infinity,
-                  height: 220,
-                  fit: BoxFit.cover,
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(30),
+          topRight: Radius.circular(30),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              data['users']?['full_name'] ?? 'Unknown',
-              style: AppTextStyles.heading.copyWith(
-                fontSize: FontSizes.subHeading + 2,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
+              const SizedBox(height: 24),
+              
+              // Header section
+              Row(
                 children: [
-                  _buildInfoRow(Icons.directions_car, "Car", data['vehicle'] ?? 'Unknown'),
-                  _buildInfoRow(Icons.build_circle_outlined, "Issue", data['description'] ?? 'No description'),
-                  FutureBuilder<String>(
-                    future: _getPlaceName(lat, lng),
-                    builder: (context, snapshot) {
-                      String locationText;
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        locationText = 'Fetching location...';
-                      } else if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-                        locationText = '(${data['lat']}, ${data['lng']})';
-                      } else {
-                        locationText = snapshot.data!;
-                      }
-                      return _buildInfoRow(Icons.location_on_outlined, "Location", locationText);
-                    },
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.2),
+                          blurRadius: 10,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: CircleAvatar(
+                      radius: 35,
+                      backgroundColor: Colors.white,
+                      child: CircleAvatar(
+                        radius: 32,
+                        backgroundImage: (data['users']?['image_url'] != null && 
+                            data['users']['image_url'].toString().isNotEmpty)
+                            ? NetworkImage(data['users']['image_url'])
+                            : const AssetImage('zob_assets/user_icon.png') as ImageProvider,
+                      ),
+                    ),
                   ),
-                  _buildInfoRow(Icons.phone, "Phone", data['users']?['phone'] ?? 'N/A'),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          data['users']?['full_name'] ?? 'Unknown User',
+                          style: AppTextStyles.heading.copyWith(
+                            fontSize: FontSizes.subHeading + 2,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            'Emergency Request',
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.w600,
+                              fontSize: FontSizes.caption,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
-            ),
-          ],
+              
+              const SizedBox(height: 24),
+              
+              // Problem image
+              if (data['image'] != null)
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.2),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.network(
+                      data['image'],
+                      width: double.infinity,
+                      height: 200,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: double.infinity,
+                        height: 200,
+                        color: Colors.grey.shade100,
+                        child: const Icon(
+                          Icons.image_not_supported,
+                          size: 60,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              
+              const SizedBox(height: 24),
+              
+              // Details section
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.grey.shade50,
+                      Colors.white,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _buildEnhancedInfoRow(Icons.directions_car_rounded, "Vehicle", data['vehicle'] ?? 'Unknown'),
+                    const SizedBox(height: 16),
+                    _buildEnhancedInfoRow(Icons.build_circle_outlined, "Problem", data['description'] ?? 'No description'),
+                    const SizedBox(height: 16),
+                    FutureBuilder<String>(
+                      future: _getPlaceName(lat, lng),
+                      builder: (context, snapshot) {
+                        String locationText;
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          locationText = 'Loading location...';
+                        } else if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+                          locationText = '(${data['lat']}, ${data['lng']})';
+                        } else {
+                          locationText = snapshot.data!;
+                        }
+                        return _buildEnhancedInfoRow(Icons.location_on_rounded, "Location", locationText);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    _buildEnhancedInfoRow(Icons.phone_rounded, "Phone", data['users']?['phone'] ?? 'Not available'),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Action buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.primary,
+                            AppColors.primary.withOpacity(0.8),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(25),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.4),
+                            blurRadius: 12,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          // Add accept request logic here
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                        ),
+                        child: Text(
+                          'Accept Request',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: FontSizes.body,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    child: IconButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.close_rounded),
+                      color: Colors.grey.shade600,
+                      iconSize: 28,
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: Colors.blueGrey),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: AppTextStyles.body.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.blueGrey[700],
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: AppTextStyles.body.copyWith(
-                    color: Colors.black87,
-                  ),
-                ),
-              ],
-            ),
+  Widget _buildEnhancedInfoRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
           ),
-        ],
-      ),
+          child: Icon(
+            icon, 
+            color: AppColors.primary,
+            size: 20,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: AppTextStyles.body.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                  fontSize: FontSizes.caption,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: AppTextStyles.body.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -364,9 +594,23 @@ class _MechanicMapState extends State<MechanicMap> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.primary,
+                AppColors.primary.withOpacity(0.8),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         title: Text(
           'nearby_sos_requests'.tr(),
-          style: TextStyle(
+          style: AppTextStyles.heading.copyWith(
             color: Colors.white,
             fontFamily: AppFonts.primaryFont,
             fontSize: FontSizes.subHeading,
@@ -374,7 +618,21 @@ class _MechanicMapState extends State<MechanicMap> {
           ),
         ),
         centerTitle: true,
-        backgroundColor: AppColors.primary,
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 22),
+              onPressed: () {
+                _loadNearbySOSRequests();
+              },
+            ),
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -395,15 +653,65 @@ class _MechanicMapState extends State<MechanicMap> {
                   'id': 'mapbox.mapbox-traffic-v1',
                 },
               ),
-              CurrentLocationLayer(
-                style: LocationMarkerStyle(
-                  marker: const DefaultLocationMarker(
-                    child: Icon(Icons.my_location, color: Colors.white),
-                  ),
-                  markerSize: const Size(35, 35),
-                  markerDirection: MarkerDirection.heading,
+              // Custom pulsating current location marker
+              if (_currentLatLng != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _currentLatLng!,
+                      width: 60,
+                      height: 60,
+                      child: AnimatedBuilder(
+                        animation: _pulseAnimation,
+                        builder: (context, child) {
+                          return Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Outer pulsating circle
+                              Transform.scale(
+                                scale: _pulseAnimation.value,
+                                child: Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withOpacity(0.3),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                              // Inner static circle
+                              Container(
+                                width: 20,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 3,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.primary.withOpacity(0.4),
+                                      blurRadius: 8,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.my_location,
+                                  color: Colors.white,
+                                  size: 12,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-              ),
+              // SOS request markers with data
               MarkerLayer(markers: _sosMarkers),
             ],
           ),

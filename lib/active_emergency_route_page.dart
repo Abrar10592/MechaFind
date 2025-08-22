@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'user_home.dart';
+import 'utils.dart';
 class ActiveEmergencyRoutePage extends StatefulWidget {
   final String requestId;
   final LatLng userLocation;
@@ -17,8 +18,21 @@ class ActiveEmergencyRoutePage extends StatefulWidget {
   State createState() => _ActiveEmergencyRoutePageState();
 }
 
-class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage> {
+class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage> 
+    with TickerProviderStateMixin {
   late Stream<Map<String, dynamic>?> _requestStream;
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+  RealtimeChannel? _realtimeSubscription;
+  
+  // Local state for immediate UI updates
+  Map<String, dynamic>? _currentRequestData;
+  bool _mechanicRemoved = false;
+  
+  // Sheet height constraints
+  static const double _minSheetHeight = 0.16; // 1/6 of screen
+  static const double _maxSheetHeight = 0.5;  // 1/2 of screen
+  static const double _initialSheetHeight = 0.3; // Initial height
 
   @override
   void initState() {
@@ -26,6 +40,21 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage> {
     debugPrint(
         '🚀 ActiveEmergencyRoutePage opened for requestId=${widget.requestId}');
     debugPrint('🚀 Initial userLocation = ${widget.userLocation}');
+    
+    // Initialize pulse animation
+    _pulseController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    );
+    _pulseAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.3,
+    ).animate(CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeInOut,
+    ));
+    _pulseController.repeat(reverse: true);
+    
     _requestStream = Supabase.instance.client
         .from('requests')
         .stream(primaryKey: ['id'])
@@ -41,6 +70,138 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage> {
       }
       return null;
     });
+
+    // Setup real-time subscription for immediate updates
+    _setupRealtimeSubscription();
+  }
+
+  void _setupRealtimeSubscription() {
+    debugPrint('🔄 Setting up real-time subscription for request ${widget.requestId}');
+    
+    _realtimeSubscription = Supabase.instance.client
+        .channel('public:requests:${widget.requestId}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'requests',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: widget.requestId,
+          ),
+          callback: (payload) {
+            debugPrint('🔄 Real-time update received: ${payload.newRecord}');
+            final newRecord = payload.newRecord;
+            final status = newRecord['status']?.toString().toLowerCase().trim() ?? '';
+            final mechanicId = newRecord['mechanic_id'];
+            
+            debugPrint('🔄 Real-time status update: $status, mechanic_id: $mechanicId');
+            
+            if (status == 'pending' && mechanicId == null) {
+              debugPrint('✅ Mechanic removed - request back to pending status');
+              // Force UI refresh to show waiting state
+              if (mounted) {
+                setState(() {
+                  _mechanicRemoved = true;
+                  _currentRequestData = Map<String, dynamic>.from(newRecord);
+                });
+              }
+            } else if (status == 'accepted' && mechanicId != null) {
+              debugPrint('✅ New mechanic assigned - resetting removal flag');
+              // New mechanic assigned, reset the removal flag
+              if (mounted) {
+                setState(() {
+                  _mechanicRemoved = false;
+                  _currentRequestData = Map<String, dynamic>.from(newRecord);
+                });
+              }
+            }
+          },
+        )
+        .subscribe((status, [error]) {
+          debugPrint('📡 Subscription status: $status');
+          if (error != null) {
+            debugPrint('❌ Subscription error: $error');
+          }
+        });
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    _realtimeSubscription?.unsubscribe();
+    super.dispose();
+  }
+
+  // Modern animated marker widget with app color scheme
+  Widget _buildAnimatedMarker({
+    required Color color,
+    required IconData icon,
+    bool animate = false,
+    bool isEmergency = false,
+  }) {
+    return AnimatedBuilder(
+      animation: _pulseAnimation,
+      builder: (context, child) {
+        final scale = animate ? _pulseAnimation.value : 1.0;
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: isEmergency 
+                ? RadialGradient(
+                    colors: [
+                      AppColors.danger,
+                      AppColors.danger.withOpacity(0.8),
+                    ],
+                  )
+                : RadialGradient(
+                    colors: [
+                      color,
+                      color.withOpacity(0.8),
+                    ],
+                  ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: isEmergency 
+                    ? AppColors.danger.withOpacity(0.6)
+                    : color.withOpacity(0.5),
+                  spreadRadius: animate ? 4 : 2,
+                  blurRadius: animate ? 12 : 8,
+                  offset: const Offset(0, 2),
+                ),
+                if (animate)
+                  BoxShadow(
+                    color: isEmergency 
+                      ? AppColors.danger.withOpacity(0.3)
+                      : color.withOpacity(0.3),
+                    spreadRadius: 8,
+                    blurRadius: 20,
+                    offset: const Offset(0, 4),
+                  ),
+              ],
+              border: Border.all(
+                color: Colors.white,
+                width: 3,
+              ),
+            ),
+            child: Icon(
+              icon,
+              color: Colors.white,
+              size: 20,
+              shadows: [
+                Shadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 2,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<Map<String, dynamic>?> _fetchMechanicProfile(String mechanicId) async {
@@ -83,18 +244,229 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage> {
   }
 
   Future<void> _cancelRequest() async {
-    await Supabase.instance.client
-        .from('requests')
-        .update({'status': 'canceled'})
-        .eq('id', widget.requestId);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Request canceled')),
-      );
+    // Show confirmation dialog
+    final bool? shouldCancel = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.danger,
+                AppColors.danger.withOpacity(0.8),
+              ],
+            ),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Cancel Request',
+                style: AppTextStyles.heading.copyWith(
+                  color: Colors.white,
+                  fontFamily: AppFonts.primaryFont,
+                  fontSize: 18,
+                ),
+              ),
+            ],
+          ),
+        ),
+        titlePadding: EdgeInsets.zero,
+        content: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Text(
+            'Are you sure you want to cancel this emergency request? This action cannot be undone.',
+            style: AppTextStyles.body.copyWith(
+              color: AppColors.textPrimary,
+              fontFamily: AppFonts.secondaryFont,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        actions: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.textSecondary,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: AppColors.textSecondary.withOpacity(0.3),
+                        ),
+                      ),
+                    ),
+                    child: Text(
+                      'No, Keep Request',
+                      style: AppTextStyles.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.danger,
+                          AppColors.danger.withOpacity(0.8),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.danger.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        foregroundColor: Colors.white,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: Text(
+                        'Yes, Cancel',
+                        style: AppTextStyles.body.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        actionsPadding: EdgeInsets.zero,
+      ),
+    );
+
+    // If user confirmed cancellation
+    if (shouldCancel == true) {
+      try {
+        await Supabase.instance.client
+            .from('requests')
+            .update({'status': 'canceled'})
+            .eq('id', widget.requestId);
+
+        if (mounted) {
+          // Navigate back to user home page
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => UserHomePage()),
+            (Route<dynamic> route) => false,
+          );
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Request has been canceled'),
+              backgroundColor: AppColors.danger,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to cancel request: ${e.toString()}'),
+              backgroundColor: AppColors.danger,
+            ),
+          );
+        }
+      }
     }
   }
 
-  // NEW: Service complete popup
+  Future<void> _removeMechanic() async {
+    try {
+      debugPrint('🗑️ Removing mechanic - updating request to pending status...');
+      
+      // Immediately update local state to show waiting UI
+      setState(() {
+        _mechanicRemoved = true;
+        _currentRequestData = {
+          ...(_currentRequestData ?? {}),
+          'status': 'pending',
+          'mechanic_id': null,
+          'mech_lat': null,
+          'mech_lng': null,
+        };
+      });
+      
+      // Update request to remove mechanic and reset to pending status
+      final updateResult = await Supabase.instance.client
+          .from('requests')
+          .update({
+            'status': 'pending',
+            'mechanic_id': null,
+            'mech_lat': null,
+            'mech_lng': null,
+          })
+          .eq('id', widget.requestId)
+          .select();
+
+      debugPrint('✅ Mechanic removal update completed: $updateResult');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Mechanic removed. Searching for new mechanics...'),
+            backgroundColor: AppColors.tealPrimary,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Error removing mechanic: $e');
+      
+      // Revert local state if update failed
+      setState(() {
+        _mechanicRemoved = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to remove mechanic: ${e.toString()}'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
+  // Modern service complete popup with app styling
   void _showServiceCompleteDialog(Map<String, dynamic> request) {
     double rating = 0;
     final TextEditingController reviewController = TextEditingController();
@@ -104,100 +476,236 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage> {
       builder: (context) {
         return StatefulBuilder(builder: (context, setState) {
           return AlertDialog(
-            title: const Text('Rate the Service'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(5, (index) {
-                    return IconButton(
-                      icon: Icon(
-                        index < rating ? Icons.star : Icons.star_border,
-                        color: Colors.amber,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          rating = index + 1.0;
-                        });
-                      },
-                    );
-                  }),
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            title: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.tealPrimary,
+                    AppColors.tealSecondary,
+                  ],
                 ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: reviewController,
-                  minLines: 2,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    labelText: 'Write a review',
-                    border: OutlineInputBorder(),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(24),
+                  topRight: Radius.circular(24),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.star_rate,
+                    color: Colors.white,
+                    size: 32,
                   ),
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  Text(
+                    'Rate the Service',
+                    style: AppTextStyles.heading.copyWith(
+                      color: Colors.white,
+                      fontFamily: AppFonts.primaryFont,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            titlePadding: EdgeInsets.zero,
+            content: Container(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 16),
+                  Text(
+                    'How was your experience?',
+                    style: AppTextStyles.body.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  // Star rating
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            rating = index + 1.0;
+                          });
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.all(4),
+                          child: Icon(
+                            index < rating ? Icons.star : Icons.star_border,
+                            color: index < rating 
+                              ? Colors.amber.shade400
+                              : Colors.grey.shade300,
+                            size: 32,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 24),
+                  // Review text field
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.tealPrimary.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: TextField(
+                      controller: reviewController,
+                      minLines: 3,
+                      maxLines: 4,
+                      style: AppTextStyles.body.copyWith(
+                        fontFamily: AppFonts.secondaryFont,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Write a review (optional)',
+                        labelStyle: AppTextStyles.label.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.all(16),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  if (rating == 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('Please give a rating'),
-                    ));
-                    return;
-                  }
-
-                  try {
-                    // 1. Update request status to completed
-                    await Supabase.instance.client
-                        .from('requests')
-                        .update({'status': 'completed'})
-                        .eq('id', widget.requestId);
-
-                    // 2. Create review record
-                    await Supabase.instance.client.from('reviews').insert({
-                      'request_id': widget.requestId,
-                      'user_id': request['user_id'],
-                      'mechanic_id': request['mechanic_id'],
-                      'rating': rating.toInt(),
-                      'comment': reviewController.text.trim(),
-                    });
-
-                    if (mounted) {
-                      Navigator.pop(context); // Close the dialog
-
-                      // Navigate back to user home page
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(builder: (context) => UserHomePage()),
-                            (Route<dynamic> route) => false,
-                      );
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Thank you for your feedback!'),
-                          duration: Duration(seconds: 2),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                      );
-                    }
-                  } catch (e, st) {
-                    debugPrint('❌ Error submitting review: $e');
-                    debugPrint('Stack trace: $st');
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Failed to submit: ${e.toString()}'),
+                        child: Text(
+                          'Cancel',
+                          style: AppTextStyles.body.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      );
-                    }
-                  }
-                },
-                child: const Text('Submit'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.tealPrimary,
+                              AppColors.tealSecondary,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.tealPrimary.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            if (rating == 0) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text('Please give a rating'),
+                                  backgroundColor: AppColors.danger,
+                                ),
+                              );
+                              return;
+                            }
+
+                            try {
+                              // 1. Update request status to completed
+                              await Supabase.instance.client
+                                  .from('requests')
+                                  .update({'status': 'completed'})
+                                  .eq('id', widget.requestId);
+
+                              // 2. Create review record
+                              await Supabase.instance.client.from('reviews').insert({
+                                'request_id': widget.requestId,
+                                'user_id': request['user_id'],
+                                'mechanic_id': request['mechanic_id'],
+                                'rating': rating.toInt(),
+                                'comment': reviewController.text.trim(),
+                              });
+
+                              if (mounted) {
+                                Navigator.pop(context); // Close the dialog
+
+                                // Navigate back to user home page
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => UserHomePage()),
+                                      (Route<dynamic> route) => false,
+                                );
+
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Thank you for your feedback!'),
+                                    backgroundColor: AppColors.tealPrimary,
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              }
+                            } catch (e, st) {
+                              debugPrint('❌ Error submitting review: $e');
+                              debugPrint('Stack trace: $st');
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Failed to submit: ${e.toString()}'),
+                                    backgroundColor: AppColors.danger,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            foregroundColor: Colors.white,
+                            shadowColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: Text(
+                            'Submit Review',
+                            style: AppTextStyles.body.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
+            actionsPadding: EdgeInsets.zero,
           );
         });
       },
@@ -205,143 +713,511 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage> {
   }
 
 
-  Widget _buildWaitingUI([String reason = '']) {
-    if (reason.isNotEmpty) {
-      debugPrint('⏳ Still waiting… reason: $reason');
-    }
-    return Column(
+  Widget _buildFullScreenMap({
+    required LatLng userPos,
+    LatLng? mechPos,
+  }) {
+    return FlutterMap(
+      options: MapOptions(
+        initialCenter: mechPos != null 
+          ? LatLng(
+              (userPos.latitude + mechPos.latitude) / 2,
+              (userPos.longitude + mechPos.longitude) / 2,
+            )
+          : userPos,
+        initialZoom: mechPos != null ? 14.5 : 15,
+      ),
       children: [
-        SizedBox(
-          height: 250,
-          width: double.infinity,
-          child: FlutterMap(
-            options: MapOptions(
-              initialCenter: widget.userLocation,
-              initialZoom: 15,
-            ),
-            children: [
-              TileLayer(
-                  urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png"),
-              MarkerLayer(markers: [
-                Marker(
-                  point: widget.userLocation,
-                  width: 36,
-                  height: 36,
-                  child: const Icon(Icons.person_pin_circle,
-                      color: Colors.red, size: 32),
-                ),
-              ]),
-            ],
-          ),
+        TileLayer(
+          urlTemplate:
+              "https://api.mapbox.com/styles/v1/adil420/cmdkaqq33007y01sj85a2gpa5/tiles/256/{z}/{x}/{y}@2x?access_token=pk.eyJ1IjoiYWRpbDQyMCIsImEiOiJjbWRrN3dhb2wwdXRnMmxvZ2dhNmY2Nzc3In0.yrzJJ09yyfdT4Zg4Y_CJhQ",
+          additionalOptions: {
+            'accessToken': 'pk.eyJ1IjoiYWRpbDQyMCIsImEiOiJjbWRrN3dhb2wwdXRnMmxvZ2dhNmY2Nzc3In0.yrzJJ09yyfdT4Zg4Y_CJhQ',
+            'id': 'mapbox.mapbox-traffic-v1',
+          },
         ),
-        const SizedBox(height: 28),
-        const CircularProgressIndicator(),
-        const SizedBox(height: 16),
-        const Text("Searching for mechanics nearby...",
-            style: TextStyle(fontSize: 17, color: Colors.blue)),
-        const SizedBox(height: 12),
-        const Text("Mechanics are connecting...",
-            style: TextStyle(fontSize: 15, color: Colors.black54)),
+        if (mechPos != null)
+          PolylineLayer(polylines: [
+            Polyline(
+              points: [userPos, mechPos],
+              color: AppColors.tealPrimary,
+              strokeWidth: 5,
+            ),
+          ]),
+        MarkerLayer(markers: [
+          Marker(
+            point: userPos,
+            width: 40,
+            height: 40,
+            child: _buildAnimatedMarker(
+              color: AppColors.danger,
+              icon: Icons.person_pin_circle,
+              animate: true,
+              isEmergency: true,
+            ),
+          ),
+          if (mechPos != null)
+            Marker(
+              point: mechPos,
+              width: 40,
+              height: 40,
+              child: _buildAnimatedMarker(
+                color: AppColors.tealPrimary,
+                icon: Icons.build_circle,
+                animate: false,
+              ),
+            ),
+        ]),
       ],
     );
   }
 
-  Widget _buildLiveMap({
-    required LatLng userPos,
-    required LatLng mechPos,
+  Widget _buildDraggableBottomSheet({
+    Map<String, dynamic>? request,
+    Map<String, dynamic>? mechanic,
+    bool isWaiting = false,
   }) {
-    return SizedBox(
-      height: 250,
-      width: double.infinity,
-      child: FlutterMap(
-        options: MapOptions(
-          initialCenter: LatLng(
-            (userPos.latitude + mechPos.latitude) / 2,
-            (userPos.longitude + mechPos.longitude) / 2,
+    return DraggableScrollableSheet(
+      key: ValueKey('bottom_sheet_${isWaiting ? 'waiting' : 'ready'}'),
+      initialChildSize: _initialSheetHeight,
+      minChildSize: _minSheetHeight,
+      maxChildSize: _maxSheetHeight,
+      snap: true,
+      snapSizes: [_minSheetHeight, _initialSheetHeight, _maxSheetHeight],
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withOpacity(0.2),
+                blurRadius: 20,
+                offset: const Offset(0, -8),
+                spreadRadius: 2,
+              ),
+            ],
           ),
-          initialZoom: 14.5,
+          child: Column(
+            children: [
+              // Drag handle
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.textSecondary.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              
+              // Content
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  physics: const ClampingScrollPhysics(),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: isWaiting 
+                      ? _buildWaitingContent()
+                      : _buildMechanicContent(mechanic!, request!),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildWaitingContent() {
+    return Column(
+      children: [
+        const SizedBox(height: 20),
+        
+        // Loading indicator with app colors
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.background,
+                AppColors.background.withOpacity(0.8),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withOpacity(0.1),
+                blurRadius: 15,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.tealPrimary,
+                      AppColors.tealSecondary,
+                    ],
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.tealPrimary.withOpacity(0.4),
+                      blurRadius: 12,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: const CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  strokeWidth: 3,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                "🔍 Searching for mechanics nearby...",
+                style: AppTextStyles.heading.copyWith(
+                  color: AppColors.primary,
+                  fontSize: 18,
+                  fontFamily: AppFonts.primaryFont,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                "Emergency assistance is on the way",
+                style: AppTextStyles.body.copyWith(
+                  color: AppColors.textSecondary,
+                  fontFamily: AppFonts.secondaryFont,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
-        children: [
-          TileLayer(
-              urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png"),
-          PolylineLayer(polylines: [
-            Polyline(
-                points: [userPos, mechPos],
-                color: Colors.blue,
-                strokeWidth: 4),
-          ]),
-          MarkerLayer(markers: [
-            Marker(
-              point: userPos,
-              width: 34,
-              height: 34,
-              child: const Icon(Icons.person_pin_circle,
-                  color: Colors.red, size: 28),
+        
+        const SizedBox(height: 24),
+        
+        // Cancel request button - always available when waiting
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.danger,
+                AppColors.danger.withOpacity(0.8),
+              ],
             ),
-            Marker(
-              point: mechPos,
-              width: 34,
-              height: 34,
-              child: const Icon(Icons.build, color: Colors.green, size: 28),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.danger.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ElevatedButton.icon(
+            icon: const Icon(Icons.cancel_outlined, size: 20),
+            label: Text(
+              'Cancel Request',
+              style: AppTextStyles.body.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ]),
-        ],
-      ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              foregroundColor: Colors.white,
+              shadowColor: Colors.transparent,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            onPressed: _cancelRequest,
+          ),
+        ),
+        
+        const SizedBox(height: 80), // Extra space for smaller sheet size
+      ],
+    );
+  }
+
+  Widget _buildMechanicContent(Map<String, dynamic> mechanic, Map<String, dynamic> request) {
+    return Column(
+      children: [
+        const SizedBox(height: 10),
+        _buildMechanicCard(mechanic),
+        const SizedBox(height: 24),
+        
+        // Action buttons
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.danger,
+                      AppColors.danger.withOpacity(0.8),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.danger.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.cancel_outlined, size: 20),
+                  label: Text(
+                    'Cancel Request',
+                    style: AppTextStyles.body.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: Colors.white,
+                    shadowColor: Colors.transparent,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  onPressed: _cancelRequest,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.tealPrimary,
+                      AppColors.tealSecondary,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.tealPrimary.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.check_circle_outline, size: 20),
+                  label: Text(
+                    'Service Complete',
+                    style: AppTextStyles.body.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: Colors.white,
+                    shadowColor: Colors.transparent,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  onPressed: () => _showServiceCompleteDialog(request),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 80), // Extra space for scrolling
+      ],
     );
   }
 
   Widget _buildMechanicCard(Map mechanic) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      margin: const EdgeInsets.symmetric(horizontal: 10),
+      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [BoxShadow(blurRadius: 6, color: Colors.black12)],
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white,
+            Colors.white.withOpacity(0.95),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.15),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: 2,
+          ),
+          BoxShadow(
+            color: AppColors.tealPrimary.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(
+          color: AppColors.tealPrimary.withOpacity(0.2),
+          width: 1,
+        ),
       ),
       child: Column(
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Stack(
             children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundImage: (mechanic['image_url'] != null &&
-                    mechanic['image_url'].toString().isNotEmpty)
-                    ? NetworkImage(mechanic['image_url'])
-                    : null,
-                backgroundColor: Colors.grey[200],
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.tealPrimary.withOpacity(0.1),
+                      AppColors.tealSecondary.withOpacity(0.1),
+                    ],
+                  ),
+                  border: Border.all(
+                    color: AppColors.tealPrimary,
+                    width: 2,
+                  ),
+                ),
+                child: CircleAvatar(
+                  radius: 30,
+                  backgroundImage: (mechanic['image_url'] != null &&
+                      mechanic['image_url'].toString().isNotEmpty)
+                      ? NetworkImage(mechanic['image_url'])
+                      : null,
+                  backgroundColor: Colors.transparent,
+                  child: (mechanic['image_url'] == null || 
+                          mechanic['image_url'].toString().isEmpty)
+                      ? Icon(
+                          Icons.person,
+                          color: AppColors.tealPrimary,
+                          size: 32,
+                        )
+                      : null,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(mechanic['full_name'] ?? '',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 17)),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.star,
-                            color: Colors.amber, size: 16),
-                        Text(" ${mechanic['rating'] ?? ''}",
-                            style: const TextStyle(fontSize: 13)),
-                      ],
+                    Text(
+                      mechanic['full_name'] ?? 'Mechanic',
+                      style: AppTextStyles.heading.copyWith(
+                        fontFamily: AppFonts.primaryFont,
+                        color: AppColors.primary,
+                        fontSize: 18,
+                      ),
                     ),
                     const SizedBox(height: 6),
-                    Text('Phone: ${mechanic['phone'] ?? '-'}',
-                        style: const TextStyle(fontSize: 13)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.amber.shade400,
+                            Colors.amber.shade600,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.star, color: Colors.white, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            "${mechanic['rating'] ?? 'N/A'}",
+                            style: AppTextStyles.label.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.phone,
+                          color: AppColors.tealPrimary,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          mechanic['phone'] ?? 'No phone',
+                          style: AppTextStyles.body.copyWith(
+                            color: AppColors.textSecondary,
+                            fontFamily: AppFonts.secondaryFont,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     Wrap(
                       spacing: 6,
-                      runSpacing: -4,
+                      runSpacing: 4,
                       children: (mechanic['expertise'] as List? ?? [])
-                          .map((s) => Chip(
-                        label: Text(s,
-                            style: const TextStyle(fontSize: 11)),
-                        backgroundColor: Colors.blue[50],
-                      ))
+                          .map((s) => Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      AppColors.tealPrimary.withOpacity(0.1),
+                                      AppColors.tealSecondary.withOpacity(0.1),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: AppColors.tealPrimary.withOpacity(0.3),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  s,
+                                  style: AppTextStyles.label.copyWith(
+                                    color: AppColors.tealPrimary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ))
                           .toList(),
                     ),
                   ],
@@ -349,59 +1225,205 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          // Action buttons
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              ElevatedButton.icon(
-                icon: const Icon(Icons.call),
-                label: const Text("Call"),
-                style:
-                ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                onPressed: () {
-                  if (mechanic['phone'] != null) {
-                    launchUrl(Uri.parse('tel:${mechanic['phone']}'));
-                  }
-                },
-              ),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.chat),
-                label: const Text("Chat"),
-                style:
-                ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Chat not implemented')),
-                  );
-                },
-              ),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.person),
-                label: const Text("Profile"),
-                onPressed: () {
-                  showDialog(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                        title:
-                        Text(mechanic['full_name'] ?? 'Profile'),
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Phone: ${mechanic['phone'] ?? '-'}'),
-                            const SizedBox(height: 8),
-                            Text(
-                                'Expertise: ${(mechanic['expertise'] as List?)?.join(", ") ?? "-"}'),
+          // Cross button positioned at top right
+          Positioned(
+            top: 0,
+            right: 0,
+            child: GestureDetector(
+              onTap: () async {
+                // Show confirmation dialog for removing mechanic
+                final bool? shouldRemove = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    backgroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    title: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.secondary,
+                            AppColors.secondary.withOpacity(0.8),
                           ],
                         ),
-                        actions: [
-                          TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('Close'))
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(20),
+                          topRight: Radius.circular(20),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.person_remove,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Remove Mechanic',
+                            style: AppTextStyles.heading.copyWith(
+                              color: Colors.white,
+                              fontFamily: AppFonts.primaryFont,
+                              fontSize: 18,
+                            ),
+                          ),
                         ],
-                      ));
-                },
+                      ),
+                    ),
+                    titlePadding: EdgeInsets.zero,
+                    content: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Text(
+                        'Are you sure you want to remove this mechanic? Your request will be set back to pending status and will be available for other mechanics.',
+                        style: AppTextStyles.body.copyWith(
+                          color: AppColors.textPrimary,
+                          fontFamily: AppFonts.secondaryFont,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    actions: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextButton(
+                                onPressed: () => Navigator.of(context).pop(false),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppColors.textSecondary,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    side: BorderSide(
+                                      color: AppColors.textSecondary.withOpacity(0.3),
+                                    ),
+                                  ),
+                                ),
+                                child: Text(
+                                  'No, Keep Mechanic',
+                                  style: AppTextStyles.body.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      AppColors.secondary,
+                                      AppColors.secondary.withOpacity(0.8),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.secondary.withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: ElevatedButton(
+                                  onPressed: () => Navigator.of(context).pop(true),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.transparent,
+                                    foregroundColor: Colors.white,
+                                    shadowColor: Colors.transparent,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                  ),
+                                  child: Text(
+                                    'Yes, Remove',
+                                    style: AppTextStyles.body.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    actionsPadding: EdgeInsets.zero,
+                  ),
+                );
+
+                // If user confirmed removal
+                if (shouldRemove == true) {
+                  await _removeMechanic();
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.danger.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.danger.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Icon(
+                  Icons.close,
+                  color: AppColors.danger,
+                  size: 20,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+          const SizedBox(height: 20),
+          // Action buttons with modern styling
+          Row(
+            children: [
+              Expanded(
+                child: _buildActionButton(
+                  icon: Icons.call,
+                  label: "Call",
+                  color: AppColors.secondary,
+                  onPressed: () {
+                    if (mechanic['phone'] != null) {
+                      launchUrl(Uri.parse('tel:${mechanic['phone']}'));
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildActionButton(
+                  icon: Icons.chat_bubble,
+                  label: "Chat",
+                  color: AppColors.tealPrimary,
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Chat feature coming soon!'),
+                        backgroundColor: AppColors.tealPrimary,
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildActionButton(
+                  icon: Icons.person,
+                  label: "Profile",
+                  color: AppColors.primary,
+                  onPressed: () => _showMechanicProfile(mechanic),
+                ),
               ),
             ],
           ),
@@ -410,31 +1432,255 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage> {
     );
   }
 
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color,
+            color.withOpacity(0.8),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ElevatedButton.icon(
+        icon: Icon(icon, size: 18),
+        label: Text(
+          label,
+          style: AppTextStyles.label.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+        ),
+        onPressed: onPressed,
+      ),
+    );
+  }
+
+  void _showMechanicProfile(Map mechanic) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.primary,
+                AppColors.gradientStart,
+              ],
+            ),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: Text(
+            mechanic['full_name'] ?? 'Mechanic Profile',
+            style: AppTextStyles.heading.copyWith(
+              color: Colors.white,
+              fontFamily: AppFonts.primaryFont,
+            ),
+          ),
+        ),
+        titlePadding: EdgeInsets.zero,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 12),
+            _buildProfileItem(
+              icon: Icons.phone,
+              label: 'Phone',
+              value: mechanic['phone'] ?? 'Not available',
+            ),
+            const SizedBox(height: 12),
+            _buildProfileItem(
+              icon: Icons.star,
+              label: 'Rating',
+              value: '${mechanic['rating'] ?? 'No rating'} ⭐',
+            ),
+            const SizedBox(height: 12),
+            _buildProfileItem(
+              icon: Icons.build,
+              label: 'Expertise',
+              value: (mechanic['expertise'] as List?)?.join(", ") ?? "General repair",
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.primary,
+            ),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileItem({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.tealPrimary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: AppColors.tealPrimary,
+            size: 18,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: AppTextStyles.label.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: AppTextStyles.body.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-          title: const Text('Emergency Request Status'),
-          backgroundColor: Colors.blue),
+        title: Text(
+          'Emergency Request Status',
+          style: AppTextStyles.heading.copyWith(
+            color: Colors.white,
+            fontFamily: AppFonts.primaryFont,
+          ),
+        ),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.primary,
+                AppColors.gradientStart,
+              ],
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: StreamBuilder<Map<String, dynamic>?>(
         stream: _requestStream,
         builder: (context, snapshot) {
-          final request = snapshot.data;
-          if (snapshot.connectionState == ConnectionState.waiting ||
-              request == null) {
-            return _buildWaitingUI('Stream loading or null request');
+          // Handle loading state
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Stack(
+              children: [
+                _buildFullScreenMap(userPos: widget.userLocation),
+                _buildDraggableBottomSheet(isWaiting: true),
+              ],
+            );
           }
 
-          final status =
-              request['status']?.toString().toLowerCase().trim() ?? '';
+          var request = snapshot.data;
+          
+          // Use local state if mechanic was just removed
+          if (_mechanicRemoved && _currentRequestData != null) {
+            request = _currentRequestData;
+            debugPrint('🔄 Using local state due to mechanic removal');
+          }
+          
+          // Store current request data for local state management
+          if (request != null && !_mechanicRemoved) {
+            _currentRequestData = request;
+          }
+          
+          // Handle no request data
+          if (request == null) {
+            return Stack(
+              children: [
+                _buildFullScreenMap(userPos: widget.userLocation),
+                _buildDraggableBottomSheet(isWaiting: true),
+              ],
+            );
+          }
+
+          final status = request['status']?.toString().toLowerCase().trim() ?? '';
+          debugPrint('🔄 Current request status: $status');
+          debugPrint('🔄 Mechanic ID: ${request['mechanic_id']}');
+          debugPrint('🔄 Mechanic removed flag: $_mechanicRemoved');
+          
+          // Handle pending/non-accepted requests OR when mechanic was just removed
           if (status != 'accepted' ||
               request['mechanic_id'] == null ||
               request['mech_lat'] == null ||
-              request['mech_lng'] == null) {
-            return _buildWaitingUI(
-                'Conditions for live tracking not met yet');
+              request['mech_lng'] == null ||
+              _mechanicRemoved) {
+            debugPrint('🔄 Showing waiting UI - Status: $status, Removed: $_mechanicRemoved');
+            return Stack(
+              children: [
+                _buildFullScreenMap(userPos: widget.userLocation),
+                _buildDraggableBottomSheet(isWaiting: true),
+              ],
+            );
           }
 
+          // Parse coordinates
           final userLat = double.tryParse(
               request['user_lat']?.toString() ??
                   widget.userLocation.latitude.toString()) ??
@@ -443,61 +1689,55 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage> {
               request['user_lng']?.toString() ??
                   widget.userLocation.longitude.toString()) ??
               widget.userLocation.longitude;
-          final mechLat =
-              double.tryParse(request['mech_lat']?.toString() ?? '0') ?? 0.0;
-          final mechLng =
-              double.tryParse(request['mech_lng']?.toString() ?? '0') ?? 0.0;
+          final mechLat = double.tryParse(request['mech_lat']?.toString() ?? '0') ?? 0.0;
+          final mechLng = double.tryParse(request['mech_lng']?.toString() ?? '0') ?? 0.0;
 
           final userCurrentPos = LatLng(userLat, userLng);
           final mechanicPos = LatLng(mechLat, mechLng);
 
+          // Handle accepted request with mechanic
           return FutureBuilder<Map<String, dynamic>?>(
-            future: _fetchMechanicProfile(
-                request['mechanic_id'].toString()),
+            future: _fetchMechanicProfile(request['mechanic_id'].toString()),
             builder: (context, mechanicSnap) {
-              if (mechanicSnap.connectionState != ConnectionState.done ||
-                  mechanicSnap.data == null) {
-                return _buildWaitingUI('Mechanic profile still loading');
+              // Show map with mechanic position while loading profile
+              if (mechanicSnap.connectionState == ConnectionState.waiting) {
+                return Stack(
+                  children: [
+                    _buildFullScreenMap(
+                      userPos: userCurrentPos,
+                      mechPos: mechanicPos,
+                    ),
+                    _buildDraggableBottomSheet(isWaiting: true),
+                  ],
+                );
               }
-              return ListView(
+              
+              // Show map with mechanic but waiting drawer if no profile data
+              if (!mechanicSnap.hasData || mechanicSnap.data == null) {
+                return Stack(
+                  children: [
+                    _buildFullScreenMap(
+                      userPos: userCurrentPos,
+                      mechPos: mechanicPos,
+                    ),
+                    _buildDraggableBottomSheet(isWaiting: true),
+                  ],
+                );
+              }
+              
+              // Show full UI with mechanic data
+              return Stack(
                 children: [
-                  _buildLiveMap(
-                      userPos: userCurrentPos, mechPos: mechanicPos),
-                  const SizedBox(height: 10),
-                  _buildMechanicCard(mechanicSnap.data!),
-                  const SizedBox(height: 20),
-                  // Cancel button
-                  Padding(
-                    padding:
-                    const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.cancel),
-                      label: const Text('Cancel Request'),
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          minimumSize: const Size.fromHeight(48)),
-                      onPressed: _cancelRequest,
-                    ),
+                  _buildFullScreenMap(
+                    userPos: userCurrentPos,
+                    mechPos: mechanicPos,
                   ),
-                  const SizedBox(height: 12),
-                  // Service complete button
-                  Padding(
-                    padding:
-                    const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.check_circle),
-                      label: const Text('Service Complete'),
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          minimumSize: const Size.fromHeight(48)),
-                      onPressed: () => _showServiceCompleteDialog(request),
-
-
-                    ),
+                  _buildDraggableBottomSheet(
+                    request: request,
+                    mechanic: mechanicSnap.data!,
+                    isWaiting: false,
                   ),
                 ],
-
-
               );
             },
           );

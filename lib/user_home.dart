@@ -21,43 +21,145 @@ class UserHomePage extends StatefulWidget {
   State createState() => _UserHomePageState();
 }
 
-class _UserHomePageState extends State<UserHomePage> {
+class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver {
   String? userName;
   String currentLocation = 'Getting location...';
   double? userLat;
   double? userLng;
   List<Map<String, dynamic>> nearbyMechanics = [];
   List<Map<String, dynamic>> activeRequests = [];
+  RealtimeChannel? _requestSubscription;
 
   final supabase = Supabase.instance.client;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkLocationServiceAndLoad();
-    _listenActiveRequests();
+    _setupRealtimeActiveRequests();
     if (supabase.auth.currentUser != null) {
       MessageNotificationService().refresh();
     }
   }
 
-  void _listenActiveRequests() {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh data when returning to this page
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadActiveRequests();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      print('🔄 App resumed - refreshing active requests');
+      _loadActiveRequests();
+      // Reestablish subscription if needed
+      if (_requestSubscription == null) {
+        _setupRealtimeActiveRequests();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _requestSubscription?.unsubscribe();
+    super.dispose();
+  }
+
+  void _setupRealtimeActiveRequests() {
     final user = supabase.auth.currentUser;
     if (user == null) return;
-    supabase
-        .from('requests')
-        .stream(primaryKey: ['id'])
-        .map((rows) => rows
-        .where((row) =>
-    row['user_id'] == user.id &&
-        (row['status'] == 'pending' || row['status'] == 'accepted'))
-        .cast<Map<String, dynamic>>()
-        .toList())
-        .listen((filteredRows) {
-      setState(() {
-        activeRequests = List<Map<String, dynamic>>.from(filteredRows);
-      });
-    });
+
+    // Unsubscribe existing subscription if any
+    _requestSubscription?.unsubscribe();
+
+    // Initial load of active requests
+    _loadActiveRequests();
+
+    // Setup real-time subscription for immediate updates
+    final channelName = 'public:requests:user_${user.id}_${DateTime.now().millisecondsSinceEpoch}';
+    print('🔄 Setting up real-time subscription: $channelName');
+    
+    _requestSubscription = supabase
+        .channel(channelName)
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'requests',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: user.id,
+          ),
+          callback: (payload) {
+            print('🔄 Real-time request update: ${payload.eventType}');
+            print('🔄 Record data: ${payload.newRecord}');
+            
+            // Reload active requests when any change occurs
+            if (mounted) {
+              _loadActiveRequests();
+            }
+          },
+        )
+        .subscribe((status, [error]) {
+          print('📡 Request subscription status: $status');
+          if (status == RealtimeSubscribeStatus.subscribed) {
+            print('✅ Real-time subscription active for user home');
+          } else if (status == RealtimeSubscribeStatus.closed) {
+            print('❌ Real-time subscription closed - attempting to reconnect');
+            // Attempt to reconnect after a delay
+            Future.delayed(const Duration(seconds: 2), () {
+              if (mounted) {
+                _setupRealtimeActiveRequests();
+              }
+            });
+          }
+          if (error != null) {
+            print('❌ Request subscription error: $error');
+          }
+        });
+  }
+
+  Future<void> _loadActiveRequests() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      // Load all active requests (pending and accepted) to show their current status
+      final response = await supabase
+          .from('requests')
+          .select('*')
+          .eq('user_id', user.id)
+          .or('status.eq.pending,status.eq.accepted')
+          .order('created_at', ascending: false);
+
+      if (mounted) {
+        setState(() {
+          activeRequests = List<Map<String, dynamic>>.from(response);
+        });
+        print('📊 Active requests loaded: ${activeRequests.length}');
+        
+        // Debug: Print the requests to see what we're getting
+        for (var req in activeRequests) {
+          print('🔍 Request ${req['id']}: status=${req['status']}, mechanic_id=${req['mechanic_id']}, type=${req['request_type']}');
+        }
+      }
+    } catch (e) {
+      print('❌ Error loading active requests: $e');
+    }
+  }
+
+  Future<void> refreshActiveRequestsData() async {
+    print('🔄 Manually refreshing active requests data');
+    await _loadActiveRequests();
+    // Also refresh the real-time subscription
+    _setupRealtimeActiveRequests();
   }
 
   Future _checkLocationServiceAndLoad() async {
@@ -362,14 +464,27 @@ class _UserHomePageState extends State<UserHomePage> {
   // You can keep your existing _showRequestServiceDialog. Not shown for brevity.
 
   List<Map<String, dynamic>> get _filteredActiveRequests {
-    final emergencyReq = activeRequests.firstWhere(
+    // Filter requests to show pending and accepted requests
+    final validActiveRequests = activeRequests.where((r) {
+      final status = (r['status'] ?? '').toLowerCase();
+      
+      // Show requests that are:
+      // 1. Accepted (with mechanic assigned) - fully active
+      // 2. Pending (might have mechanic assigned or not) - waiting for mechanic
+      return status == 'accepted' || status == 'pending';
+    }).toList();
+    
+    // Prioritize emergency requests
+    final emergencyReq = validActiveRequests.firstWhere(
           (r) => (r['request_type'] ?? 'normal') == 'emergency',
       orElse: () => {},
     );
     if (emergencyReq.isNotEmpty) {
       return [emergencyReq];
     }
-    return activeRequests
+    
+    // Return normal requests
+    return validActiveRequests
         .where((r) => (r['request_type'] ?? 'normal') == 'normal')
         .toList();
   }
@@ -387,22 +502,33 @@ class _UserHomePageState extends State<UserHomePage> {
         ),
         ...filteredRequests.map((req) {
           Color statusColor;
-          switch ((req['status'] ?? '').toLowerCase()) {
+          String subtitle;
+          
+          final status = (req['status'] ?? '').toLowerCase();
+          final mechanicId = req['mechanic_id'];
+          
+          switch (status) {
             case 'pending':
               statusColor = Colors.orange;
+              subtitle = mechanicId != null 
+                  ? "Status: Pending (Mechanic assigned)\nVehicle: ${req['vehicle'] ?? '-'}\nDescription: ${req['description'] ?? '-'}"
+                  : "Status: Looking for mechanic\nVehicle: ${req['vehicle'] ?? '-'}\nDescription: ${req['description'] ?? '-'}";
               break;
             case 'accepted':
               statusColor = Colors.green;
+              subtitle = "Status: Accepted\nVehicle: ${req['vehicle'] ?? '-'}\nDescription: ${req['description'] ?? '-'}";
               break;
             default:
               statusColor = Colors.grey;
+              subtitle = "Status: ${req['status']}\nVehicle: ${req['vehicle'] ?? '-'}\nDescription: ${req['description'] ?? '-'}";
           }
+          
           return Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: ListTile(
-              onTap: () {
+              onTap: () async {
                 if ((req['request_type'] ?? 'normal') == 'emergency') {
-                  Navigator.pushNamed(
+                  await Navigator.pushNamed(
                     context,
                     '/active_emergency_route',
                     arguments: {
@@ -410,21 +536,43 @@ class _UserHomePageState extends State<UserHomePage> {
                       'userLocation': LatLng(userLat!, userLng!),
                     },
                   );
+                  
+                  // Refresh data when returning from emergency route
+                  print('🔄 Returned from emergency route, refreshing data');
+                  await refreshActiveRequestsData();
                 } else {
-                  _showActiveRequestMechanicDetails(req);
+                  if (mechanicId != null) {
+                    _showActiveRequestMechanicDetails(req);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Still looking for a mechanic...')),
+                    );
+                  }
                 }
               },
               leading: CircleAvatar(
                 backgroundColor: statusColor,
-                child: const Icon(Icons.build, color: Colors.white),
+                child: Icon(
+                  status == 'pending' && mechanicId == null 
+                      ? Icons.search 
+                      : Icons.build, 
+                  color: Colors.white
+                ),
               ),
-              title: const Text("Request for Mechanic"),
+              title: Text("Request for Mechanic"),
               subtitle: Text(
-                "Status: ${req['status']}\nVehicle: ${req['vehicle'] ?? '-'}\nDescription: ${req['description'] ?? '-'}",
+                subtitle,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),
               isThreeLine: true,
+              trailing: status == 'pending' && mechanicId == null
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : null,
             ),
           );
         }),
