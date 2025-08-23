@@ -250,11 +250,7 @@ class FindMechanicService {
           : <Map<String, dynamic>>[];
 
       // Create a map of user data for quick lookup
-      final usersMap = Map.fromIterable(
-        usersResponse,
-        key: (user) => user['id'],
-        value: (user) => user,
-      );
+      final usersMap = { for (var user in usersResponse) user['id'] : user };
 
       // Combine review and user data
       return reviewsResponse.map((review) {
