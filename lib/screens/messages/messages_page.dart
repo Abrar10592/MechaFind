@@ -238,69 +238,219 @@ class _MessagesPageState extends State<MessagesPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Messages',
-          style: TextStyle(
-            fontFamily: AppFonts.primaryFont,
-            color: Colors.white,
+      backgroundColor: Colors.grey.shade50,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.primary.withOpacity(0.1),
+              Colors.white,
+              AppColors.primary.withOpacity(0.05),
+            ],
           ),
         ),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pushNamedAndRemoveUntil(
-                context, '/userHome', (route) => false);
-          },
-        ),
-        actions: [
-          AnimatedBuilder(
-            animation: _pulseController,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: 1.0 + (_pulseController.value * 0.1),
-                child: IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: () {
-                    setState(() {
-                      _isLoading = true;
-                    });
-                    _loadConversations();
+        child: SafeArea(
+          child: Stack(
+            children: [
+              // Background decorative elements
+              Positioned(
+                top: -100,
+                right: -100,
+                child: AnimatedBuilder(
+                  animation: _pulseController,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: _pulseAnimation.value,
+                      child: Container(
+                        width: 300,
+                        height: 300,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              AppColors.primary.withOpacity(0.1),
+                              AppColors.primary.withOpacity(0.05),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
                   },
                 ),
-              );
-            },
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? _buildShimmerLoading()
-          : _conversations.isEmpty
-              ? _buildEmptyState()
-              : RefreshIndicator(
-                  onRefresh: _loadConversations,
-                  child: ListView.builder(
-                    itemCount: _conversations.length,
-                    itemBuilder: (context, index) {
-                      final conversation = _conversations[index];
-                      return TweenAnimationBuilder<double>(
-                        duration: Duration(milliseconds: 600 + (index * 100)),
-                        tween: Tween(begin: 0.0, end: 1.0),
-                        builder: (context, value, child) {
-                          return Transform.translate(
-                            offset: Offset((1 - value) * 300, 0),
-                            child: Opacity(
-                              opacity: value,
-                              child: _buildConversationCard(conversation),
-                            ),
-                          );
+              ),
+              
+              // Main content
+              CustomScrollView(
+                slivers: [
+                  // Enhanced App Bar
+                  SliverAppBar(
+                    expandedHeight: 120,
+                    floating: false,
+                    pinned: true,
+                    elevation: 0,
+                    backgroundColor: Colors.transparent,
+                    leading: Container(
+                      margin: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        onPressed: () {
+                          Navigator.pushNamedAndRemoveUntil(
+                              context, '/userHome', (route) => false);
                         },
-                      );
-                    },
+                      ),
+                    ),
+                    actions: [
+                      Container(
+                        margin: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: AnimatedBuilder(
+                          animation: _pulseController,
+                          builder: (context, child) {
+                            return Transform.scale(
+                              scale: 1.0 + (_pulseController.value * 0.1),
+                              child: IconButton(
+                                icon: const Icon(Icons.refresh, color: Colors.white),
+                                onPressed: () {
+                                  setState(() {
+                                    _isLoading = true;
+                                  });
+                                  _loadConversations();
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                    flexibleSpace: FlexibleSpaceBar(
+                      background: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.primary,
+                              AppColors.primary.withOpacity(0.8),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: const BorderRadius.only(
+                            bottomLeft: Radius.circular(30),
+                            bottomRight: Radius.circular(30),
+                          ),
+                        ),
+                        child: Stack(
+                          children: [
+                            // Decorative circles
+                            Positioned(
+                              top: 20,
+                              right: 30,
+                              child: Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withOpacity(0.1),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: 40,
+                              right: 80,
+                              child: Container(
+                                width: 30,
+                                height: 30,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withOpacity(0.15),
+                                ),
+                              ),
+                            ),
+                            // Title with message count
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            "Your",
+                                            style: TextStyle(
+                                              color: Colors.white.withOpacity(0.9),
+                                              fontSize: FontSizes.body,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            "Messages",
+                                            style: AppTextStyles.heading.copyWith(
+                                              color: Colors.white,
+                                              fontSize: FontSizes.heading,
+                                              fontFamily: AppFonts.primaryFont,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (!_isLoading && _conversations.isNotEmpty)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(15),
+                                        ),
+                                        child: Text(
+                                          '${_conversations.length} ${_conversations.length == 1 ? 'Chat' : 'Chats'}',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: FontSizes.caption,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  
+                  // Content
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: _isLoading
+                          ? _buildEnhancedShimmerLoading()
+                          : _conversations.isEmpty
+                              ? _buildEnhancedEmptyState()
+                              : _buildEnhancedConversationsList(),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
       bottomNavigationBar: BottomNavBar(
         currentIndex: 2,
         onTap: (index) {
@@ -325,15 +475,60 @@ class _MessagesPageState extends State<MessagesPage>
     );
   }
 
-  Widget _buildConversationCard(Map<String, dynamic> conversation) {
+  Widget _buildEnhancedConversationsList() {
+    return RefreshIndicator(
+      onRefresh: _loadConversations,
+      backgroundColor: Colors.white,
+      color: AppColors.primary,
+      child: ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: _conversations.length,
+        itemBuilder: (context, index) {
+          final conversation = _conversations[index];
+          return TweenAnimationBuilder<double>(
+            duration: Duration(milliseconds: 600 + (index * 100)),
+            tween: Tween(begin: 0.0, end: 1.0),
+            builder: (context, value, child) {
+              return Transform.translate(
+                offset: Offset((1 - value) * 300, 0),
+                child: Opacity(
+                  opacity: value,
+                  child: _buildEnhancedConversationCard(conversation),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEnhancedConversationCard(Map<String, dynamic> conversation) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
         child: InkWell(
+          borderRadius: BorderRadius.circular(20),
           onTap: () async {
             // Mark messages as read when opening chat
             await _markMessagesAsRead(conversation['mechanic_id']);
@@ -366,39 +561,63 @@ class _MessagesPageState extends State<MessagesPage>
               _loadConversations();
             });
           },
-          borderRadius: BorderRadius.circular(12),
           splashColor: AppColors.primary.withOpacity(0.1),
           highlightColor: AppColors.primary.withOpacity(0.05),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             child: Row(
               children: [
-                // Mechanic Avatar
-                CircleAvatar(
-                  radius: 28,
-                  backgroundImage: conversation['mechanic_image_url'] != null
-                      ? NetworkImage(conversation['mechanic_image_url'])
-                      : null,
-                  backgroundColor: AppColors.primary,
-                  child: conversation['mechanic_image_url'] == null
-                      ? Text(
-                          conversation['mechanic_name'][0].toUpperCase(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: AppFonts.primaryFont,
-                          ),
-                        )
-                      : null,
+                // Enhanced Profile Image
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.primary.withOpacity(0.2),
+                        AppColors.primary.withOpacity(0.1),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.3),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(3),
+                    child: Hero(
+                      tag: 'mechanic_${conversation['mechanic_id']}',
+                      child: CircleAvatar(
+                        radius: 28,
+                        backgroundColor: AppColors.primary,
+                        backgroundImage: conversation['mechanic_image_url'] != null
+                            ? NetworkImage(conversation['mechanic_image_url'])
+                            : null,
+                        child: conversation['mechanic_image_url'] == null
+                            ? Text(
+                                conversation['mechanic_name'][0].toUpperCase(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: AppFonts.primaryFont,
+                                ),
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 16),
                 
-                // Conversation Details
+                // Content
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Name and Time
                       Row(
                         children: [
                           Expanded(
@@ -407,20 +626,32 @@ class _MessagesPageState extends State<MessagesPage>
                               style: AppTextStyles.heading.copyWith(
                                 fontSize: FontSizes.subHeading,
                                 fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade800,
+                                fontFamily: AppFonts.primaryFont,
                               ),
                             ),
                           ),
-                          Text(
-                            _formatTime(conversation['last_message_time']),
-                            style: TextStyle(
-                              fontSize: FontSizes.caption,
-                              color: AppColors.textSecondary,
-                              fontFamily: AppFonts.primaryFont,
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              _formatTime(conversation['last_message_time']),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: AppFonts.primaryFont,
+                              ),
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
+                      
+                      // Last Message and Badge
                       Row(
                         children: [
                           Expanded(
@@ -453,13 +684,19 @@ class _MessagesPageState extends State<MessagesPage>
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: AppColors.primary,
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          AppColors.primary,
+                                          AppColors.primary.withOpacity(0.8),
+                                        ],
+                                      ),
                                       borderRadius: BorderRadius.circular(12),
                                       boxShadow: [
                                         BoxShadow(
                                           color: AppColors.primary.withOpacity(0.3),
                                           spreadRadius: 1,
-                                          blurRadius: 3,
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
                                         ),
                                       ],
                                     ),
@@ -481,6 +718,20 @@ class _MessagesPageState extends State<MessagesPage>
                     ],
                   ),
                 ),
+                
+                // Arrow Icon
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.arrow_forward_ios,
+                    size: 16,
+                    color: AppColors.primary,
+                  ),
+                ),
               ],
             ),
           ),
@@ -489,116 +740,152 @@ class _MessagesPageState extends State<MessagesPage>
     );
   }
 
-  Widget _buildShimmerLoading() {
+  Widget _buildEnhancedShimmerLoading() {
     return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemCount: 6,
       itemBuilder: (context, index) {
         return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  // Shimmer avatar
-                  AnimatedBuilder(
-                    animation: _shimmerAnimation,
-                    builder: (context, child) {
-                      return Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Colors.grey[300]!,
-                              Colors.grey[100]!,
-                              Colors.grey[300]!,
-                            ],
-                            stops: [
-                              (_shimmerAnimation.value - 0.3).clamp(0.0, 1.0),
-                              _shimmerAnimation.value.clamp(0.0, 1.0),
-                              (_shimmerAnimation.value + 0.3).clamp(0.0, 1.0),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 16),
-                  
-                  // Shimmer content
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Name shimmer
-                        AnimatedBuilder(
-                          animation: _shimmerAnimation,
-                          builder: (context, child) {
-                            return Container(
-                              height: 16,
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(4),
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    Colors.grey[300]!,
-                                    Colors.grey[100]!,
-                                    Colors.grey[300]!,
-                                  ],
-                                  stops: [
-                                    (_shimmerAnimation.value - 0.3).clamp(0.0, 1.0),
-                                    _shimmerAnimation.value.clamp(0.0, 1.0),
-                                    (_shimmerAnimation.value + 0.3).clamp(0.0, 1.0),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 8),
-                        
-                        // Message shimmer
-                        AnimatedBuilder(
-                          animation: _shimmerAnimation,
-                          builder: (context, child) {
-                            return Container(
-                              height: 14,
-                              width: 250,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(4),
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    Colors.grey[300]!,
-                                    Colors.grey[100]!,
-                                    Colors.grey[300]!,
-                                  ],
-                                  stops: [
-                                    (_shimmerAnimation.value - 0.3).clamp(0.0, 1.0),
-                                    _shimmerAnimation.value.clamp(0.0, 1.0),
-                                    (_shimmerAnimation.value + 0.3).clamp(0.0, 1.0),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+                spreadRadius: 0,
               ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                // Shimmer Avatar
+                AnimatedBuilder(
+                  animation: _shimmerAnimation,
+                  builder: (context, child) {
+                    return Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Colors.grey[300]!,
+                            Colors.grey[100]!,
+                            Colors.grey[300]!,
+                          ],
+                          stops: [
+                            (_shimmerAnimation.value - 0.3).clamp(0.0, 1.0),
+                            _shimmerAnimation.value.clamp(0.0, 1.0),
+                            (_shimmerAnimation.value + 0.3).clamp(0.0, 1.0),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 16),
+                
+                // Shimmer Content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Name shimmer
+                      AnimatedBuilder(
+                        animation: _shimmerAnimation,
+                        builder: (context, child) {
+                          return Container(
+                            height: 16,
+                            width: double.infinity * 0.6,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Colors.grey[300]!,
+                                  Colors.grey[100]!,
+                                  Colors.grey[300]!,
+                                ],
+                                stops: [
+                                  (_shimmerAnimation.value - 0.3).clamp(0.0, 1.0),
+                                  _shimmerAnimation.value.clamp(0.0, 1.0),
+                                  (_shimmerAnimation.value + 0.3).clamp(0.0, 1.0),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      // Message shimmer
+                      AnimatedBuilder(
+                        animation: _shimmerAnimation,
+                        builder: (context, child) {
+                          return Container(
+                            height: 14,
+                            width: double.infinity * 0.8,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(7),
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Colors.grey[300]!,
+                                  Colors.grey[100]!,
+                                  Colors.grey[300]!,
+                                ],
+                                stops: [
+                                  (_shimmerAnimation.value - 0.3).clamp(0.0, 1.0),
+                                  _shimmerAnimation.value.clamp(0.0, 1.0),
+                                  (_shimmerAnimation.value + 0.3).clamp(0.0, 1.0),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Arrow shimmer
+                AnimatedBuilder(
+                  animation: _shimmerAnimation,
+                  builder: (context, child) {
+                    return Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Colors.grey[300]!,
+                            Colors.grey[100]!,
+                            Colors.grey[300]!,
+                          ],
+                          stops: [
+                            (_shimmerAnimation.value - 0.3).clamp(0.0, 1.0),
+                            _shimmerAnimation.value.clamp(0.0, 1.0),
+                            (_shimmerAnimation.value + 0.3).clamp(0.0, 1.0),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
           ),
         );
@@ -606,66 +893,127 @@ class _MessagesPageState extends State<MessagesPage>
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEnhancedEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // Enhanced animated icon with gradient background
           AnimatedBuilder(
             animation: _pulseAnimation,
             builder: (context, child) {
               return Transform.scale(
                 scale: _pulseAnimation.value,
-                child: const Icon(
-                  Icons.message_outlined,
-                  size: 64,
-                  color: AppColors.textSecondary,
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.primary.withOpacity(0.1),
+                        AppColors.primary.withOpacity(0.05),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.2),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.chat_bubble_outline,
+                    size: 64,
+                    color: AppColors.primary,
+                  ),
                 ),
               );
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 32),
+          
+          // Enhanced title
           Text(
-            'No messages yet',
+            'No conversations yet',
             style: TextStyle(
-              fontSize: FontSizes.subHeading,
+              fontSize: FontSizes.heading,
               fontFamily: AppFonts.primaryFont,
-              color: AppColors.textSecondary,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade800,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Start a conversation with a mechanic',
-            style: TextStyle(
-              fontSize: FontSizes.body,
-              fontFamily: AppFonts.primaryFont,
-              color: AppColors.textSecondary,
+          const SizedBox(height: 12),
+          
+          // Enhanced subtitle
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              'Start chatting with mechanics to get help with your vehicle issues',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: FontSizes.body,
+                fontFamily: AppFonts.primaryFont,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 40),
+          
+          // Enhanced action button
           AnimatedBuilder(
             animation: _badgeAnimation,
             builder: (context, child) {
               return Transform.translate(
                 offset: Offset(0, _badgeAnimation.value * 2),
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/find-mechanics');
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.primary,
+                        AppColors.primary.withOpacity(0.8),
+                      ],
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    elevation: 4 + (_badgeAnimation.value * 2),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.3),
+                        blurRadius: 15 + (_badgeAnimation.value * 5),
+                        offset: Offset(0, 5 + (_badgeAnimation.value * 2)),
+                      ),
+                    ],
                   ),
-                  child: Text(
-                    'Find Mechanics',
-                    style: TextStyle(
-                      fontFamily: AppFonts.primaryFont,
-                      fontSize: FontSizes.body,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () {
+                        Navigator.pushNamed(context, '/find-mechanics');
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.search,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Find Mechanics',
+                              style: TextStyle(
+                                fontFamily: AppFonts.primaryFont,
+                                fontSize: FontSizes.body,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
