@@ -13,17 +13,79 @@ class HistoryPage extends StatefulWidget {
   State<HistoryPage> createState() => _HistoryPageState();
 }
 
-class _HistoryPageState extends State<HistoryPage> {
+class _HistoryPageState extends State<HistoryPage> 
+    with TickerProviderStateMixin {
   List<ServiceHistory> _serviceHistory = [];
   List<Map<String, dynamic>> _completedRequests = [];
   final SupabaseClient _supabase = Supabase.instance.client;
   bool _isLoading = true;
   String? _errorMessage;
 
+  // Animation controllers
+  late AnimationController _fadeController;
+  late AnimationController _pulseController;
+  late AnimationController _shimmerController;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _pulseAnimation;
+  late Animation<double> _shimmerAnimation;
+
   @override
   void initState() {
     super.initState();
+    
+    // Initialize animation controllers
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _pulseController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    );
+    _shimmerController = AnimationController(
+      duration: const Duration(seconds: 1),
+      vsync: this,
+    );
+
+    // Initialize animations
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeInOut,
+    ));
+
+    _pulseAnimation = Tween<double>(
+      begin: 0.9,
+      end: 1.1,
+    ).animate(CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeInOut,
+    ));
+
+    _shimmerAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _shimmerController,
+      curve: Curves.easeInOut,
+    ));
+
+    // Start animations
+    _fadeController.forward();
+    _pulseController.repeat(reverse: true);
+    _shimmerController.repeat();
+    
     _loadServiceHistory();
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _pulseController.dispose();
+    _shimmerController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadServiceHistory() async {
@@ -153,89 +215,271 @@ class _HistoryPageState extends State<HistoryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Service History',
-          style: TextStyle(
-            fontFamily: AppFonts.primaryFont,
-            color: Colors.white,
+      backgroundColor: Colors.grey.shade50,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.primary.withOpacity(0.1),
+              Colors.white,
+              AppColors.primary.withOpacity(0.05),
+            ],
           ),
         ),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pushNamedAndRemoveUntil(
-                context, '/userHome', (route) => false);
-          },
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        size: 64,
-                        color: Colors.red[300],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        _errorMessage!,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.red,
+        child: SafeArea(
+          child: Stack(
+            children: [
+              // Background decorative elements
+              Positioned(
+                top: -100,
+                right: -100,
+                child: AnimatedBuilder(
+                  animation: _pulseController,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: _pulseAnimation.value,
+                      child: Container(
+                        width: 300,
+                        height: 300,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              AppColors.primary.withOpacity(0.1),
+                              AppColors.primary.withOpacity(0.05),
+                              Colors.transparent,
+                            ],
+                          ),
                         ),
-                        textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadServiceHistory,
-                        child: const Text('Retry'),
+                    );
+                  },
+                ),
+              ),
+              
+              // Main content
+              CustomScrollView(
+                slivers: [
+                  // Enhanced App Bar
+                  SliverAppBar(
+                    expandedHeight: 120,
+                    floating: false,
+                    pinned: true,
+                    elevation: 0,
+                    backgroundColor: Colors.transparent,
+                    leading: Container(
+                      margin: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        onPressed: () {
+                          Navigator.pushNamedAndRemoveUntil(
+                              context, '/userHome', (route) => false);
+                        },
+                      ),
+                    ),
+                    actions: [
+                      Container(
+                        margin: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: AnimatedBuilder(
+                          animation: _pulseController,
+                          builder: (context, child) {
+                            return Transform.scale(
+                              scale: 1.0 + (_pulseController.value * 0.1),
+                              child: IconButton(
+                                icon: const Icon(Icons.refresh, color: Colors.white),
+                                onPressed: () {
+                                  _loadServiceHistory();
+                                },
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     ],
-                  ),
-                )
-              : Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        'Your service history and mechanics you can rate',
-                        style: TextStyle(
-                          fontFamily: AppFonts.primaryFont,
-                          fontSize: FontSizes.body,
-                          color: AppColors.textSecondary,
+                    flexibleSpace: FlexibleSpaceBar(
+                      background: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.primary,
+                              AppColors.primary.withOpacity(0.8),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: const BorderRadius.only(
+                            bottomLeft: Radius.circular(30),
+                            bottomRight: Radius.circular(30),
+                          ),
                         ),
-                        textAlign: TextAlign.center,
+                        child: Stack(
+                          children: [
+                            // Decorative circles
+                            Positioned(
+                              top: 20,
+                              right: 30,
+                              child: Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withOpacity(0.1),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: 40,
+                              right: 80,
+                              child: Container(
+                                width: 30,
+                                height: 30,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withOpacity(0.15),
+                                ),
+                              ),
+                            ),
+                            // Title with history count
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            "Service",
+                                            style: TextStyle(
+                                              color: Colors.white.withOpacity(0.9),
+                                              fontSize: FontSizes.body,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            "History",
+                                            style: AppTextStyles.heading.copyWith(
+                                              color: Colors.white,
+                                              fontSize: FontSizes.heading,
+                                              fontFamily: AppFonts.primaryFont,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (!_isLoading && allServiceInteractions.isNotEmpty)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(15),
+                                        ),
+                                        child: Text(
+                                          '${allServiceInteractions.length} ${allServiceInteractions.length == 1 ? 'Service' : 'Services'}',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: FontSizes.caption,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    Expanded(
-                      child: allServiceInteractions.isEmpty
-                          ? _buildEmptyState()
-                          : ListView.builder(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              itemCount: allServiceInteractions.length,
-                              itemBuilder: (context, index) {
-                                final item = allServiceInteractions[index];
-                                if (item is ServiceHistory) {
-                                  if (item.rating > 0) {
-                                    return _buildReviewedServiceCard(item);
-                                  } else {
-                                    return _buildPendingReviewCard(item);
-                                  }
-                                } else {
-                                  return _buildUnratedRequestCard(item);
-                                }
-                              },
-                            ),
+                  ),
+                  
+                  // Content
+                  SliverToBoxAdapter(
+                    child: FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: _isLoading
+                          ? _buildEnhancedShimmerLoading()
+                          : _errorMessage != null
+                              ? _buildEnhancedErrorState()
+                              : Column(
+                                  children: [
+                                    Container(
+                                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                                      padding: const EdgeInsets.all(20),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(16),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: AppColors.primary.withOpacity(0.1),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Text(
+                                        'Your service history and mechanics you can rate',
+                                        style: TextStyle(
+                                          fontFamily: AppFonts.primaryFont,
+                                          fontSize: FontSizes.body,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                    allServiceInteractions.isEmpty
+                                        ? _buildEnhancedEmptyState()
+                                        : Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                                            child: Column(
+                                              children: allServiceInteractions.asMap().entries.map((entry) {
+                                                final index = entry.key;
+                                                final item = entry.value;
+                                                return TweenAnimationBuilder<double>(
+                                                  duration: Duration(milliseconds: 600 + (index * 100)),
+                                                  tween: Tween(begin: 0.0, end: 1.0),
+                                                  builder: (context, value, child) {
+                                                    return Transform.translate(
+                                                      offset: Offset((1 - value) * 300, 0),
+                                                      child: Opacity(
+                                                        opacity: value,
+                                                        child: item is ServiceHistory
+                                                            ? (item.rating > 0
+                                                                ? _buildEnhancedReviewedServiceCard(item)
+                                                                : _buildEnhancedPendingReviewCard(item))
+                                                            : _buildEnhancedUnratedRequestCard(item),
+                                                      ),
+                                                    );
+                                                  },
+                                                );
+                                              }).toList(),
+                                            ),
+                                          ),
+                                  ],
+                                ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
       bottomNavigationBar: BottomNavBar(
         currentIndex: 3,
         onTap: (index) {
@@ -260,11 +504,362 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  Widget _buildPendingReviewCard(ServiceHistory history) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
+  Widget _buildEnhancedShimmerLoading() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: List.generate(4, (index) {
+          return Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                  spreadRadius: 0,
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: AnimatedBuilder(
+                animation: _shimmerAnimation,
+                builder: (context, child) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header shimmer
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              height: 18,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(9),
+                                gradient: LinearGradient(
+                                  begin: Alignment(-1.0 + _shimmerAnimation.value * 2, 0.0),
+                                  end: Alignment(1.0 + _shimmerAnimation.value * 2, 0.0),
+                                  colors: [
+                                    Colors.grey.shade300,
+                                    Colors.grey.shade100,
+                                    Colors.grey.shade300,
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Container(
+                            width: 80,
+                            height: 18,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(9),
+                              gradient: LinearGradient(
+                                begin: Alignment(-1.0 + _shimmerAnimation.value * 2, 0.0),
+                                end: Alignment(1.0 + _shimmerAnimation.value * 2, 0.0),
+                                colors: [
+                                  Colors.grey.shade300,
+                                  Colors.grey.shade100,
+                                  Colors.grey.shade300,
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      // Date shimmer
+                      Container(
+                        width: 120,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(7),
+                          gradient: LinearGradient(
+                            begin: Alignment(-1.0 + _shimmerAnimation.value * 2, 0.0),
+                            end: Alignment(1.0 + _shimmerAnimation.value * 2, 0.0),
+                            colors: [
+                              Colors.grey.shade300,
+                              Colors.grey.shade100,
+                              Colors.grey.shade300,
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      // Content shimmer
+                      Container(
+                        height: 14,
+                        width: double.infinity * 0.8,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(7),
+                          gradient: LinearGradient(
+                            begin: Alignment(-1.0 + _shimmerAnimation.value * 2, 0.0),
+                            end: Alignment(1.0 + _shimmerAnimation.value * 2, 0.0),
+                            colors: [
+                              Colors.grey.shade300,
+                              Colors.grey.shade100,
+                              Colors.grey.shade300,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildEnhancedErrorState() {
+    return Center(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedBuilder(
+              animation: _pulseAnimation,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _pulseAnimation.value,
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.red.withOpacity(0.1),
+                          Colors.red.withOpacity(0.05),
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.red.withOpacity(0.2),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: Colors.red[300],
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 24),
+            Text(
+              _errorMessage!,
+              style: TextStyle(
+                fontSize: FontSizes.subHeading,
+                color: Colors.red,
+                fontFamily: AppFonts.primaryFont,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primary,
+                    AppColors.primary.withOpacity(0.8),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.3),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: _loadServiceHistory,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    child: Text(
+                      'Retry',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: FontSizes.body,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: AppFonts.primaryFont,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEnhancedEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Enhanced animated icon with gradient background
+            AnimatedBuilder(
+              animation: _pulseAnimation,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _pulseAnimation.value,
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.primary.withOpacity(0.1),
+                          AppColors.primary.withOpacity(0.05),
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.2),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      Icons.history,
+                      size: 64,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 32),
+            
+            // Enhanced title
+            Text(
+              'No service history found',
+              style: TextStyle(
+                fontSize: FontSizes.heading,
+                fontFamily: AppFonts.primaryFont,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            
+            // Enhanced subtitle
+            Text(
+              'Your completed services will appear here for rating',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: FontSizes.body,
+                fontFamily: AppFonts.primaryFont,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 40),
+            
+            // Enhanced action button
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primary,
+                    AppColors.primary.withOpacity(0.8),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.3),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () {
+                    Navigator.pushNamed(context, '/find-mechanics');
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.search,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Find Mechanics',
+                          style: TextStyle(
+                            fontFamily: AppFonts.primaryFont,
+                            fontSize: FontSizes.body,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEnhancedPendingReviewCard(ServiceHistory history) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -278,21 +873,36 @@ class _HistoryPageState extends State<HistoryPage> {
                         history.mechanicName,
                         style: AppTextStyles.heading.copyWith(
                           fontSize: FontSizes.subHeading,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade800,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: Colors.orange,
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.orange,
+                              Colors.orange.withOpacity(0.8),
+                            ],
+                          ),
                           borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.orange.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: const Text(
-                          'NOT REVIEWED',
+                          'PENDING REVIEW',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ),
@@ -301,34 +911,91 @@ class _HistoryPageState extends State<HistoryPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(Icons.calendar_today,
-                    size: 16, color: AppColors.textSecondary),
-                const SizedBox(width: 4),
-                Text(
-                  DateFormat('MMM dd, yyyy').format(history.serviceDate),
-                  style: AppTextStyles.label,
-                ),
-              ],
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.calendar_today,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    DateFormat('MMM dd, yyyy').format(history.serviceDate),
+                    style: AppTextStyles.label.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Text(
               'Service entry exists but needs your review. Please rate this mechanic.',
-              style: AppTextStyles.body.copyWith(fontSize: FontSizes.body),
+              style: AppTextStyles.body.copyWith(
+                fontSize: FontSizes.body,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
             Row(
               children: [
                 const Spacer(),
-                ElevatedButton(
-                  onPressed: () => _updateExistingReview(history),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.primary,
+                        AppColors.primary.withOpacity(0.8),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: const Text('Add Review'),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => _updateExistingReview(history),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.star,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Add Review',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: FontSizes.body,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: AppFonts.primaryFont,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -338,11 +1005,29 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  Widget _buildReviewedServiceCard(ServiceHistory history) {
-    return Card(
+  Widget _buildEnhancedReviewedServiceCard(ServiceHistory history) {
+    return Container(
       margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+            spreadRadius: 0,
+          ),
+        ],
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -356,14 +1041,28 @@ class _HistoryPageState extends State<HistoryPage> {
                         history.mechanicName,
                         style: AppTextStyles.heading.copyWith(
                           fontSize: FontSizes.subHeading,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade800,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: Colors.green,
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.green,
+                              Colors.green.withOpacity(0.8),
+                            ],
+                          ),
                           borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.green.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: const Text(
                           'REVIEWED',
@@ -371,6 +1070,7 @@ class _HistoryPageState extends State<HistoryPage> {
                             color: Colors.white,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ),
@@ -379,57 +1079,103 @@ class _HistoryPageState extends State<HistoryPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(Icons.calendar_today,
-                    size: 16, color: AppColors.textSecondary),
-                const SizedBox(width: 4),
-                Text(
-                  DateFormat('MMM dd, yyyy').format(history.serviceDate),
-                  style: AppTextStyles.label,
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                ...List.generate(
-                  5,
-                  (index) => Icon(
-                    index < history.rating
-                        ? Icons.star
-                        : Icons.star_border,
-                    size: 16,
-                    color: Colors.amber,
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.calendar_today,
+                    size: 18,
+                    color: AppColors.primary,
                   ),
+                  const SizedBox(width: 8),
+                  Text(
+                    DateFormat('MMM dd, yyyy').format(history.serviceDate),
+                    style: AppTextStyles.label.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.amber.withOpacity(0.1),
+                    Colors.amber.withOpacity(0.05),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  history.rating.toString(),
-                  style: AppTextStyles.label,
-                ),
-              ],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  ...List.generate(
+                    5,
+                    (index) => Icon(
+                      index < history.rating
+                          ? Icons.star
+                          : Icons.star_border,
+                      size: 20,
+                      color: Colors.amber,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.amber,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      history.rating.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             if (history.userReview.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: AppColors.background,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.primary.withOpacity(0.2),
+                    width: 1,
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Your Review:',
-                      style: AppTextStyles.label,
+                      style: AppTextStyles.label.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     Text(
                       history.userReview,
-                      style: AppTextStyles.body,
+                      style: AppTextStyles.body.copyWith(
+                        height: 1.4,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                   ],
                 ),
@@ -441,14 +1187,32 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  Widget _buildUnratedRequestCard(Map<String, dynamic> request) {
+  Widget _buildEnhancedUnratedRequestCard(Map<String, dynamic> request) {
     final mechanicName = request['mechanics']?['users']?['full_name'] ?? 'Unknown Mechanic';
     final serviceDate = DateTime.parse(request['created_at']);
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+            spreadRadius: 0,
+          ),
+        ],
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -462,14 +1226,28 @@ class _HistoryPageState extends State<HistoryPage> {
                         mechanicName,
                         style: AppTextStyles.heading.copyWith(
                           fontSize: FontSizes.subHeading,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade800,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: Colors.orange,
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.orange,
+                              Colors.orange.withOpacity(0.8),
+                            ],
+                          ),
                           borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.orange.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: const Text(
                           'PENDING REVIEW',
@@ -477,6 +1255,7 @@ class _HistoryPageState extends State<HistoryPage> {
                             color: Colors.white,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ),
@@ -485,34 +1264,91 @@ class _HistoryPageState extends State<HistoryPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(Icons.calendar_today,
-                    size: 16, color: AppColors.textSecondary),
-                const SizedBox(width: 4),
-                Text(
-                  DateFormat('MMM dd, yyyy').format(serviceDate),
-                  style: AppTextStyles.label,
-                ),
-              ],
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.calendar_today,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    DateFormat('MMM dd, yyyy').format(serviceDate),
+                    style: AppTextStyles.label.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Text(
               'Service completed successfully. How was your experience?',
-              style: AppTextStyles.body.copyWith(fontSize: FontSizes.body),
+              style: AppTextStyles.body.copyWith(
+                fontSize: FontSizes.body,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
             Row(
               children: [
                 const Spacer(),
-                ElevatedButton(
-                  onPressed: () => _rateService(request),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.primary,
+                        AppColors.primary.withOpacity(0.8),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: const Text('Rate Service'),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => _rateService(request),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.star_rate,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Rate Service',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: FontSizes.body,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: AppFonts.primaryFont,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -626,36 +1462,3 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.history,
-            size: 64,
-            color: AppColors.textSecondary,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No service history found',
-            style: TextStyle(
-              fontSize: FontSizes.subHeading,
-              fontFamily: AppFonts.primaryFont,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Your completed services will appear here for rating',
-            style: TextStyle(
-              fontSize: FontSizes.body,
-              fontFamily: AppFonts.primaryFont,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
