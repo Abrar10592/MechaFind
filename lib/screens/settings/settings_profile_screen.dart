@@ -15,7 +15,8 @@ class SettingsProfileScreen extends StatefulWidget {
   State<SettingsProfileScreen> createState() => _SettingsProfileScreenState();
 }
 
-class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
+class _SettingsProfileScreenState extends State<SettingsProfileScreen>
+    with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -29,10 +30,71 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
   List<String> _vehicleModels = [];
   bool _isLoading = false;
 
+  // Animation controllers
+  late AnimationController _fadeController;
+  late AnimationController _pulseController;
+  late AnimationController _shimmerController;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _pulseAnimation;
+  late Animation<double> _shimmerAnimation;
+
   @override
   void initState() {
     super.initState();
+    
+    // Initialize animation controllers
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _pulseController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    );
+    _shimmerController = AnimationController(
+      duration: const Duration(seconds: 1),
+      vsync: this,
+    );
+
+    // Initialize animations
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeInOut,
+    ));
+
+    _pulseAnimation = Tween<double>(
+      begin: 0.9,
+      end: 1.1,
+    ).animate(CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeInOut,
+    ));
+
+    _shimmerAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _shimmerController,
+      curve: Curves.easeInOut,
+    ));
+
+    // Start animations
+    _fadeController.forward();
+    _pulseController.repeat(reverse: true);
+    _shimmerController.repeat();
+    
     _loadUserProfile();
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _pulseController.dispose();
+    _shimmerController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUserProfile() async {
@@ -80,164 +142,220 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Profile & Settings', style: TextStyle(fontSize: 22,color: AppColors.textlight)),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: _isLoading 
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : const Icon(Icons.save),
-            onPressed: _isLoading ? null : _saveProfile,
+      backgroundColor: Colors.grey.shade50,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.primary.withOpacity(0.1),
+              Colors.white,
+              AppColors.primary.withOpacity(0.05),
+            ],
           ),
-        ],
-      ),
-      body: _isLoading && _nameController.text.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+        ),
+        child: SafeArea(
+          child: Stack(
             children: [
-              // Profile Picture
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      GestureDetector(
-                        onTap: _pickImage,
+              // Background decorative elements
+              Positioned(
+                top: -100,
+                right: -100,
+                child: AnimatedBuilder(
+                  animation: _pulseController,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: _pulseAnimation.value,
+                      child: Container(
+                        width: 300,
+                        height: 300,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              AppColors.primary.withOpacity(0.1),
+                              AppColors.primary.withOpacity(0.05),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              
+              // Main content
+              CustomScrollView(
+                slivers: [
+                  // Enhanced App Bar
+                  SliverAppBar(
+                    expandedHeight: 120,
+                    floating: false,
+                    pinned: true,
+                    elevation: 0,
+                    backgroundColor: Colors.transparent,
+                    leading: Container(
+                      margin: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        onPressed: () {
+                          Navigator.pushNamedAndRemoveUntil(
+                              context, '/userHome', (route) => false);
+                        },
+                      ),
+                    ),
+                    actions: [
+                      Container(
+                        margin: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: AnimatedBuilder(
+                          animation: _pulseController,
+                          builder: (context, child) {
+                            return Transform.scale(
+                              scale: 1.0 + (_pulseController.value * 0.1),
+                              child: IconButton(
+                                icon: _isLoading 
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        ),
+                                      )
+                                    : const Icon(Icons.save, color: Colors.white),
+                                onPressed: _isLoading ? null : _saveProfile,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                    flexibleSpace: FlexibleSpaceBar(
+                      background: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.primary,
+                              AppColors.primary.withOpacity(0.8),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: const BorderRadius.only(
+                            bottomLeft: Radius.circular(30),
+                            bottomRight: Radius.circular(30),
+                          ),
+                        ),
                         child: Stack(
                           children: [
-                            CircleAvatar(
-                              radius: 60,
-                              backgroundColor: Colors.grey[300],
-                              backgroundImage: _profileImage != null 
-                                  ? FileImage(_profileImage!) 
-                                  : (_profileImageUrl != null ? NetworkImage(_profileImageUrl!) : null),
-                              child: _profileImage == null && _profileImageUrl == null 
-                                  ? const Icon(Icons.person, size: 60) 
-                                  : null,
+                            // Decorative circles
+                            Positioned(
+                              top: 20,
+                              right: 30,
+                              child: Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withOpacity(0.1),
+                                ),
+                              ),
                             ),
                             Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: CircleAvatar(
-                                radius: 18,
-                                backgroundColor: AppColors.primary,
-                                child: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
+                              top: 40,
+                              right: 80,
+                              child: Container(
+                                width: 30,
+                                height: 30,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withOpacity(0.15),
+                                ),
+                              ),
+                            ),
+                            // Title
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      "Profile &",
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(0.9),
+                                        fontSize: FontSizes.body,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      "Settings",
+                                      style: AppTextStyles.heading.copyWith(
+                                        color: Colors.white,
+                                        fontSize: FontSizes.heading,
+                                        fontFamily: AppFonts.primaryFont,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Tap to change profile picture',
-                        style: AppTextStyles.label,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Personal Info
-              _buildSectionCard(
-                title: 'Personal Information',
-                children: [
-                  _buildInput(_nameController, 'Full Name', Icons.person, isRequired: true),
-                  _buildInput(_phoneController, 'Phone Number', Icons.phone),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.calendar_today),
-                    title: Text(
-                      _selectedDate != null
-                          ? 'Date of Birth: ${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}'
-                          : 'Select Date of Birth',
-                      style: AppTextStyles.body,
                     ),
-                    trailing: const Icon(Icons.arrow_forward_ios),
-                    onTap: _selectDate,
                   ),
-                ],
-              ),
+                  
+                  // Content
+                  SliverToBoxAdapter(
+                    child: FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: _isLoading && _nameController.text.isEmpty
+                          ? _buildEnhancedShimmerLoading()
+                          : Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Form(
+                                key: _formKey,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    // Enhanced Profile Picture Section
+                                    _buildEnhancedProfilePictureSection(),
+                                    
+                                    const SizedBox(height: 24),
 
-              const SizedBox(height: 16),
+                                    // Enhanced Personal Info Section
+                                    _buildEnhancedPersonalInfoSection(),
 
-              // Vehicle Info
-              _buildSectionCard(
-                title: 'Vehicle Information',
-                children: [
-                  Row(
-                    children: [
-                      Expanded(child: _buildInput(_vehicleController, 'Vehicle Model', Icons.directions_car)),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: _addVehicle,
-                        icon: const Icon(Icons.add),
-                        style: IconButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  if (_vehicleModels.isNotEmpty)
-                    ...[
-                      Text('Your Vehicles:', style: AppTextStyles.label),
-                      const SizedBox(height: 8),
-                      ..._vehicleModels.map(
-                        (vehicle) => Card(
-                          child: ListTile(
-                            leading: const Icon(Icons.directions_car),
-                            title: Text(vehicle, style: AppTextStyles.body),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete),
-                              onPressed: () => _removeVehicle(vehicle),
+                                    const SizedBox(height: 24),
+
+                                    // Enhanced Vehicle Info Section
+                                    _buildEnhancedVehicleInfoSection(),
+
+                                    const SizedBox(height: 24),
+
+                                    // Enhanced App Settings Section
+                                    _buildEnhancedAppSettingsSection(),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                      ),
-                    ]
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              // App Settings
-              _buildSectionCard(
-                title: 'App Settings',
-                children: [
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text('Push Notifications', style: AppTextStyles.body),
-                    subtitle: Text('Receive notifications about services', style: AppTextStyles.label),
-                    value: true,
-                    onChanged: (value) {},
+                    ),
                   ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text('Location Services', style: AppTextStyles.body),
-                    subtitle: Text('Allow app to access your location', style: AppTextStyles.label),
-                    value: true,
-                    onChanged: (value) {},
-                  ),
-                  _buildLanguageTile(),
-                  _buildNavTile('Privacy Policy', Icons.privacy_tip),
-                  _buildNavTile('Help & Support', Icons.help),
-                  _buildNavTile('Logout', Icons.logout, onTap: _logout),
                 ],
               ),
             ],
@@ -256,7 +374,6 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
               Navigator.pushNamed(context, '/find-mechanics');
               break;
             case 2:
-              // Navigate to messages
               Navigator.pushNamed(context, '/messages');
               break;
             case 3:
@@ -268,54 +385,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
     );
   }
 
-  Widget _buildInput(TextEditingController controller, String label, IconData icon, {int maxLines = 1, bool isRequired = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: TextFormField(
-        controller: controller,
-        maxLines: maxLines,
-        style: AppTextStyles.body,
-        decoration: InputDecoration(
-          labelText: label + (isRequired ? ' *' : ''),
-          labelStyle: AppTextStyles.label,
-          border: const OutlineInputBorder(),
-          prefixIcon: Icon(icon),
-        ),
-        validator: (value) {
-          if (isRequired && (value == null || value.isEmpty)) {
-            return 'Please enter $label';
-          }
-          return null;
-        },
-      ),
-    );
-  }
 
-  Widget _buildSectionCard({required String title, required List<Widget> children}) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: AppTextStyles.heading),
-            const SizedBox(height: 16),
-            ...children,
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavTile(String title, IconData icon, {VoidCallback? onTap}) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: AppColors.primary),
-      title: Text(title, style: AppTextStyles.body),
-      trailing: const Icon(Icons.arrow_forward_ios),
-      onTap: onTap,
-    );
-  }
 
   Future<void> _pickImage() async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
@@ -501,26 +571,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
     }
   }
 
-  Widget _buildLanguageTile() {
-    final currentLang = context.locale.languageCode;
-    final languageText = currentLang == 'en' ? 'English' : 'বাংলা';
-    final flagEmoji = currentLang == 'en' ? '🇺🇸' : '🇧🇩';
-    
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(Icons.language, color: AppColors.primary),
-      title: Text('Language / ভাষা', style: AppTextStyles.body),
-      subtitle: Row(
-        children: [
-          Text(flagEmoji, style: TextStyle(fontSize: 16)),
-          SizedBox(width: 8),
-          Text(languageText, style: AppTextStyles.label),
-        ],
-      ),
-      trailing: Icon(Icons.chevron_right, color: Colors.grey),
-      onTap: _showLanguageDialog,
-    );
-  }
+
 
   void _showLanguageDialog() {
     showDialog(
@@ -609,6 +660,965 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen> {
             child: const Text('Logout'),
           ),
         ],
+      ),
+    );
+  }
+
+  // Enhanced Loading State
+  Widget _buildEnhancedShimmerLoading() {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: List.generate(4, (index) {
+          return Container(
+            margin: const EdgeInsets.only(bottom: 20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                  spreadRadius: 0,
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: AnimatedBuilder(
+                animation: _shimmerAnimation,
+                builder: (context, child) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header shimmer
+                      Container(
+                        height: 20,
+                        width: double.infinity * 0.4,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          gradient: LinearGradient(
+                            begin: Alignment(-1.0 + _shimmerAnimation.value * 2, 0.0),
+                            end: Alignment(1.0 + _shimmerAnimation.value * 2, 0.0),
+                            colors: [
+                              Colors.grey.shade300,
+                              Colors.grey.shade100,
+                              Colors.grey.shade300,
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Content shimmer
+                      Container(
+                        height: 16,
+                        width: double.infinity * 0.8,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          gradient: LinearGradient(
+                            begin: Alignment(-1.0 + _shimmerAnimation.value * 2, 0.0),
+                            end: Alignment(1.0 + _shimmerAnimation.value * 2, 0.0),
+                            colors: [
+                              Colors.grey.shade300,
+                              Colors.grey.shade100,
+                              Colors.grey.shade300,
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      Container(
+                        height: 16,
+                        width: double.infinity * 0.6,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          gradient: LinearGradient(
+                            begin: Alignment(-1.0 + _shimmerAnimation.value * 2, 0.0),
+                            end: Alignment(1.0 + _shimmerAnimation.value * 2, 0.0),
+                            colors: [
+                              Colors.grey.shade300,
+                              Colors.grey.shade100,
+                              Colors.grey.shade300,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  // Enhanced Profile Picture Section
+  Widget _buildEnhancedProfilePictureSection() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.white,
+            AppColors.primary.withOpacity(0.02),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.15),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+            spreadRadius: 2,
+          ),
+          BoxShadow(
+            color: Colors.white,
+            blurRadius: 15,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Text(
+            'Profile Picture',
+            style: AppTextStyles.heading.copyWith(
+              fontSize: FontSizes.subHeading,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 20),
+          
+          GestureDetector(
+            onTap: _pickImage,
+            child: Stack(
+              children: [
+                AnimatedBuilder(
+                  animation: _pulseAnimation,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: 1.0 + (_pulseController.value * 0.05),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.primary.withOpacity(0.1),
+                              AppColors.primary.withOpacity(0.05),
+                            ],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.2),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(4),
+                        child: CircleAvatar(
+                          radius: 60,
+                          backgroundColor: Colors.grey[300],
+                          backgroundImage: _profileImage != null 
+                              ? FileImage(_profileImage!) 
+                              : (_profileImageUrl != null ? NetworkImage(_profileImageUrl!) : null),
+                          child: _profileImage == null && _profileImageUrl == null 
+                              ? Icon(
+                                  Icons.person, 
+                                  size: 60, 
+                                  color: AppColors.primary.withOpacity(0.7),
+                                ) 
+                              : null,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                Positioned(
+                  bottom: 5,
+                  right: 5,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.primary,
+                          AppColors.primary.withOpacity(0.8),
+                        ],
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: Colors.transparent,
+                      child: const Icon(
+                        Icons.camera_alt, 
+                        size: 18, 
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          Text(
+            'Tap to change profile picture',
+            style: AppTextStyles.label.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Enhanced Personal Info Section
+  Widget _buildEnhancedPersonalInfoSection() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.white,
+            AppColors.primary.withOpacity(0.02),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.primary.withOpacity(0.2),
+                        AppColors.primary.withOpacity(0.1),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.person,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Personal Information',
+                  style: AppTextStyles.heading.copyWith(
+                    fontSize: FontSizes.subHeading,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            
+            _buildEnhancedInput(_nameController, 'Full Name', Icons.person_outline, isRequired: true),
+            const SizedBox(height: 16),
+            
+            _buildEnhancedInput(_phoneController, 'Phone Number', Icons.phone_outlined),
+            const SizedBox(height: 16),
+            
+            _buildEnhancedDateSelector(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Enhanced Vehicle Info Section
+  Widget _buildEnhancedVehicleInfoSection() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.white,
+            AppColors.primary.withOpacity(0.02),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.tealPrimary.withOpacity(0.2),
+                        AppColors.tealPrimary.withOpacity(0.1),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.directions_car,
+                    color: AppColors.tealPrimary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Vehicle Information',
+                  style: AppTextStyles.heading.copyWith(
+                    fontSize: FontSizes.subHeading,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            
+            Row(
+              children: [
+                Expanded(
+                  child: _buildEnhancedInput(_vehicleController, 'Vehicle Model', Icons.directions_car_outlined),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.primary,
+                        AppColors.primary.withOpacity(0.8),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: _addVehicle,
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        child: const Icon(
+                          Icons.add,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            
+            if (_vehicleModels.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              Text(
+                'Your Vehicles:',
+                style: AppTextStyles.label.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              
+              ..._vehicleModels.asMap().entries.map((entry) {
+                final index = entry.key;
+                final vehicle = entry.value;
+                return TweenAnimationBuilder<double>(
+                  duration: Duration(milliseconds: 300 + (index * 100)),
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  builder: (context, value, child) {
+                    return Transform.translate(
+                      offset: Offset((1 - value) * 200, 0),
+                      child: Opacity(
+                        opacity: value,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppColors.tealPrimary.withOpacity(0.1),
+                                AppColors.tealPrimary.withOpacity(0.05),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: AppColors.tealPrimary.withOpacity(0.2),
+                            ),
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.tealPrimary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.directions_car,
+                                color: AppColors.tealPrimary,
+                                size: 20,
+                              ),
+                            ),
+                            title: Text(
+                              vehicle,
+                              style: AppTextStyles.body.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            trailing: IconButton(
+                              icon: Icon(
+                                Icons.delete_outline,
+                                color: Colors.red.shade400,
+                              ),
+                              onPressed: () => _removeVehicle(vehicle),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              }),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Enhanced App Settings Section
+  Widget _buildEnhancedAppSettingsSection() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.white,
+            AppColors.primary.withOpacity(0.02),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.greenPrimary.withOpacity(0.2),
+                        AppColors.greenPrimary.withOpacity(0.1),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.settings,
+                    color: AppColors.greenPrimary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'App Settings',
+                  style: AppTextStyles.heading.copyWith(
+                    fontSize: FontSizes.subHeading,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            
+            _buildEnhancedSwitchTile(
+              'Push Notifications',
+              'Receive notifications about services',
+              Icons.notifications_outlined,
+              true,
+              (value) {},
+            ),
+            
+            const SizedBox(height: 12),
+            
+            _buildEnhancedSwitchTile(
+              'Location Services',
+              'Allow app to access your location',
+              Icons.location_on_outlined,
+              true,
+              (value) {},
+            ),
+            
+            const SizedBox(height: 16),
+            
+            _buildEnhancedLanguageTile(),
+            
+            const SizedBox(height: 12),
+            
+            _buildEnhancedNavTile('Privacy Policy', Icons.privacy_tip_outlined, null),
+            
+            const SizedBox(height: 12),
+            
+            _buildEnhancedNavTile('Help & Support', Icons.help_outline, null),
+            
+            const SizedBox(height: 12),
+            
+            _buildEnhancedNavTile('Logout', Icons.logout, _logout, isDestructive: true),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Enhanced Input Field
+  Widget _buildEnhancedInput(
+    TextEditingController controller, 
+    String label, 
+    IconData icon, {
+    int maxLines = 1, 
+    bool isRequired = false
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Clear label above the input
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: RichText(
+            text: TextSpan(
+              text: label,
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+              ),
+              children: [
+                if (isRequired)
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Colors.red.shade500,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColors.primary.withOpacity(0.2),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: TextFormField(
+            controller: controller,
+            maxLines: maxLines,
+            style: AppTextStyles.body.copyWith(
+              color: AppColors.textPrimary,
+              fontSize: 16,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Enter your ${label.toLowerCase()}',
+              hintStyle: AppTextStyles.label.copyWith(
+                color: AppColors.textSecondary.withOpacity(0.7),
+                fontSize: 15,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: AppColors.primary,
+                  width: 2,
+                ),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: Colors.red.shade400,
+                  width: 1,
+                ),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: Colors.red.shade400,
+                  width: 2,
+                ),
+              ),
+              prefixIcon: Container(
+                margin: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  icon,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+            ),
+            validator: (value) {
+              if (isRequired && (value == null || value.isEmpty)) {
+                return 'Please enter $label';
+              }
+              return null;
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Enhanced Date Selector
+  Widget _buildEnhancedDateSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Clear label above the date selector
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            'Date of Birth',
+            style: AppTextStyles.body.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+            ),
+          ),
+        ),
+        
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColors.primary.withOpacity(0.2),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            leading: Container(
+              margin: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.calendar_today_outlined,
+                color: AppColors.primary,
+                size: 20,
+              ),
+            ),
+            title: Text(
+              _selectedDate != null
+                  ? '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}'
+                  : 'Select your date of birth',
+              style: AppTextStyles.body.copyWith(
+                color: _selectedDate != null ? AppColors.textPrimary : AppColors.textSecondary.withOpacity(0.7),
+                fontWeight: _selectedDate != null ? FontWeight.w600 : FontWeight.normal,
+                fontSize: 16,
+              ),
+            ),
+            trailing: Icon(
+              Icons.arrow_forward_ios,
+              color: AppColors.primary,
+              size: 16,
+            ),
+            onTap: _selectDate,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Enhanced Switch Tile
+  Widget _buildEnhancedSwitchTile(
+    String title,
+    String subtitle,
+    IconData icon,
+    bool value,
+    ValueChanged<bool> onChanged,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.primary.withOpacity(0.1),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              color: AppColors.primary,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 16),
+          
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: AppTextStyles.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: AppTextStyles.label.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          Transform.scale(
+            scale: 0.9,
+            child: Switch(
+              value: value,
+              onChanged: onChanged,
+              activeColor: AppColors.primary,
+              activeTrackColor: AppColors.primary.withOpacity(0.3),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Enhanced Language Tile
+  Widget _buildEnhancedLanguageTile() {
+    final currentLang = context.locale.languageCode;
+    final languageText = currentLang == 'en' ? 'English' : 'বাংলা';
+    final flagEmoji = currentLang == 'en' ? '🇺🇸' : '🇧🇩';
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.primary.withOpacity(0.2),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Container(
+          margin: const EdgeInsets.all(4),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            Icons.language,
+            color: AppColors.primary,
+            size: 20,
+          ),
+        ),
+        title: Text(
+          'Language / ভাষা',
+          style: AppTextStyles.body.copyWith(
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        subtitle: Row(
+          children: [
+            Text(flagEmoji, style: const TextStyle(fontSize: 16)),
+            const SizedBox(width: 8),
+            Text(
+              languageText,
+              style: AppTextStyles.label.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          color: AppColors.primary,
+          size: 16,
+        ),
+        onTap: _showLanguageDialog,
+      ),
+    );
+  }
+
+  // Enhanced Nav Tile
+  Widget _buildEnhancedNavTile(
+    String title, 
+    IconData icon, 
+    VoidCallback? onTap, {
+    bool isDestructive = false
+  }) {
+    final color = isDestructive ? Colors.red : AppColors.primary;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: color.withOpacity(0.2),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: Container(
+              margin: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                color: color,
+                size: 20,
+              ),
+            ),
+            title: Text(
+              title,
+              style: AppTextStyles.body.copyWith(
+                fontWeight: FontWeight.w600,
+                color: isDestructive ? Colors.red : AppColors.textPrimary,
+              ),
+            ),
+            trailing: Icon(
+              Icons.arrow_forward_ios,
+              color: color,
+              size: 16,
+            ),
+          ),
+        ),
       ),
     );
   }
