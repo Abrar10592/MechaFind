@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 import 'package:mechfind/utils.dart';
 import 'widgets/emergency_form_dialog.dart';
@@ -38,7 +39,7 @@ class UserHomePage extends StatefulWidget {
 
 class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver, TickerProviderStateMixin {
   String? userName;
-  String currentLocation = 'Getting location...';
+  String currentLocation = tr('getting_location');
   double? userLat;
   double? userLng;
   List<Map<String, dynamic>> nearbyMechanics = [];
@@ -395,8 +396,8 @@ mechanic_services(service_id, services(name))
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Sign In Required"),
-        content: const Text("Please sign in or sign up to request a mechanic."),
+        title: Text(tr("sign_in_required")),
+        content: Text(tr("please_sign_in_to_request_mechanic")),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -469,7 +470,7 @@ mechanic_services(service_id, services(name))
                 : const CircleAvatar(radius: 30, child: Icon(Icons.person)),
             title: Text(mechanic['name'] ?? ''),
             subtitle: Text(
-                'Rating: ${mechanic['rating']}\nServices: ${mechanic['services']?.join(", ")}'),
+                '${tr("rating")}: ${mechanic['rating']}\n${tr("services")}: ${mechanic['services']?.join(", ")}'),
           ),
           Text('Request Status: ${request['status']}'),
           const SizedBox(height: 15),
@@ -562,13 +563,13 @@ mechanic_services(service_id, services(name))
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
-          title: const Text("Emergency Request in Progress"),
-          content: const Text(
-              "You already have a pending emergency request. Please wait until it is resolved before creating a new one."),
+          title: Text(tr("emergency_request_in_progress")),
+          content: Text(
+              tr("emergency_request_pending_warning")),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text("OK"),
+              child: Text(tr("ok")),
             ),
           ],
         ),
@@ -759,7 +760,7 @@ mechanic_services(service_id, services(name))
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Welcome back,',
+                      tr('welcome_back'),
                       style: AppTextStyles.body.copyWith(
                         color: Colors.white.withOpacity(0.9),
                         fontFamily: AppFonts.secondaryFont,
@@ -768,7 +769,7 @@ mechanic_services(service_id, services(name))
                     const SizedBox(height: 4),
                     if (!widget.isGuest)
                       Text(
-                        userName ?? 'User',
+                        userName ?? tr('user'),
                         style: AppTextStyles.heading.copyWith(
                           color: Colors.white,
                           fontFamily: AppFonts.primaryFont,
@@ -778,7 +779,7 @@ mechanic_services(service_id, services(name))
                       )
                     else
                       Text(
-                        'Guest User',
+                        tr('guest_user'),
                         style: AppTextStyles.heading.copyWith(
                           color: Colors.white,
                           fontFamily: AppFonts.primaryFont,
@@ -1087,7 +1088,7 @@ mechanic_services(service_id, services(name))
     final hasAccepted = _isRequestActiveForMechanic(mech['id'], 'accepted');
     
     Color btnColor = AppColors.tealPrimary;
-    String btnText = "Request Service";
+    String btnText = tr("request_service");
     IconData btnIcon = Icons.build;
     
     if (hasPending) {
@@ -1425,7 +1426,7 @@ mechanic_services(service_id, services(name))
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Active Requests',
+                        tr('active_requests'),
                         style: AppTextStyles.heading.copyWith(
                           color: AppColors.primary,
                           fontFamily: AppFonts.primaryFont,
@@ -1433,7 +1434,7 @@ mechanic_services(service_id, services(name))
                         ),
                       ),
                       Text(
-                        '${activeRequests.length} ongoing requests',
+                        '${activeRequests.length} ${tr("ongoing_requests")}',
                         style: AppTextStyles.label.copyWith(
                           color: AppColors.textSecondary,
                         ),
@@ -1463,12 +1464,12 @@ mechanic_services(service_id, services(name))
     switch (status) {
       case 'pending':
         statusColor = mechanicId != null ? AppColors.orangePrimary : AppColors.tealPrimary;
-        statusText = mechanicId != null ? "Mechanic Assigned" : "Finding Mechanic";
+        statusText = mechanicId != null ? tr("mechanic_assigned") : tr("finding_mechanic");
         statusIcon = mechanicId != null ? Icons.person_pin : Icons.search;
         break;
       case 'accepted':
         statusColor = AppColors.greenPrimary;
-        statusText = "En Route";
+        statusText = tr("en_route");
         statusIcon = Icons.directions_car;
         break;
       default:

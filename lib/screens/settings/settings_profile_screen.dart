@@ -107,7 +107,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
       if (profile == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Unable to load profile data')),
+            SnackBar(content: Text(tr('unable_to_load_profile_data'))),
           );
         }
         return;
@@ -129,7 +129,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading profile: $e')),
+          SnackBar(content: Text('${tr("error_loading_profile")} $e')),
         );
       }
     } finally {
@@ -293,7 +293,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      "Profile &",
+                                      tr("profile_and"),
                                       style: TextStyle(
                                         color: Colors.white.withOpacity(0.9),
                                         fontSize: FontSizes.body,
@@ -302,7 +302,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      "Settings",
+                                      tr("settings"),
                                       style: AppTextStyles.heading.copyWith(
                                         color: Colors.white,
                                         fontSize: FontSizes.heading,
@@ -428,8 +428,8 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
         final success = await UserService.updateVehicleModel(_vehicleModels);
         if (!success && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to save vehicle. Changes will be saved when you save your profile.'),
+            SnackBar(
+              content: Text(tr('failed_to_save_vehicle')),
               backgroundColor: Colors.orange,
             ),
           );
@@ -450,8 +450,8 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
       final success = await UserService.updateVehicleModel(_vehicleModels);
       if (!success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to remove vehicle. Changes will be saved when you save your profile.'),
+          SnackBar(
+            content: Text(tr('failed_to_remove_vehicle')),
             backgroundColor: Colors.orange,
           ),
         );
@@ -527,15 +527,15 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
           if (mounted) {
             if (success) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Profile updated successfully!'),
+                SnackBar(
+                  content: Text(tr('profile_updated_successfully')),
                   backgroundColor: Colors.green,
                 ),
               );
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Failed to update profile. Please try again.'),
+                SnackBar(
+                  content: Text(tr('failed_to_update_profile')),
                   backgroundColor: Colors.red,
                 ),
               );
@@ -545,8 +545,8 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
           // No changes to save
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('No changes to save'),
+              SnackBar(
+                content: Text(tr('no_changes_to_save')),
                 backgroundColor: Colors.orange,
               ),
             );
@@ -556,7 +556,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error saving profile: $e'),
+              content: Text('${tr("error_saving_profile")} $e'),
               backgroundColor: Colors.red,
             ),
           );
@@ -577,7 +577,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Select Language / ভাষা নির্বাচন করুন', style: AppTextStyles.heading),
+        title: Text(tr('select_language'), style: AppTextStyles.heading),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -586,7 +586,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
                 children: [
                   Text('🇺🇸', style: TextStyle(fontSize: 20)),
                   SizedBox(width: 12),
-                  Text('English', style: AppTextStyles.body),
+                  Text(tr('english'), style: AppTextStyles.body),
                 ],
               ),
               value: 'en',
@@ -599,7 +599,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
                 children: [
                   Text('🇧🇩', style: TextStyle(fontSize: 20)),
                   SizedBox(width: 12),
-                  Text('বাংলা', style: AppTextStyles.body),
+                  Text(tr('bangla'), style: AppTextStyles.body),
                 ],
               ),
               value: 'bn',
@@ -612,7 +612,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel / বাতিল'),
+            child: Text('${tr("cancel")} / ${tr("cancel")}'),
           ),
         ],
       ),
@@ -635,8 +635,8 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
       SnackBar(
         content: Text(
           languageCode == 'en' 
-            ? 'Language changed to English' 
-            : 'ভাষা বাংলায় পরিবর্তিত হয়েছে'
+            ? tr('language_changed_to_english') 
+            : tr('language_changed_to_bangla')
         ),
         backgroundColor: Colors.green,
         duration: Duration(seconds: 2),
@@ -648,16 +648,16 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Logout', style: AppTextStyles.heading),
-        content: Text('Are you sure you want to logout?', style: AppTextStyles.body),
+        title: Text(tr('logout'), style: AppTextStyles.heading),
+        content: Text(tr('are_you_sure_logout'), style: AppTextStyles.body),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('cancel'))),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               Navigator.pushReplacementNamed(context, '/');
             },
-            child: const Text('Logout'),
+            child: Text(tr('logout')),
           ),
         ],
       ),
@@ -788,7 +788,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
       child: Column(
         children: [
           Text(
-            'Profile Picture',
+            tr('profile_picture'),
             style: AppTextStyles.heading.copyWith(
               fontSize: FontSizes.subHeading,
               fontWeight: FontWeight.bold,
@@ -879,7 +879,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
           const SizedBox(height: 16),
           
           Text(
-            'Tap to change profile picture',
+            tr('tap_to_change_profile_picture'),
             style: AppTextStyles.label.copyWith(
               color: AppColors.textSecondary,
               fontWeight: FontWeight.w500,
@@ -938,7 +938,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  'Personal Information',
+                  tr('personal_information'),
                   style: AppTextStyles.heading.copyWith(
                     fontSize: FontSizes.subHeading,
                     fontWeight: FontWeight.bold,
@@ -949,10 +949,10 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
             ),
             const SizedBox(height: 24),
             
-            _buildEnhancedInput(_nameController, 'Full Name', Icons.person_outline, isRequired: true),
+            _buildEnhancedInput(_nameController, tr('full_name'), Icons.person_outline, isRequired: true),
             const SizedBox(height: 16),
             
-            _buildEnhancedInput(_phoneController, 'Phone Number', Icons.phone_outlined),
+            _buildEnhancedInput(_phoneController, tr('phone_number'), Icons.phone_outlined),
             const SizedBox(height: 16),
             
             _buildEnhancedDateSelector(),
@@ -1010,7 +1010,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  'Vehicle Information',
+                  tr('vehicle_information'),
                   style: AppTextStyles.heading.copyWith(
                     fontSize: FontSizes.subHeading,
                     fontWeight: FontWeight.bold,
@@ -1024,7 +1024,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
             Row(
               children: [
                 Expanded(
-                  child: _buildEnhancedInput(_vehicleController, 'Vehicle Model', Icons.directions_car_outlined),
+                  child: _buildEnhancedInput(_vehicleController, tr('vehicle_model'), Icons.directions_car_outlined),
                 ),
                 const SizedBox(width: 12),
                 Container(
@@ -1066,7 +1066,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
             if (_vehicleModels.isNotEmpty) ...[
               const SizedBox(height: 20),
               Text(
-                'Your Vehicles:',
+                tr('your_vehicles'),
                 style: AppTextStyles.label.copyWith(
                   fontWeight: FontWeight.w600,
                   color: AppColors.primary,
@@ -1189,7 +1189,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  'App Settings',
+                  tr('app_settings'),
                   style: AppTextStyles.heading.copyWith(
                     fontSize: FontSizes.subHeading,
                     fontWeight: FontWeight.bold,
@@ -1201,8 +1201,8 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
             const SizedBox(height: 24),
             
             _buildEnhancedSwitchTile(
-              'Push Notifications',
-              'Receive notifications about services',
+              tr('push_notifications_setting'),
+              tr('receive_notifications_about_services'),
               Icons.notifications_outlined,
               true,
               (value) {},
@@ -1211,8 +1211,8 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
             const SizedBox(height: 12),
             
             _buildEnhancedSwitchTile(
-              'Location Services',
-              'Allow app to access your location',
+              tr('location_services'),
+              tr('allow_app_to_access_location'),
               Icons.location_on_outlined,
               true,
               (value) {},
@@ -1224,15 +1224,15 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
             
             const SizedBox(height: 12),
             
-            _buildEnhancedNavTile('Privacy Policy', Icons.privacy_tip_outlined, null),
+            _buildEnhancedNavTile(tr('privacy_policy'), Icons.privacy_tip_outlined, null),
             
             const SizedBox(height: 12),
             
-            _buildEnhancedNavTile('Help & Support', Icons.help_outline, null),
+            _buildEnhancedNavTile(tr('help_support'), Icons.help_outline, null),
             
             const SizedBox(height: 12),
             
-            _buildEnhancedNavTile('Logout', Icons.logout, _logout, isDestructive: true),
+            _buildEnhancedNavTile(tr('logout'), Icons.logout, _logout, isDestructive: true),
           ],
         ),
       ),
@@ -1298,7 +1298,10 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
               fontSize: 16,
             ),
             decoration: InputDecoration(
-              hintText: 'Enter your ${label.toLowerCase()}',
+              hintText: label == tr('full_name') ? tr('enter_your_full_name') : 
+                        label == tr('phone_number') ? tr('enter_your_phone_number') : 
+                        label == tr('vehicle_model') ? tr('enter_your_vehicle_model') :
+                        'Enter your ${label.toLowerCase()}',
               hintStyle: AppTextStyles.label.copyWith(
                 color: AppColors.textSecondary.withOpacity(0.7),
                 fontSize: 15,
@@ -1347,7 +1350,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
             ),
             validator: (value) {
               if (isRequired && (value == null || value.isEmpty)) {
-                return 'Please enter $label';
+                return '${tr("please_enter")} $label';
               }
               return null;
             },
@@ -1366,7 +1369,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
-            'Date of Birth',
+            tr('date_of_birth'),
             style: AppTextStyles.body.copyWith(
               color: AppColors.textPrimary,
               fontWeight: FontWeight.w600,
@@ -1408,7 +1411,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
             title: Text(
               _selectedDate != null
                   ? '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}'
-                  : 'Select your date of birth',
+                  : tr('select_your_date_of_birth'),
               style: AppTextStyles.body.copyWith(
                 color: _selectedDate != null ? AppColors.textPrimary : AppColors.textSecondary.withOpacity(0.7),
                 fontWeight: _selectedDate != null ? FontWeight.w600 : FontWeight.normal,
@@ -1499,7 +1502,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
   // Enhanced Language Tile
   Widget _buildEnhancedLanguageTile() {
     final currentLang = context.locale.languageCode;
-    final languageText = currentLang == 'en' ? 'English' : 'বাংলা';
+    final languageText = currentLang == 'en' ? tr('english') : tr('bangla');
     final flagEmoji = currentLang == 'en' ? '🇺🇸' : '🇧🇩';
     
     return Container(
@@ -1533,7 +1536,7 @@ class _SettingsProfileScreenState extends State<SettingsProfileScreen>
           ),
         ),
         title: Text(
-          'Language / ভাষা',
+          tr('language'),
           style: AppTextStyles.body.copyWith(
             fontWeight: FontWeight.w600,
             color: AppColors.textPrimary,

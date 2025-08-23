@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'detailed_mechanic_card.dart';
 import 'widgets/bottom_navbar.dart';
 import 'services/find_mechanic_service.dart';
@@ -168,7 +169,7 @@ class _FindMechanicsPageState extends State<FindMechanicsPage>
               color: AppColors.primary.withOpacity(0.7),
             ),
           ),
-          hintText: 'Search by name or service',
+          hintText: tr('search_by_name_or_service'),
           hintStyle: TextStyle(
             color: AppColors.textSecondary.withOpacity(0.7),
             fontFamily: AppFonts.secondaryFont,
@@ -331,7 +332,7 @@ class _FindMechanicsPageState extends State<FindMechanicsPage>
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                "Find Nearby",
+                                                tr("find_nearby"),
                                                 style: TextStyle(
                                                   color: Colors.white.withOpacity(0.9),
                                                   fontSize: FontSizes.body,
@@ -340,7 +341,7 @@ class _FindMechanicsPageState extends State<FindMechanicsPage>
                                               ),
                                               const SizedBox(height: 4),
                                               Text(
-                                                "Mechanics",
+                                                tr("mechanics"),
                                                 style: AppTextStyles.heading.copyWith(
                                                   color: Colors.white,
                                                   fontSize: FontSizes.heading,
@@ -627,7 +628,7 @@ class _FindMechanicsPageState extends State<FindMechanicsPage>
             Text(
               searchQuery.isEmpty 
                 ? 'No Mechanics Found'
-                : 'No Results for "${searchQuery.length > 20 ? '${searchQuery.substring(0, 20)}...' : searchQuery}"',
+                : '${tr("no_results_for")} "${searchQuery.length > 20 ? '${searchQuery.substring(0, 20)}...' : searchQuery}"',
               style: AppTextStyles.heading.copyWith(
                 fontSize: FontSizes.subHeading,
                 color: AppColors.textPrimary,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mechfind/utils.dart';
@@ -30,7 +31,7 @@ class _SignInPageState extends State<SignInPage> {
 
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter email and password')),
+        SnackBar(content: Text(tr('please_enter_email_password'))),
       );
       return;
     }
@@ -47,7 +48,7 @@ class _SignInPageState extends State<SignInPage> {
 
       if (user == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Login failed. Please try again.')),
+          SnackBar(content: Text(tr('login_failed'))),
         );
         setState(() => _loading = false);
         return;
@@ -56,7 +57,7 @@ class _SignInPageState extends State<SignInPage> {
       if (user.emailConfirmedAt == null) {
         await supabase.auth.signOut();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please verify your email before signing in.')),
+          SnackBar(content: Text(tr('please_verify_email'))),
         );
         setState(() => _loading = false);
         return;
@@ -70,7 +71,7 @@ class _SignInPageState extends State<SignInPage> {
       if (userRecord == null) {
         await supabase.auth.signOut();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User data not found. Please sign up again.')),
+          SnackBar(content: Text(tr('user_data_not_found'))),
         );
         setState(() => _loading = false);
         return;
@@ -100,11 +101,11 @@ class _SignInPageState extends State<SignInPage> {
       }
     } on AuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Auth Error: ${e.message}')),
+        SnackBar(content: Text('${tr("auth_error")} ${e.message}')),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unexpected error: $e')),
+        SnackBar(content: Text('${tr("unexpected_error")} $e')),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -137,7 +138,7 @@ class _SignInPageState extends State<SignInPage> {
 
     if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your email to reset password')),
+        SnackBar(content: Text(tr('please_enter_email_reset'))),
       );
       return;
     }
@@ -150,7 +151,7 @@ class _SignInPageState extends State<SignInPage> {
         redirectTo: 'YOUR_REDIRECT_URL', // Replace with your redirect URL
       );
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password reset email sent. Check your inbox.')),
+        SnackBar(content: Text(tr('password_reset_email_sent'))),
       );
     } on AuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -217,7 +218,7 @@ class _SignInPageState extends State<SignInPage> {
           children: [
             const SizedBox(height: 24),
             Text(
-              'Welcome Back',
+              tr('welcome_back_signin'),
               style: AppTextStyles.heading.copyWith(
                 fontSize: FontSizes.heading,
                 fontFamily: AppFonts.primaryFont,
@@ -226,7 +227,7 @@ class _SignInPageState extends State<SignInPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Sign in to your MechFind account',
+              tr('sign_in_to_account'),
               style: AppTextStyles.body.copyWith(
                 fontSize: FontSizes.body,
                 color: Colors.white70,
@@ -236,13 +237,13 @@ class _SignInPageState extends State<SignInPage> {
             const SizedBox(height: 32),
             _buildTextField(
               icon: Icons.email_outlined,
-              hintText: 'Email address',
+              hintText: tr('email_address'),
               controller: _emailController,
             ),
             const SizedBox(height: 16),
             _buildTextField(
               icon: Icons.lock_outline,
-              hintText: 'Password',
+              hintText: tr('password'),
               controller: _passwordController,
               obscureText: _obscurePassword,
               suffixIcon: IconButton(
@@ -260,7 +261,7 @@ class _SignInPageState extends State<SignInPage> {
               child: TextButton(
                 onPressed: _loading ? null : _resetPassword,
                 child: Text(
-                  'Forgot Password?',
+                  tr('forgot_password'),
                   style: TextStyle(color: AppColors.accent),
                 ),
               ),
@@ -278,7 +279,7 @@ class _SignInPageState extends State<SignInPage> {
                 child: _loading
                     ? const CircularProgressIndicator(color: Colors.white)
                     : Text(
-                        'Sign In',
+                        tr('sign_in'),
                         style: AppTextStyles.body.copyWith(
                           fontWeight: FontWeight.bold,
                           fontSize: FontSizes.subHeading,
@@ -295,7 +296,7 @@ class _SignInPageState extends State<SignInPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  'Don\'t have an account?',
+                  tr('dont_have_account'),
                   style: AppTextStyles.body.copyWith(
                     color: Colors.white70,
                     fontSize: FontSizes.body,
@@ -304,7 +305,7 @@ class _SignInPageState extends State<SignInPage> {
                 GestureDetector(
                   onTap: () => Navigator.pushNamed(context, '/role'),
                   child: Text(
-                    ' Sign Up',
+                    ' ${tr("sign_up")}',
                     style: AppTextStyles.body.copyWith(
                       color: AppColors.accent,
                       fontWeight: FontWeight.bold,

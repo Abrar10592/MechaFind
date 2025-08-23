@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
 import 'dart:math' as math;
@@ -366,7 +367,7 @@ class _LandingPageState extends State<LandingPage>
                   ),
                 ),
                 child: Text(
-                  'Your Roadside Rescue Partner',
+                  tr('your_roadside_rescue_partner'),
                   style: TextStyle(
                     fontFamily: AppFonts.primaryFont,
                     fontSize: 18,
@@ -388,17 +389,17 @@ class _LandingPageState extends State<LandingPage>
     final features = [
       FeatureData(
         icon: Icons.location_on,
-        text: 'Find nearby mechanics instantly',
+        text: tr('find_nearby_mechanics_instantly'),
         color: AppColors.tealPrimary,
       ),
       FeatureData(
         icon: Icons.people,
-        text: 'Connect with trusted professionals',
+        text: tr('connect_with_trusted_professionals'),
         color: AppColors.orangePrimary,
       ),
       FeatureData(
         icon: Icons.shield,
-        text: 'Emergency roadside assistance',
+        text: tr('emergency_roadside_assistance'),
         color: AppColors.greenPrimary,
       ),
     ];
@@ -466,7 +467,7 @@ class _LandingPageState extends State<LandingPage>
                 verticalOffset: 50,
                 child: FadeInAnimation(
                   child: GlowingButton(
-                    text: 'Get Started',
+                    text: tr('get_started'),
                     primaryColor: AppColors.tealPrimary,
                     secondaryColor: AppColors.tealSecondary,
                     icon: Icons.rocket_launch,
@@ -507,7 +508,7 @@ class _LandingPageState extends State<LandingPage>
               verticalOffset: 50,
               child: FadeInAnimation(
                 child: GlowingButton(
-                  text: 'Get Started',
+                  text: tr('get_started'),
                   primaryColor: AppColors.tealPrimary,
                   secondaryColor: AppColors.tealSecondary,
                   icon: Icons.rocket_launch,
@@ -575,7 +576,7 @@ class _LandingPageState extends State<LandingPage>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              'Browse as Guest',
+              tr('browse_as_guest'),
               style: TextStyle(
                 fontFamily: AppFonts.primaryFont,
                 color: Colors.white.withOpacity(0.9),
