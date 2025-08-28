@@ -30,6 +30,21 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
   final _descriptionController = TextEditingController();
   File? _capturedImage;
   String? _location;
+  String? _selectedProblem;
+  
+  final List<String> _vehicleProblems = [
+    'Vehicle not starting',
+    'Battery dead',
+    'Flat tire',
+    'Engine overheating',
+    'Brake failure',
+    'Transmission issues',
+    'Electrical system failure',
+    'Fuel system problems',
+    'Steering problems',
+    'Strange noises',
+    'Other (specify)',
+  ];
   Position? _coords;
   bool _loading = false;
   bool _useCurrentLocation = true;
@@ -173,11 +188,20 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
 
   Future _handleSubmit() async {
     final vehicle = _vehicleController.text.trim();
-    final desc = _descriptionController.text.trim();
-
-    if (vehicle.isEmpty || desc.isEmpty || _capturedImage == null) {
-      _showMessage('Please fill all fields and take a photo.');
+    if (vehicle.isEmpty || _capturedImage == null || _selectedProblem == null) {
+      _showMessage('Please fill all required fields and take a photo.');
       return;
+    }
+
+    String description;
+    if (_selectedProblem == 'Other (specify)') {
+      description = _descriptionController.text.trim();
+      if (description.isEmpty) {
+        _showMessage('Please provide a description for your vehicle problem.');
+        return;
+      }
+    } else {
+      description = _selectedProblem!;
     }
 
     // Determine which location to use
@@ -263,7 +287,7 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
         'mechanic_id': null,
         'status': 'pending',
         'vehicle': vehicle,
-        'description': desc,
+        'description': description,
         'image': imageUrl,
         'lat': lat.toString(),
         'lng': lng.toString(),
@@ -355,6 +379,78 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
               ],
             ),
             const SizedBox(height: 12),
+            TextField(
+              controller: _vehicleController,
+              style: AppTextStyles.body.copyWith(color: Colors.white),
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.directions_car, color: Colors.white70),
+                hintText: "Vehicle Model",
+                hintStyle: AppTextStyles.label.copyWith(color: Colors.white60),
+                filled: true,
+                fillColor: AppColors.primary.withOpacity(0.25),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            // Problem selection dropdown
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.25),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  dropdownColor: AppColors.primary,
+                  value: _selectedProblem,
+                  hint: Text(
+                    'Select Vehicle Problem',
+                    style: AppTextStyles.body.copyWith(color: Colors.white70),
+                  ),
+                  isExpanded: true,
+                  icon: const Icon(Icons.arrow_drop_down, color: Colors.white70),
+                  items: _vehicleProblems.map((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(
+                        value,
+                        style: AppTextStyles.body.copyWith(color: Colors.white),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedProblem = newValue;
+                    });
+                  },
+                ),
+              ),
+            ),
+            if (_selectedProblem == 'Other (specify)')
+              Padding(
+                padding: const EdgeInsets.only(top: 14),
+                child: TextField(
+                  controller: _descriptionController,
+                  style: AppTextStyles.body.copyWith(color: Colors.white),
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.description, color: Colors.white70),
+                    hintText: "Specify your vehicle problem",
+                    hintStyle: AppTextStyles.label.copyWith(color: Colors.white60),
+                    filled: true,
+                    fillColor: AppColors.primary.withOpacity(0.25),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  maxLines: 3,
+                ),
+              ),
+            const SizedBox(height: 14),
+            
             // Location selection buttons
             Row(
               children: [
@@ -430,40 +526,7 @@ class _EmergencyFormDialogState extends State<EmergencyFormDialog> {
               ],
             ),
             const SizedBox(height: 20),
-            TextField(
-              controller: _vehicleController,
-              style: AppTextStyles.body.copyWith(color: Colors.white),
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.directions_car, color: Colors.white70),
-                hintText: "Vehicle Model",
-                hintStyle: AppTextStyles.label.copyWith(color: Colors.white60),
-                filled: true,
-                fillColor: AppColors.primary.withOpacity(0.25),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _descriptionController,
-              minLines: 2,
-              maxLines: 4,
-              style: AppTextStyles.body.copyWith(color: Colors.white),
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.report_problem, color: Colors.white70),
-                hintText: "Describe your problem",
-                hintStyle: AppTextStyles.label.copyWith(color: Colors.white60),
-                filled: true,
-                fillColor: AppColors.primary.withOpacity(0.25),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
+
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: AppColors.accent.withOpacity(0.7)),
