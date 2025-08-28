@@ -507,6 +507,23 @@ mechanic_services(service_id, services(name))
                 },
               ),
               ElevatedButton.icon(
+                icon: const Icon(Icons.edit),
+                label: const Text('Edit Request'),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                onPressed: () {
+                  _showEditRequestDialog(request);
+                },
+              ),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.add_circle),
+                label: const Text('Add Request'),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                onPressed: () {
+                  Navigator.pop(context);
+                  _showRequestServiceDialog(mechanic);
+                },
+              ),
+              ElevatedButton.icon(
                 icon: const Icon(Icons.cancel),
                 label: const Text('Cancel Request'),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -1757,6 +1774,119 @@ mechanic_services(service_id, services(name))
           _loadActiveRequests();
           _fetchMechanicsFromDB();
         },
+      ),
+    );
+  }
+
+  void _showEditRequestDialog(Map request) {
+    final TextEditingController vehicleController = TextEditingController(text: request['vehicle'] ?? '');
+    final TextEditingController descriptionController = TextEditingController(text: request['description'] ?? '');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.primary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Edit Service Request',
+          style: AppTextStyles.heading.copyWith(color: Colors.white),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: vehicleController,
+                style: AppTextStyles.body.copyWith(color: Colors.white),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.directions_car, color: Colors.white70),
+                  hintText: "Vehicle Model",
+                  hintStyle: AppTextStyles.label.copyWith(color: Colors.white60),
+                  filled: true,
+                  fillColor: AppColors.primary.withOpacity(0.25),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: descriptionController,
+                minLines: 2,
+                maxLines: 4,
+                style: AppTextStyles.body.copyWith(color: Colors.white),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.build, color: Colors.white70),
+                  hintText: "Describe the service you need",
+                  hintStyle: AppTextStyles.label.copyWith(color: Colors.white60),
+                  filled: true,
+                  fillColor: AppColors.primary.withOpacity(0.25),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: AppTextStyles.body.copyWith(color: Colors.white70),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () async {
+              try {
+                await supabase.from('requests').update({
+                  'vehicle': vehicleController.text,
+                  'description': descriptionController.text,
+                }).eq('id', request['id']);
+                
+                Navigator.pop(context); // Close edit dialog
+                Navigator.pop(context); // Close mechanic details sheet
+                
+                // Show success message
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Request updated successfully'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+                
+                // Refresh active requests
+                await refreshActiveRequestsData();
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to update request: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                'Update Request',
+                style: AppTextStyles.body.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
