@@ -80,6 +80,7 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
 
   @override
   void dispose() {
+    _clearBanner(); // Clear any existing banners
     _fadeController.dispose();
     _slideController.dispose();
     _pulseController.dispose();
@@ -515,6 +516,11 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
                             setState(() {
                               pushNotifications = value;
                             });
+                            // Show banner with appropriate message
+                            final message = isEnglish 
+                              ? (value ? 'Push Notifications turned ON' : 'Push Notifications turned OFF')
+                              : (value ? 'পুশ নোটিফিকেশন চালু করা হয়েছে' : 'পুশ নোটিফিকেশন বন্ধ করা হয়েছে');
+                            _showBanner(message, autoHide: true);
                           },
                         ),
                         _buildModernToggleItem(
@@ -526,6 +532,11 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
                             setState(() {
                               locationAccess = value;
                             });
+                            // Show banner with appropriate message
+                            final message = isEnglish 
+                              ? (value ? 'Location Access turned ON' : 'Location Access turned OFF')
+                              : (value ? 'অবস্থান অ্যাক্সেস চালু করা হয়েছে' : 'অবস্থান অ্যাক্সেস বন্ধ করা হয়েছে');
+                            _showBanner(message, autoHide: true);
                           },
                         ),
                       ],
@@ -909,8 +920,8 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
                 child: Switch.adaptive(
                   value: value,
                   onChanged: onChanged,
-                  activeColor: AppColors.primary,
-                  activeTrackColor: AppColors.primary.withOpacity(0.3),
+                  activeColor: Colors.blue,
+                  activeTrackColor: Colors.blue.withOpacity(0.3),
                   inactiveThumbColor: Colors.grey.shade400,
                   inactiveTrackColor: Colors.grey.shade200,
                 ),
@@ -1307,5 +1318,41 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
         ],
       ),
     );
+  }
+
+  // Banner methods for showing notifications
+  void _clearBanner() {
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+    }
+  }
+
+  void _showBanner(String message, {bool autoHide = false, Duration? duration}) {
+    if (!mounted) return;
+    
+    ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+
+    ScaffoldMessenger.of(context).showMaterialBanner(
+      MaterialBanner(
+        content: Text(message),
+        backgroundColor: AppColors.primary.withOpacity(0.95),
+        contentTextStyle: const TextStyle(color: Colors.white),
+        actions: [
+          TextButton(
+            onPressed: () {
+              _clearBanner();
+            },
+            child: const Text('Dismiss', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    // Auto-hide banner for status messages
+    if (autoHide) {
+      Future.delayed(duration ?? const Duration(seconds: 2), () {
+        _clearBanner();
+      });
+    }
   }
 }
