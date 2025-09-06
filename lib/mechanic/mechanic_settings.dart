@@ -22,6 +22,10 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
   
   // Service area
   String selectedServiceArea = '';
+  
+  // Time preferences
+  TimeOfDay workStartTime = const TimeOfDay(hour: 9, minute: 0);  // 9:00 AM
+  TimeOfDay workEndTime = const TimeOfDay(hour: 18, minute: 0);   // 6:00 PM
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -98,12 +102,27 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
       selectedLanguage = context.locale.languageCode;
       // Set default to Bengali name, will be translated for display
       selectedServiceArea = prefs.getString('service_area') ?? 'ঢাকা, বাংলাদেশ';
+      
+      // Load time preferences
+      final startHour = prefs.getInt('work_start_hour') ?? 9;
+      final startMinute = prefs.getInt('work_start_minute') ?? 0;
+      final endHour = prefs.getInt('work_end_hour') ?? 18;
+      final endMinute = prefs.getInt('work_end_minute') ?? 0;
+      
+      workStartTime = TimeOfDay(hour: startHour, minute: startMinute);
+      workEndTime = TimeOfDay(hour: endHour, minute: endMinute);
     });
   }
 
   Future<void> _saveSettings() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('service_area', selectedServiceArea);
+    
+    // Save time preferences
+    await prefs.setInt('work_start_hour', workStartTime.hour);
+    await prefs.setInt('work_start_minute', workStartTime.minute);
+    await prefs.setInt('work_end_hour', workEndTime.hour);
+    await prefs.setInt('work_end_minute', workEndTime.minute);
   }
 
   // Helper method to translate service area for display
@@ -812,6 +831,126 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
     );
   }
 
+  void _showStartTimePicker() async {
+    final isEnglish = context.locale.languageCode == 'en';
+    
+    final TimeOfDay? selectedTime = await showTimePicker(
+      context: context,
+      initialTime: workStartTime,
+      helpText: isEnglish ? 'Select Work Start Time' : 'কাজের শুরুর সময় নির্বাচন করুন',
+      confirmText: isEnglish ? 'Confirm' : 'নিশ্চিত',
+      cancelText: isEnglish ? 'Cancel' : 'বাতিল',
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: false),
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              timePickerTheme: TimePickerThemeData(
+                backgroundColor: Colors.white,
+                hourMinuteShape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                dayPeriodBorderSide: const BorderSide(color: Colors.grey),
+              ),
+            ),
+            child: child!,
+          ),
+        );
+      },
+    );
+
+    if (selectedTime != null) {
+      // Validate that start time is before end time
+      final startMinutes = selectedTime.hour * 60 + selectedTime.minute;
+      final endMinutes = workEndTime.hour * 60 + workEndTime.minute;
+      
+      if (startMinutes >= endMinutes) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isEnglish 
+              ? 'Start time must be before end time' 
+              : 'শুরুর সময় শেষের সময়ের আগে হতে হবে'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      setState(() {
+        workStartTime = selectedTime;
+      });
+      _saveSettings();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isEnglish 
+            ? 'Work start time updated to ${workStartTime.format(context)}' 
+            : 'কাজের শুরুর সময় ${workStartTime.format(context)} এ আপডেট হয়েছে'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  void _showEndTimePicker() async {
+    final isEnglish = context.locale.languageCode == 'en';
+    
+    final TimeOfDay? selectedTime = await showTimePicker(
+      context: context,
+      initialTime: workEndTime,
+      helpText: isEnglish ? 'Select Work End Time' : 'কাজের শেষের সময় নির্বাচন করুন',
+      confirmText: isEnglish ? 'Confirm' : 'নিশ্চিত',
+      cancelText: isEnglish ? 'Cancel' : 'বাতিল',
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: false),
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              timePickerTheme: TimePickerThemeData(
+                backgroundColor: Colors.white,
+                hourMinuteShape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                dayPeriodBorderSide: const BorderSide(color: Colors.grey),
+              ),
+            ),
+            child: child!,
+          ),
+        );
+      },
+    );
+
+    if (selectedTime != null) {
+      // Validate that end time is after start time
+      final startMinutes = workStartTime.hour * 60 + workStartTime.minute;
+      final endMinutes = selectedTime.hour * 60 + selectedTime.minute;
+      
+      if (endMinutes <= startMinutes) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isEnglish 
+              ? 'End time must be after start time' 
+              : 'শেষের সময় শুরুর সময়ের পরে হতে হবে'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      setState(() {
+        workEndTime = selectedTime;
+      });
+      _saveSettings();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isEnglish 
+            ? 'Work end time updated to ${workEndTime.format(context)}' 
+            : 'কাজের শেষের সময় ${workEndTime.format(context)} এ আপডেট হয়েছে'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isEnglish = context.locale.languageCode == 'en';
@@ -1018,6 +1157,22 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
                             : 'বর্তমান: ${_getTranslatedServiceArea(selectedServiceArea, false).split(',')[0]}',
                           icon: Icons.map_outlined,
                           onTap: _showServiceAreaSelection,
+                        ),
+                        _buildModernClickableItem(
+                          title: isEnglish ? 'Work Start Time' : 'কাজের শুরুর সময়',
+                          subtitle: isEnglish 
+                            ? 'Starts at: ${workStartTime.format(context)}' 
+                            : 'শুরু হয়: ${workStartTime.format(context)}',
+                          icon: Icons.schedule_outlined,
+                          onTap: _showStartTimePicker,
+                        ),
+                        _buildModernClickableItem(
+                          title: isEnglish ? 'Work End Time' : 'কাজের শেষের সময়',
+                          subtitle: isEnglish 
+                            ? 'Ends at: ${workEndTime.format(context)}' 
+                            : 'শেষ হয়: ${workEndTime.format(context)}',
+                          icon: Icons.schedule_outlined,
+                          onTap: _showEndTimePicker,
                         ),
                       ],
                     ),
