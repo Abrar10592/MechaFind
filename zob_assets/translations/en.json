@@ -145,5 +145,20 @@
   "messages": "Messages",
   "no_conversations_yet": "No conversations yet",
   "no_conversations_description": "When users message you about their vehicle issues, conversations will appear here",
-  "yesterday": "Yesterday"
+  "yesterday": "Yesterday",
+  "send_complaint": "Send Complaint",
+  "your_name": "Your Name",
+  "enter_your_name": "Enter your name",
+  "complaint_category": "Complaint Category",
+  "general_issue": "General Issue",
+  "app_bug": "App Bug",
+  "payment_issue": "Payment Issue",
+  "booking_issue": "Booking Issue",
+  "profile_issue": "Profile Issue",
+  "other": "Other",
+  "subject": "Subject",
+  "brief_subject": "Brief subject",
+  "complaint_details": "Complaint Details",
+  "describe_your_complaint": "Describe your complaint in detail",
+  "please_enter_complaint_details": "Please enter complaint details"
 }

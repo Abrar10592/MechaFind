@@ -173,11 +173,11 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
     }
   }
 
-  Future<void> _sendEmail(String email) async {
+  Future<void> _sendEmail(String email, {String? subject, String? body}) async {
     final Uri emailUri = Uri(
       scheme: 'mailto',
       path: email,
-      query: 'subject=MechFind Support Request',
+      query: _buildEmailQuery(subject, body),
     );
     try {
       if (await canLaunchUrl(emailUri)) {
@@ -187,6 +187,265 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
       }
     } catch (e) {
       _showBanner('Error opening email app');
+    }
+  }
+
+  String _buildEmailQuery(String? subject, String? body) {
+    final Map<String, String> queryParams = {};
+    
+    if (subject != null && subject.isNotEmpty) {
+      queryParams['subject'] = subject;
+    } else {
+      queryParams['subject'] = 'MechFind Support Request';
+    }
+    
+    if (body != null && body.isNotEmpty) {
+      queryParams['body'] = body;
+    }
+    
+    return queryParams.entries
+        .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
+        .join('&');
+  }
+
+  // New complaint form functionality
+  void _showComplaintForm() {
+    final TextEditingController nameController = TextEditingController();
+    final TextEditingController subjectController = TextEditingController();
+    final TextEditingController messageController = TextEditingController();
+    String selectedCategory = 'general';
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(
+                'send_complaint'.tr(),
+                style: AppTextStyles.heading.copyWith(
+                  color: const Color(0xFF2C3E50),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Name field
+                    Text(
+                      'your_name'.tr(),
+                      style: AppTextStyles.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF34495E),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: nameController,
+                      decoration: InputDecoration(
+                        hintText: 'enter_your_name'.tr(),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Category dropdown
+                    Text(
+                      'complaint_category'.tr(),
+                      style: AppTextStyles.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF34495E),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: selectedCategory,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                      items: [
+                        DropdownMenuItem(
+                          value: 'general',
+                          child: Text('general_issue'.tr()),
+                        ),
+                        DropdownMenuItem(
+                          value: 'app_bug',
+                          child: Text('app_bug'.tr()),
+                        ),
+                        DropdownMenuItem(
+                          value: 'payment',
+                          child: Text('payment_issue'.tr()),
+                        ),
+                        DropdownMenuItem(
+                          value: 'booking',
+                          child: Text('booking_issue'.tr()),
+                        ),
+                        DropdownMenuItem(
+                          value: 'profile',
+                          child: Text('profile_issue'.tr()),
+                        ),
+                        DropdownMenuItem(
+                          value: 'other',
+                          child: Text('other'.tr()),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          selectedCategory = value!;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Subject field
+                    Text(
+                      'subject'.tr(),
+                      style: AppTextStyles.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF34495E),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: subjectController,
+                      decoration: InputDecoration(
+                        hintText: 'brief_subject'.tr(),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Message field
+                    Text(
+                      'complaint_details'.tr(),
+                      style: AppTextStyles.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF34495E),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: messageController,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        hintText: 'describe_your_complaint'.tr(),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.all(12),
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(
+                    'cancel'.tr(),
+                    style: AppTextStyles.body.copyWith(
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    if (messageController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('please_enter_complaint_details'.tr()),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                      return;
+                    }
+                    _sendComplaintEmail(
+                      nameController.text.trim(),
+                      selectedCategory,
+                      subjectController.text.trim(),
+                      messageController.text.trim(),
+                    );
+                    Navigator.of(context).pop();
+                  },
+                  icon: const Icon(Icons.send, size: 18),
+                  label: Text('send_complaint'.tr()),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF3498DB),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _sendComplaintEmail(String name, String category, String subject, String message) {
+    final categoryName = _getCategoryDisplayName(category);
+    
+    final emailSubject = subject.isNotEmpty 
+        ? 'MechFind Complaint: $subject'
+        : 'MechFind Complaint: $categoryName';
+    
+    final emailBody = '''
+--- MechFind Complaint Form ---
+
+Name: ${name.isNotEmpty ? name : 'Not provided'}
+Category: $categoryName
+Date: ${DateTime.now().toString().split('.')[0]}
+
+Complaint Details:
+$message
+
+---
+Sent from MechFind Mobile App
+    ''';
+
+    _sendEmail('support@mechfind.com.bd', subject: emailSubject, body: emailBody);
+  }
+
+  String _getCategoryDisplayName(String category) {
+    switch (category) {
+      case 'general':
+        return 'general_issue'.tr();
+      case 'app_bug':
+        return 'app_bug'.tr();
+      case 'payment':
+        return 'payment_issue'.tr();
+      case 'booking':
+        return 'booking_issue'.tr();
+      case 'profile':
+        return 'profile_issue'.tr();
+      case 'other':
+        return 'other'.tr();
+      default:
+        return 'general_issue'.tr();
     }
   }
 
@@ -379,7 +638,7 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
             ),
             const SizedBox(height: 4),
             GestureDetector(
-              onTap: () => _sendEmail('support@mechfind.com.bd'),
+              onTap: () => _showComplaintForm(),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                 decoration: BoxDecoration(
@@ -397,7 +656,7 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Icon(Icons.open_in_new, size: 16, color: Colors.blue),
+                    Icon(Icons.email, size: 16, color: Colors.blue),
                   ],
                 ),
               ),
