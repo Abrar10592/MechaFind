@@ -1192,6 +1192,8 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
                     _buildModernSectionCard(
                       title: isEnglish ? 'App Settings' : 'অ্যাপ সেটিংস',
                       icon: Icons.settings_outlined,
+                      headerColor: Colors.blue.shade600,
+                      iconBackgroundColor: Colors.blue.shade700,
                       children: [
                         _buildModernToggleItem(
                           title: isEnglish ? 'Push Notifications' : 'পুশ নোটিফিকেশন',
@@ -1234,6 +1236,8 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
                     _buildModernSectionCard(
                       title: isEnglish ? 'Language' : 'ভাষা',
                       icon: Icons.language_outlined,
+                      headerColor: Colors.green.shade600,
+                      iconBackgroundColor: Colors.green.shade700,
                       children: [
                         _buildModernLanguageSelector(isEnglish),
                       ],
@@ -1245,6 +1249,8 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
                     _buildModernSectionCard(
                       title: isEnglish ? 'Work Preferences' : 'কাজের পছন্দ',
                       icon: Icons.work_outline,
+                      headerColor: Colors.orange.shade600,
+                      iconBackgroundColor: Colors.orange.shade700,
                       children: [
                         _buildModernClickableItem(
                           title: isEnglish ? 'Service Area' : 'সেবা এলাকা',
@@ -1271,6 +1277,8 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
                     _buildModernSectionCard(
                       title: isEnglish ? 'Support' : 'সহায়তা',
                       icon: Icons.help_outline,
+                      headerColor: Colors.purple.shade600,
+                      iconBackgroundColor: Colors.purple.shade700,
                       children: [
                         _buildModernClickableItem(
                           title: isEnglish ? 'Help & Support' : 'সাহায্য ও সহায়তা',
@@ -1484,7 +1492,13 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
     required String title,
     required IconData icon,
     required List<Widget> children,
+    Color? headerColor,
+    Color? iconBackgroundColor,
   }) {
+    // Default colors if not provided
+    final effectiveHeaderColor = headerColor ?? AppColors.primary;
+    final effectiveIconBgColor = iconBackgroundColor ?? AppColors.primary;
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -1492,7 +1506,7 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.08),
+            color: effectiveHeaderColor.withOpacity(0.08),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -1506,9 +1520,11 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  AppColors.primary.withOpacity(0.1),
-                  AppColors.tealPrimary.withOpacity(0.05),
+                  effectiveHeaderColor.withOpacity(0.15),
+                  effectiveHeaderColor.withOpacity(0.08),
                 ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(20),
@@ -1520,12 +1536,16 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.15),
+                    color: effectiveIconBgColor.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: effectiveIconBgColor.withOpacity(0.3),
+                      width: 1,
+                    ),
                   ),
                   child: Icon(
                     icon,
-                    color: AppColors.primary,
+                    color: effectiveIconBgColor,
                     size: 24,
                   ),
                 ),
@@ -1533,7 +1553,7 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
                 Text(
                   title,
                   style: AppTextStyles.heading.copyWith(
-                    color: AppColors.textPrimary,
+                    color: effectiveHeaderColor.withOpacity(0.9),
                     fontFamily: AppFonts.primaryFont,
                     fontWeight: FontWeight.w600,
                     fontSize: 18,
