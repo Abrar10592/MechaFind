@@ -7,7 +7,9 @@ import 'package:latlong2/latlong.dart' as latlng;
 import '../utils.dart';
 
 class MechanicSettings extends StatefulWidget {
-  const MechanicSettings({super.key});
+  final VoidCallback? onBackToProfile;
+  
+  const MechanicSettings({super.key, this.onBackToProfile});
 
   @override
   State<MechanicSettings> createState() => _MechanicSettingsState();
@@ -725,38 +727,69 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
   Widget build(BuildContext context) {
     final isEnglish = context.locale.languageCode == 'en';
     
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        title: Text(
-          isEnglish ? 'Settings' : 'সেটিংস',
-          style: AppTextStyles.heading.copyWith(
-            color: Colors.white,
-            fontFamily: AppFonts.primaryFont,
-          ),
-        ),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppColors.primary,
-                AppColors.gradientStart,
-              ],
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          // Handle hardware back button the same way as AppBar back button
+          if (widget.onBackToProfile != null) {
+            widget.onBackToProfile!();
+          } else {
+            // Fallback: try to pop or navigate to profile
+            try {
+              Navigator.of(context, rootNavigator: false).pop();
+            } catch (e) {
+              // If pop fails, navigate to profile directly
+              Navigator.of(context).pushReplacementNamed('/mechanic/profile');
+            }
+          }
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.grey.shade50,
+        appBar: AppBar(
+          title: Text(
+            isEnglish ? 'Settings' : 'সেটিংস',
+            style: AppTextStyles.heading.copyWith(
+              color: Colors.white,
+              fontFamily: AppFonts.primaryFont,
             ),
           ),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: true,
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.primary,
+                  AppColors.gradientStart,
+                ],
+              ),
+            ),
+          ),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+            onPressed: () {
+              // Try callback first, then fallback to navigation
+              if (widget.onBackToProfile != null) {
+                widget.onBackToProfile!();
+              } else {
+                // Fallback: try to pop or navigate to profile
+                try {
+                  Navigator.of(context, rootNavigator: false).pop();
+                } catch (e) {
+                  // If pop fails, navigate to profile directly
+                  Navigator.of(context).pushReplacementNamed('/mechanic/profile');
+                }
+              }
+            },
+          ),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Container(
+        body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -935,8 +968,9 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
             ),
           ],
         ),
-      ),
-    );
+      ), // Close Scaffold body
+    ), // Close PopScope child (Scaffold)
+    ); // Close PopScope
   }
 
   Widget _buildSectionTitle(String title) {

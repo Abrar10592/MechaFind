@@ -38,7 +38,13 @@ class _MechanicState extends State<Mechanic> {
       case 3:
         return const MechanicProfile();
       case 4:
-        return const MechanicSettings();
+        return MechanicSettings(
+          onBackToProfile: () {
+            setState(() {
+              _selectedIndex = 3; // Switch to profile tab
+            });
+          },
+        );
       default:
         return const MechanicLandingScreen();
     }
