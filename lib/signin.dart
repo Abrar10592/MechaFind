@@ -100,12 +100,81 @@ class _SignInPageState extends State<SignInPage> {
         Navigator.pushReplacementNamed(context, '/userHome');
       }
     } on AuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${tr("auth_error")} ${e.message}')),
+      String errorMessage;
+      if (e.message.toLowerCase().contains('invalid login credentials')) {
+        errorMessage = 'Incorrect username or password';
+      } else if (e.message.toLowerCase().contains('invalid email')) {
+        errorMessage = 'Invalid email format';
+      } else if (e.message.toLowerCase().contains('too many attempts')) {
+        errorMessage = 'Too many login attempts. Please try again later';
+      } else {
+        errorMessage = e.message;
+      }
+      
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            backgroundColor: AppColors.background,
+            title: Text(
+              'Login Failed',
+              style: AppTextStyles.heading.copyWith(
+                color: AppColors.primary,
+                fontSize: FontSizes.subHeading,
+              ),
+            ),
+            content: Text(
+              errorMessage,
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.primary,
+              ),
+            ),
+            actions: <Widget>[
+              TextButton(
+                child: Text(
+                  'OK',
+                  style: TextStyle(color: AppColors.accent),
+                ),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          );
+        },
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${tr("unexpected_error")} $e')),
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            backgroundColor: AppColors.background,
+            title: Text(
+              'Error',
+              style: AppTextStyles.heading.copyWith(
+                color: AppColors.primary,
+                fontSize: FontSizes.subHeading,
+              ),
+            ),
+            content: Text(
+              'An unexpected error occurred',
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.primary,
+              ),
+            ),
+            actions: <Widget>[
+              TextButton(
+                child: Text(
+                  'OK',
+                  style: TextStyle(color: AppColors.accent),
+                ),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          );
+        },
       );
     } finally {
       if (mounted) setState(() => _loading = false);
