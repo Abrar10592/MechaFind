@@ -761,124 +761,290 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
     );
   }
 
-  void _showStartTimePicker() async {
+  void _showWorkingHoursRangePicker() async {
     final isEnglish = context.locale.languageCode == 'en';
     
-    final TimeOfDay? selectedTime = await showTimePicker(
+    showDialog(
       context: context,
-      initialTime: workStartTime,
-      helpText: isEnglish ? 'Select Work Start Time' : 'কাজের শুরুর সময় নির্বাচন করুন',
-      confirmText: isEnglish ? 'Confirm' : 'নিশ্চিত',
-      cancelText: isEnglish ? 'Cancel' : 'বাতিল',
-      builder: (context, child) {
-        return MediaQuery(
-          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: false),
-          child: Theme(
-            data: Theme.of(context).copyWith(
-              timePickerTheme: TimePickerThemeData(
-                backgroundColor: Colors.white,
-                hourMinuteShape: RoundedRectangleBorder(
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.access_time, color: Colors.blue),
+            SizedBox(width: 8),
+            Text(isEnglish ? 'Set Working Hours' : 'কাজের সময় নির্ধারণ করুন'),
+          ],
+        ),
+        content: Container(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Instructions
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                dayPeriodBorderSide: const BorderSide(color: Colors.grey),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        isEnglish 
+                          ? 'Set your daily working hours to help customers know when you\'re available.'
+                          : 'গ্রাহকদের জানাতে আপনার দৈনিক কাজের সময় নির্ধারণ করুন।',
+                        style: TextStyle(fontSize: 12, color: Colors.blue.shade700),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            child: child!,
-          ),
-        );
-      },
-    );
-
-    if (selectedTime != null) {
-      // Validate that start time is before end time
-      final startMinutes = selectedTime.hour * 60 + selectedTime.minute;
-      final endMinutes = workEndTime.hour * 60 + workEndTime.minute;
-      
-      if (startMinutes >= endMinutes) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isEnglish 
-              ? 'Start time must be before end time' 
-              : 'শুরুর সময় শেষের সময়ের আগে হতে হবে'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      setState(() {
-        workStartTime = selectedTime;
-      });
-      _saveSettings();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(isEnglish 
-            ? 'Work start time updated to ${workStartTime.format(context)}' 
-            : 'কাজের শুরুর সময় ${workStartTime.format(context)} এ আপডেট হয়েছে'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    }
-  }
-
-  void _showEndTimePicker() async {
-    final isEnglish = context.locale.languageCode == 'en';
-    
-    final TimeOfDay? selectedTime = await showTimePicker(
-      context: context,
-      initialTime: workEndTime,
-      helpText: isEnglish ? 'Select Work End Time' : 'কাজের শেষের সময় নির্বাচন করুন',
-      confirmText: isEnglish ? 'Confirm' : 'নিশ্চিত',
-      cancelText: isEnglish ? 'Cancel' : 'বাতিল',
-      builder: (context, child) {
-        return MediaQuery(
-          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: false),
-          child: Theme(
-            data: Theme.of(context).copyWith(
-              timePickerTheme: TimePickerThemeData(
-                backgroundColor: Colors.white,
-                hourMinuteShape: RoundedRectangleBorder(
+              
+              SizedBox(height: 20),
+              
+              // Start Time Section
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.play_arrow, color: Colors.green, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          isEnglish ? 'Start Time' : 'শুরুর সময়',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 8),
+                    InkWell(
+                      onTap: () async {
+                        final selectedTime = await showTimePicker(
+                          context: context,
+                          initialTime: workStartTime,
+                          helpText: isEnglish ? 'Select Start Time' : 'শুরুর সময় নির্বাচন করুন',
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                timePickerTheme: TimePickerThemeData(
+                                  backgroundColor: Colors.white,
+                                  hourMinuteShape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        
+                        if (selectedTime != null) {
+                          // Validate that start time is before end time
+                          final startMinutes = selectedTime.hour * 60 + selectedTime.minute;
+                          final endMinutes = workEndTime.hour * 60 + workEndTime.minute;
+                          
+                          if (startMinutes >= endMinutes) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(isEnglish 
+                                  ? 'Start time must be before end time' 
+                                  : 'শুরুর সময় শেষের সময়ের আগে হতে হবে'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+                          
+                          setState(() {
+                            workStartTime = selectedTime;
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.green.shade200),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              workStartTime.format(context),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.green.shade700,
+                              ),
+                            ),
+                            Icon(Icons.edit, color: Colors.green.shade700, size: 18),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              SizedBox(height: 16),
+              
+              // End Time Section
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.stop, color: Colors.red, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          isEnglish ? 'End Time' : 'শেষের সময়',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 8),
+                    InkWell(
+                      onTap: () async {
+                        final selectedTime = await showTimePicker(
+                          context: context,
+                          initialTime: workEndTime,
+                          helpText: isEnglish ? 'Select End Time' : 'শেষের সময় নির্বাচন করুন',
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                timePickerTheme: TimePickerThemeData(
+                                  backgroundColor: Colors.white,
+                                  hourMinuteShape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        
+                        if (selectedTime != null) {
+                          // Validate that end time is after start time
+                          final startMinutes = workStartTime.hour * 60 + workStartTime.minute;
+                          final endMinutes = selectedTime.hour * 60 + selectedTime.minute;
+                          
+                          if (endMinutes <= startMinutes) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(isEnglish 
+                                  ? 'End time must be after start time' 
+                                  : 'শেষের সময় শুরুর সময়ের পরে হতে হবে'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+                          
+                          setState(() {
+                            workEndTime = selectedTime;
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red.shade200),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              workEndTime.format(context),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.red.shade700,
+                              ),
+                            ),
+                            Icon(Icons.edit, color: Colors.red.shade700, size: 18),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              SizedBox(height: 16),
+              
+              // Summary
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                dayPeriodBorderSide: const BorderSide(color: Colors.grey),
+                child: Row(
+                  children: [
+                    Icon(Icons.schedule, color: Colors.grey.shade600, size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        isEnglish 
+                          ? 'Working Hours: ${workStartTime.format(context)} - ${workEndTime.format(context)}'
+                          : 'কাজের সময়: ${workStartTime.format(context)} - ${workEndTime.format(context)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            child: child!,
+            ],
           ),
-        );
-      },
-    );
-
-    if (selectedTime != null) {
-      // Validate that end time is after start time
-      final startMinutes = workStartTime.hour * 60 + workStartTime.minute;
-      final endMinutes = selectedTime.hour * 60 + selectedTime.minute;
-      
-      if (endMinutes <= startMinutes) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isEnglish 
-              ? 'End time must be after start time' 
-              : 'শেষের সময় শুরুর সময়ের পরে হতে হবে'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      setState(() {
-        workEndTime = selectedTime;
-      });
-      _saveSettings();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(isEnglish 
-            ? 'Work end time updated to ${workEndTime.format(context)}' 
-            : 'কাজের শেষের সময় ${workEndTime.format(context)} এ আপডেট হয়েছে'),
-          backgroundColor: Colors.green,
         ),
-      );
-    }
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(isEnglish ? 'Cancel' : 'বাতিল'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              _saveSettings();
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(isEnglish 
+                    ? 'Working hours updated: ${workStartTime.format(context)} - ${workEndTime.format(context)}' 
+                    : 'কাজের সময় আপডেট হয়েছে: ${workStartTime.format(context)} - ${workEndTime.format(context)}'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(isEnglish ? 'Save' : 'সংরক্ষণ'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -1089,20 +1255,12 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
                           onTap: _showServiceAreaSelection,
                         ),
                         _buildModernClickableItem(
-                          title: isEnglish ? 'Work Start Time' : 'কাজের শুরুর সময়',
+                          title: isEnglish ? 'Working Hours' : 'কাজের সময়',
                           subtitle: isEnglish 
-                            ? 'Starts at: ${workStartTime.format(context)}' 
-                            : 'শুরু হয়: ${workStartTime.format(context)}',
-                          icon: Icons.schedule_outlined,
-                          onTap: _showStartTimePicker,
-                        ),
-                        _buildModernClickableItem(
-                          title: isEnglish ? 'Work End Time' : 'কাজের শেষের সময়',
-                          subtitle: isEnglish 
-                            ? 'Ends at: ${workEndTime.format(context)}' 
-                            : 'শেষ হয়: ${workEndTime.format(context)}',
-                          icon: Icons.schedule_outlined,
-                          onTap: _showEndTimePicker,
+                            ? '${workStartTime.format(context)} - ${workEndTime.format(context)}' 
+                            : '${workStartTime.format(context)} - ${workEndTime.format(context)}',
+                          icon: Icons.access_time_outlined,
+                          onTap: _showWorkingHoursRangePicker,
                         ),
                       ],
                     ),
