@@ -656,6 +656,70 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
   void _showServiceAreaSelection() {
     final isEnglish = context.locale.languageCode == 'en';
     
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.location_on, color: Colors.blue),
+            SizedBox(width: 8),
+            Text(isEnglish ? 'Select Service Area' : 'সেবা এলাকা নির্বাচন'),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        _showListSelection();
+                      },
+                      icon: Icon(Icons.list),
+                      label: Text(isEnglish ? 'List View' : 'তালিকা'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[200],
+                        foregroundColor: Colors.black87,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        _showMapSelection();
+                      },
+                      icon: Icon(Icons.map),
+                      label: Text(isEnglish ? 'Map View' : 'মানচিত্র'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(isEnglish ? 'Cancel' : 'বাতিল'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showListSelection() {
+    final isEnglish = context.locale.languageCode == 'en';
+    
     // Bilingual city names - English and Bengali pairs
     final cityMap = {
       'Dhaka, Bangladesh': 'ঢাকা, বাংলাদেশ',
@@ -683,7 +747,7 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(context.locale.languageCode == 'en' ? 'Select Service Area' : 'সেবা এলাকা নির্বাচন'),
+        title: Text(isEnglish ? 'Select Service Area' : 'সেবা এলাকা নির্বাচন'),
         content: SizedBox(
           width: double.maxFinite,
           height: 300,
@@ -703,7 +767,7 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
                   Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(context.locale.languageCode == 'en' 
+                      content: Text(isEnglish 
                         ? 'Service area updated to $value' 
                         : 'সেবা এলাকা $value তে আপডেট হয়েছে'),
                     ),
@@ -716,9 +780,34 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text(context.locale.languageCode == 'en' ? 'Cancel' : 'বাতিল'),
+            child: Text(isEnglish ? 'Cancel' : 'বাতিল'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showMapSelection() {
+    final isEnglish = context.locale.languageCode == 'en';
+    
+    showDialog(
+      context: context,
+      builder: (context) => _ServiceAreaMapDialog(
+        isEnglish: isEnglish,
+        currentServiceArea: selectedServiceArea,
+        onAreaSelected: (area) {
+          setState(() {
+            selectedServiceArea = area;
+          });
+          _saveSettings();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(isEnglish 
+                ? 'Service area updated to $area' 
+                : 'সেবা এলাকা $area তে আপডেট হয়েছে'),
+            ),
+          );
+        },
       ),
     );
   }
@@ -1717,5 +1806,373 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
         _clearBanner();
       });
     }
+  }
+}
+
+class _ServiceAreaMapDialog extends StatefulWidget {
+  final bool isEnglish;
+  final String currentServiceArea;
+  final Function(String) onAreaSelected;
+
+  const _ServiceAreaMapDialog({
+    required this.isEnglish,
+    required this.currentServiceArea,
+    required this.onAreaSelected,
+  });
+
+  @override
+  State<_ServiceAreaMapDialog> createState() => _ServiceAreaMapDialogState();
+}
+
+class _ServiceAreaMapDialogState extends State<_ServiceAreaMapDialog> {
+  late String selectedArea;
+  final MapController mapController = MapController();
+
+  // City coordinates for Bangladesh
+  final Map<String, Map<String, dynamic>> cityData = {
+    'Dhaka, Bangladesh': {
+      'position': latlng.LatLng(23.8103, 90.4125),
+      'bengali': 'ঢাকা, বাংলাদেশ',
+      'color': Colors.red,
+    },
+    'Chittagong, Bangladesh': {
+      'position': latlng.LatLng(22.3569, 91.7832),
+      'bengali': 'চট্টগ্রাম, বাংলাদেশ',
+      'color': Colors.green,
+    },
+    'Sylhet, Bangladesh': {
+      'position': latlng.LatLng(24.8949, 91.8687),
+      'bengali': 'সিলেট, বাংলাদেশ',
+      'color': Colors.purple,
+    },
+    'Rajshahi, Bangladesh': {
+      'position': latlng.LatLng(24.3745, 88.6042),
+      'bengali': 'রাজশাহী, বাংলাদেশ',
+      'color': Colors.orange,
+    },
+    'Khulna, Bangladesh': {
+      'position': latlng.LatLng(22.8456, 89.5403),
+      'bengali': 'খুলনা, বাংলাদেশ',
+      'color': Colors.teal,
+    },
+    'Barisal, Bangladesh': {
+      'position': latlng.LatLng(22.7010, 90.3535),
+      'bengali': 'বরিশাল, বাংলাদেশ',
+      'color': Colors.brown,
+    },
+    'Rangpur, Bangladesh': {
+      'position': latlng.LatLng(25.7439, 89.2752),
+      'bengali': 'রংপুর, বাংলাদেশ',
+      'color': Colors.pink,
+    },
+    'Mymensingh, Bangladesh': {
+      'position': latlng.LatLng(24.7471, 90.4203),
+      'bengali': 'ময়মনসিংহ, বাংলাদেশ',
+      'color': Colors.indigo,
+    },
+    'Comilla, Bangladesh': {
+      'position': latlng.LatLng(23.4607, 91.1809),
+      'bengali': 'কুমিল্লা, বাংলাদেশ',
+      'color': Colors.amber,
+    },
+    'Narayanganj, Bangladesh': {
+      'position': latlng.LatLng(23.6238, 90.4994),
+      'bengali': 'নারায়ণগঞ্জ, বাংলাদেশ',
+      'color': Colors.cyan,
+    },
+    'Gazipur, Bangladesh': {
+      'position': latlng.LatLng(23.9999, 90.4203),
+      'bengali': 'গাজীপুর, বাংলাদেশ',
+      'color': Colors.lime,
+    },
+    'Savar, Bangladesh': {
+      'position': latlng.LatLng(23.8583, 90.2667),
+      'bengali': 'সাভার, বাংলাদেশ',
+      'color': Colors.deepOrange,
+    },
+    'Jessore, Bangladesh': {
+      'position': latlng.LatLng(23.1667, 89.2167),
+      'bengali': 'জেসোর, বাংলাদেশ',
+      'color': Colors.blueGrey,
+    },
+    'Dinajpur, Bangladesh': {
+      'position': latlng.LatLng(25.6217, 88.6354),
+      'bengali': 'দিনাজপুর, বাংলাদেশ',
+      'color': Colors.deepPurple,
+    },
+    'Bogra, Bangladesh': {
+      'position': latlng.LatLng(24.8465, 89.3776),
+      'bengali': 'বগুড়া, বাংলাদেশ',
+      'color': Colors.tealAccent,
+    },
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    selectedArea = widget.currentServiceArea;
+  }
+
+  String _getDisplayName(String englishName) {
+    if (widget.isEnglish) {
+      return englishName;
+    } else {
+      return cityData[englishName]?['bengali'] ?? englishName;
+    }
+  }
+
+  String _getEnglishName(String displayName) {
+    if (widget.isEnglish) {
+      return displayName;
+    } else {
+      // Find English key for Bengali value
+      for (var entry in cityData.entries) {
+        if (entry.value['bengali'] == displayName) {
+          return entry.key;
+        }
+      }
+      return displayName;
+    }
+  }
+
+  void _onCityTapped(String cityKey) {
+    setState(() {
+      selectedArea = widget.isEnglish ? cityKey : cityData[cityKey]!['bengali'];
+    });
+
+    // Animate to the selected city
+    final cityInfo = cityData[cityKey]!;
+    mapController.move(cityInfo['position'], 10.0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.9,
+        height: MediaQuery.of(context).size.height * 0.8,
+        child: Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: Colors.blue,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(8),
+                  topRight: Radius.circular(8),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.map, color: Colors.white),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.isEnglish 
+                        ? 'Select Service Area on Map' 
+                        : 'মানচিত্রে সেবা এলাকা নির্বাচন করুন',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(Icons.close, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Map
+            Expanded(
+              flex: 3,
+              child: FlutterMap(
+                mapController: mapController,
+                options: MapOptions(
+                  initialCenter: latlng.LatLng(23.8103, 90.4125), // Dhaka center
+                  initialZoom: 7.0,
+                  minZoom: 6.0,
+                  maxZoom: 12.0,
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.example.app',
+                  ),
+                  MarkerLayer(
+                    markers: cityData.entries.map((entry) {
+                      final cityKey = entry.key;
+                      final cityInfo = entry.value;
+                      final isSelected = _getEnglishName(selectedArea) == cityKey;
+                      
+                      return Marker(
+                        point: cityInfo['position'],
+                        width: 60,
+                        height: 60,
+                        child: GestureDetector(
+                          onTap: () => _onCityTapped(cityKey),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: isSelected ? Colors.blue : cityInfo['color'],
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white,
+                                width: isSelected ? 3 : 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Icon(
+                                isSelected ? Icons.check : Icons.location_city,
+                                color: Colors.white,
+                                size: isSelected ? 30 : 24,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+            
+            // City List
+            Expanded(
+              flex: 2,
+              child: Container(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.isEnglish 
+                        ? 'Available Service Areas:' 
+                        : 'উপলব্ধ সেবা এলাকা:',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Expanded(
+                      child: GridView.builder(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 3,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 4,
+                        ),
+                        itemCount: cityData.length,
+                        itemBuilder: (context, index) {
+                          final cityKey = cityData.keys.elementAt(index);
+                          final cityInfo = cityData[cityKey]!;
+                          final displayName = _getDisplayName(cityKey);
+                          final isSelected = _getEnglishName(selectedArea) == cityKey;
+                          
+                          return GestureDetector(
+                            onTap: () => _onCityTapped(cityKey),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: isSelected ? Colors.blue : Colors.grey[200],
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isSelected ? Colors.blue : Colors.grey[300]!,
+                                  width: 2,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: double.infinity,
+                                    decoration: BoxDecoration(
+                                      color: cityInfo['color'],
+                                      borderRadius: BorderRadius.only(
+                                        topLeft: Radius.circular(6),
+                                        bottomLeft: Radius.circular(6),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                      child: Text(
+                                        displayName.split(',')[0], // Show only city name
+                                        style: TextStyle(
+                                          color: isSelected ? Colors.white : Colors.black87,
+                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                          fontSize: 12,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isSelected)
+                                    Padding(
+                                      padding: const EdgeInsets.only(right: 8.0),
+                                      child: Icon(
+                                        Icons.check_circle,
+                                        color: Colors.white,
+                                        size: 16,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            
+            // Action Buttons
+            Container(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text(
+                        widget.isEnglish ? 'Cancel' : 'বাতিল',
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        widget.onAreaSelected(selectedArea);
+                        Navigator.of(context).pop();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text(widget.isEnglish ? 'Confirm' : 'নিশ্চিত করুন'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
