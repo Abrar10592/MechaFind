@@ -1197,7 +1197,12 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
                   CircleAvatar(
                     radius: 30,
                     backgroundColor: Colors.white.withOpacity(0.2),
-                    child: Icon(Icons.person, color: Colors.white, size: 30),
+                    backgroundImage: _hasProfileImage() 
+                      ? _getProfileImage()
+                      : null,
+                    child: !_hasProfileImage() 
+                      ? Icon(Icons.person, color: Colors.white, size: 30)
+                      : null,
                   ),
                   const SizedBox(height: 12),
                   Text(
