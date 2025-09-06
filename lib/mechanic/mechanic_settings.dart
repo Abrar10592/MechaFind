@@ -526,79 +526,9 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
   }
 
   void _showHelpSupport() {
-    final faqs = [
-      {
-        'question_en': 'How do I receive service requests?',
-        'question_bn': 'আমি কিভাবে সেবার অনুরোধ পাব?',
-        'answer_en': 'Keep your location on and stay online. Requests will come automatically based on your service area.',
-        'answer_bn': 'আপনার অবস্থান চালু রাখুন এবং অনলাইনে থাকুন। আপনার সেবা এলাকার ভিত্তিতে অনুরোধ স্বয়ংক্রিয়ভাবে আসবে।'
-      },
-      {
-        'question_en': 'What payment methods are accepted?',
-        'question_bn': 'কোন পেমেন্ট পদ্ধতি গ্রহণযোগ্য?',
-        'answer_en': 'We accept bKash, Nagad, Rocket, cash, and bank transfers.',
-        'answer_bn': 'আমরা বিকাশ, নগদ, রকেট, নগদ এবং ব্যাংক ট্রান্সফার গ্রহণ করি।'
-      },
-      {
-        'question_en': 'How do I update my service area?',
-        'question_bn': 'আমি কিভাবে আমার সেবা এলাকা আপডেট করব?',
-        'answer_en': 'Go to Settings > Service Area and select your preferred areas in Bangladesh.',
-        'answer_bn': 'সেটিংস > সেবা এলাকায় যান এবং বাংলাদেশে আপনার পছন্দের এলাকা নির্বাচন করুন।'
-      },
-      {
-        'question_en': 'What if customer payment is delayed?',
-        'question_bn': 'গ্রাহকের পেমেন্ট দেরি হলে কি করব?',
-        'answer_en': 'Contact customer first. If no response, report to MechFind support with service details.',
-        'answer_bn': 'প্রথমে গ্রাহকের সাথে যোগাযোগ করুন। কোন সাড়া না পেলে, সেবার বিস্তারিত সহ MechFind সাপোর্টে রিপোর্ট করুন।'
-      },
-      {
-        'question_en': 'How to handle emergency calls?',
-        'question_bn': 'জরুরি কল কিভাবে সামলাবেন?',
-        'answer_en': 'Emergency requests are marked with red color. Accept quickly and inform customer about arrival time.',
-        'answer_bn': 'জরুরি অনুরোধগুলি লাল রঙে চিহ্নিত। দ্রুত গ্রহণ করুন এবং গ্রাহককে পৌঁছানোর সময় জানান।'
-      }
-    ];
-
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(context.locale.languageCode == 'en' ? 'Help & Support' : 'সাহায্য ও সহায়তা'),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 400,
-          child: ListView.builder(
-            itemCount: faqs.length,
-            itemBuilder: (context, index) {
-              final faq = faqs[index];
-              return ExpansionTile(
-                title: Text(
-                  context.locale.languageCode == 'en' 
-                    ? faq['question_en']! 
-                    : faq['question_bn']!,
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                ),
-                children: [
-                  Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      context.locale.languageCode == 'en' 
-                        ? faq['answer_en']! 
-                        : faq['answer_bn']!,
-                      style: TextStyle(fontSize: 13),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(context.locale.languageCode == 'en' ? 'Close' : 'বন্ধ'),
-          ),
-        ],
-      ),
+      builder: (context) => _ModernFaqDialog(),
     );
   }
 
@@ -2320,6 +2250,342 @@ class _ServiceAreaMapDialogState extends State<_ServiceAreaMapDialog> {
                         foregroundColor: Colors.white,
                       ),
                       child: Text(widget.isEnglish ? 'Confirm' : 'নিশ্চিত করুন'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ModernFaqDialog extends StatefulWidget {
+  @override
+  _ModernFaqDialogState createState() => _ModernFaqDialogState();
+}
+
+class _ModernFaqDialogState extends State<_ModernFaqDialog> with TickerProviderStateMixin {
+  TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  int _selectedCategory = 0;
+  late TabController _tabController;
+
+  final List<String> _categories = ['All', 'Getting Started', 'Payments', 'Service Area', 'Emergency', 'Technical'];
+  final List<String> _categoriesBn = ['সব', 'শুরু করা', 'পেমেন্ট', 'সেবা এলাকা', 'জরুরি', 'টেকনিক্যাল'];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: _categories.length, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  final List<Map<String, dynamic>> _allFaqs = [
+    // Getting Started
+    {
+      'category': 1,
+      'icon': Icons.play_arrow,
+      'question_en': 'How do I get started as a mechanic?',
+      'question_bn': 'একজন মেকানিক হিসেবে কিভাবে শুরু করব?',
+      'answer_en': 'Complete your profile with skills, experience, and service area. Turn on location access and go online to start receiving requests.',
+      'answer_bn': 'দক্ষতা, অভিজ্ঞতা এবং সেবা এলাকা সহ আপনার প্রোফাইল সম্পূর্ণ করুন। অবস্থান অ্যাক্সেস চালু করুন এবং অনুরোধ পেতে অনলাইনে যান।'
+    },
+    {
+      'category': 1,
+      'icon': Icons.notifications,
+      'question_en': 'How do I receive service requests?',
+      'question_bn': 'আমি কিভাবে সেবার অনুরোধ পাব?',
+      'answer_en': 'Keep your location on and stay online. Requests will come automatically based on your service area and availability.',
+      'answer_bn': 'আপনার অবস্থান চালু রাখুন এবং অনলাইনে থাকুন। আপনার সেবা এলাকা এবং প্রাপ্যতার ভিত্তিতে অনুরোধ স্বয়ংক্রিয়ভাবে আসবে।'
+    },
+    // Payments
+    {
+      'category': 2,
+      'icon': Icons.payment,
+      'question_en': 'What payment methods are accepted?',
+      'question_bn': 'কোন পেমেন্ট পদ্ধতি গ্রহণযোগ্য?',
+      'answer_en': 'We accept bKash, Nagad, Rocket, cash, and bank transfers. Digital payments are preferred for faster processing.',
+      'answer_bn': 'আমরা বিকাশ, নগদ, রকেট, নগদ এবং ব্যাংক ট্রান্সফার গ্রহণ করি। দ্রুত প্রক্রিয়াকরণের জন্য ডিজিটাল পেমেন্ট পছন্দনীয়।'
+    },
+    {
+      'category': 2,
+      'icon': Icons.schedule,
+      'question_en': 'When do I get paid?',
+      'question_bn': 'আমি কখন পেমেন্ট পাব?',
+      'answer_en': 'Payments are processed within 24-48 hours after service completion and customer confirmation.',
+      'answer_bn': 'সেবা সম্পূর্ণ হওয়ার এবং গ্রাহক নিশ্চিতকরণের ২৪-৪৮ ঘন্টার মধ্যে পেমেন্ট প্রক্রিয়া করা হয়।'
+    },
+    {
+      'category': 2,
+      'icon': Icons.error_outline,
+      'question_en': 'What if customer payment is delayed?',
+      'question_bn': 'গ্রাহকের পেমেন্ট দেরি হলে কি করব?',
+      'answer_en': 'Contact customer first. If no response within 24 hours, report to MechFind support with service details and we will assist.',
+      'answer_bn': 'প্রথমে গ্রাহকের সাথে যোগাযোগ করুন। ২৪ ঘন্টার মধ্যে কোন সাড়া না পেলে, সেবার বিস্তারিত সহ MechFind সাপোর্টে রিপোর্ট করুন এবং আমরা সহায়তা করব।'
+    },
+    // Service Area
+    {
+      'category': 3,
+      'icon': Icons.map,
+      'question_en': 'How do I update my service area?',
+      'question_bn': 'আমি কিভাবে আমার সেবা এলাকা আপডেট করব?',
+      'answer_en': 'Go to Settings > Work Preferences > Service Area. You can select from list view or use the interactive map to choose your coverage areas.',
+      'answer_bn': 'সেটিংস > কাজের পছন্দ > সেবা এলাকায় যান। আপনি তালিকা দেখা থেকে নির্বাচন করতে পারেন বা আপনার কভারেজ এলাকা বেছে নিতে ইন্টারঅ্যাক্টিভ ম্যাপ ব্যবহার করতে পারেন।'
+    },
+    {
+      'category': 3,
+      'icon': Icons.access_time,
+      'question_en': 'Can I set my working hours?',
+      'question_bn': 'আমি কি আমার কাজের সময় নির্ধারণ করতে পারি?',
+      'answer_en': 'Yes! Go to Settings > Work Preferences and set your start and end times. This helps customers know when you\'re available.',
+      'answer_bn': 'হ্যাঁ! সেটিংস > কাজের পছন্দে যান এবং আপনার শুরু এবং শেষের সময় নির্ধারণ করুন। এটি গ্রাহকদের জানতে সাহায্য করে যে আপনি কখন উপলব্ধ।'
+    },
+    // Emergency
+    {
+      'category': 4,
+      'icon': Icons.emergency,
+      'question_en': 'How to handle emergency calls?',
+      'question_bn': 'জরুরি কল কিভাবে সামলাবেন?',
+      'answer_en': 'Emergency requests are marked with red color and special sound. Accept quickly and inform customer about arrival time. These are high-priority.',
+      'answer_bn': 'জরুরি অনুরোধগুলি লাল রঙ এবং বিশেষ শব্দ দিয়ে চিহ্নিত। দ্রুত গ্রহণ করুন এবং গ্রাহককে পৌঁছানোর সময় জানান। এগুলি উচ্চ অগ্রাধিকার।'
+    },
+    {
+      'category': 4,
+      'icon': Icons.local_hospital,
+      'question_en': 'What safety measures should I take?',
+      'question_bn': 'আমার কি নিরাপত্তা ব্যবস্থা নিতে হবে?',
+      'answer_en': 'Always inform someone about your location, carry basic safety tools, and follow traffic rules. Use the app\'s safety features.',
+      'answer_bn': 'সর্বদা কাউকে আপনার অবস্থান জানান, মৌলিক নিরাপত্তা সরঞ্জাম বহন করুন এবং ট্রাফিক নিয়ম মেনে চলুন। অ্যাপের নিরাপত্তা বৈশিষ্ট্য ব্যবহার করুন।'
+    },
+    // Technical
+    {
+      'category': 5,
+      'icon': Icons.settings,
+      'question_en': 'App is not working properly, what should I do?',
+      'question_bn': 'অ্যাপ ঠিকমতো কাজ করছে না, আমি কি করব?',
+      'answer_en': 'Try restarting the app, check your internet connection, and ensure you have the latest version. Contact support if issues persist.',
+      'answer_bn': 'অ্যাপটি পুনরায় চালু করার চেষ্টা করুন, আপনার ইন্টারনেট সংযোগ পরীক্ষা করুন এবং নিশ্চিত করুন যে আপনার কাছে সর্বশেষ সংস্করণ রয়েছে। সমস্যা অব্যাহত থাকলে সহায়তার সাথে যোগাযোগ করুন।'
+    },
+    {
+      'category': 5,
+      'icon': Icons.location_off,
+      'question_en': 'Location is not accurate, how to fix?',
+      'question_bn': 'অবস্থান সঠিক নয়, কিভাবে ঠিক করব?',
+      'answer_en': 'Enable high accuracy GPS, restart location services, and make sure you\'re in an open area with good signal.',
+      'answer_bn': 'উচ্চ নির্ভুলতা GPS সক্ষম করুন, অবস্থান সেবা পুনরায় চালু করুন এবং নিশ্চিত করুন যে আপনি ভাল সংকেত সহ একটি খোলা এলাকায় আছেন।'
+    }
+  ];
+
+  List<Map<String, dynamic>> get _filteredFaqs {
+    List<Map<String, dynamic>> filtered = _allFaqs;
+    
+    // Filter by category
+    if (_selectedCategory > 0) {
+      filtered = filtered.where((faq) => faq['category'] == _selectedCategory).toList();
+    }
+    
+    // Filter by search query
+    if (_searchQuery.isNotEmpty) {
+      final isEnglish = context.locale.languageCode == 'en';
+      filtered = filtered.where((faq) {
+        final question = isEnglish ? faq['question_en'] : faq['question_bn'];
+        final answer = isEnglish ? faq['answer_en'] : faq['answer_bn'];
+        return question.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+               answer.toLowerCase().contains(_searchQuery.toLowerCase());
+      }).toList();
+    }
+    
+    return filtered;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEnglish = context.locale.languageCode == 'en';
+    
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.9,
+        height: MediaQuery.of(context).size.height * 0.8,
+        child: Column(
+          children: [
+            // Header
+            Container(
+              padding: EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.help_outline, color: Colors.blue, size: 24),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      isEnglish ? 'Help & Support' : 'সাহায্য ও সহায়তা',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue.shade800,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(Icons.close, color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Search Bar
+            Padding(
+              padding: EdgeInsets.all(16),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: isEnglish ? 'Search FAQs...' : 'প্রশ্ন অনুসন্ধান করুন...',
+                  prefixIcon: Icon(Icons.search, color: Colors.grey),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.blue),
+                  ),
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
+              ),
+            ),
+            
+            // Category Tabs
+            Container(
+              height: 40,
+              child: TabBar(
+                controller: _tabController,
+                isScrollable: true,
+                indicatorColor: Colors.blue,
+                labelColor: Colors.blue,
+                unselectedLabelColor: Colors.grey,
+                onTap: (index) {
+                  setState(() {
+                    _selectedCategory = index;
+                  });
+                },
+                tabs: (isEnglish ? _categories : _categoriesBn).map((category) => 
+                  Tab(text: category)
+                ).toList(),
+              ),
+            ),
+            
+            // FAQ List
+            Expanded(
+              child: _filteredFaqs.isEmpty 
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.search_off, size: 64, color: Colors.grey),
+                        SizedBox(height: 16),
+                        Text(
+                          isEnglish ? 'No FAQs found' : 'কোন প্রশ্ন পাওয়া যায়নি',
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.all(16),
+                    itemCount: _filteredFaqs.length,
+                    itemBuilder: (context, index) {
+                      final faq = _filteredFaqs[index];
+                      return Card(
+                        margin: EdgeInsets.only(bottom: 12),
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ExpansionTile(
+                          leading: Container(
+                            padding: EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              faq['icon'],
+                              color: Colors.blue.shade700,
+                              size: 20,
+                            ),
+                          ),
+                          title: Text(
+                            isEnglish ? faq['question_en'] : faq['question_bn'],
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade800,
+                            ),
+                          ),
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                              child: Text(
+                                isEnglish ? faq['answer_en'] : faq['answer_bn'],
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade700,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+            ),
+            
+            // Footer
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.grey.shade600, size: 16),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      isEnglish 
+                        ? 'We\'re here to help you succeed as a mechanic on our platform.' 
+                        : 'আমাদের প্ল্যাটফর্মে একজন মেকানিক হিসেবে সফল হতে আমরা এখানে আছি।',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
                     ),
                   ),
                 ],
