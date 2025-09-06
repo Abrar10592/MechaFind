@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../utils.dart';
 
 class MechanicSettings extends StatefulWidget {
@@ -135,40 +136,183 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
     }
   }
 
+  // Helper methods for launching phone and email
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+    try {
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      } else {
+        _showBanner('Could not launch phone dialer');
+      }
+    } catch (e) {
+      _showBanner('Error making phone call');
+    }
+  }
+
+  Future<void> _sendEmail(String email) async {
+    final Uri emailUri = Uri(
+      scheme: 'mailto',
+      path: email,
+      query: 'subject=MechFind Support Request',
+    );
+    try {
+      if (await canLaunchUrl(emailUri)) {
+        await launchUrl(emailUri);
+      } else {
+        _showBanner('Could not launch email app');
+      }
+    } catch (e) {
+      _showBanner('Error opening email app');
+    }
+  }
+
   void _showContactSupport() {
+    final isEnglish = context.locale.languageCode == 'en';
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(context.locale.languageCode == 'en' ? 'Contact Support' : 'সহায়তা যোগাযোগ'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.contact_support, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Text(
+              isEnglish ? 'Contact Support' : 'সহায়তা যোগাযোগ',
+              style: AppTextStyles.heading.copyWith(
+                color: AppColors.primary,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              context.locale.languageCode == 'en' ? 'Official Email:' : 'অফিসিয়াল ইমেইল:',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            // Email Section
+            Row(
+              children: [
+                Icon(Icons.email_outlined, size: 20, color: AppColors.tealPrimary),
+                const SizedBox(width: 8),
+                Text(
+                  isEnglish ? 'Official Email:' : 'অফিসিয়াল ইমেইল:',
+                  style: AppTextStyles.body.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ],
             ),
-            Text('support@mechfind.com.bd'),
-            SizedBox(height: 10),
-            Text(
-              context.locale.languageCode == 'en' ? 'Office Address:' : 'অফিস ঠিকানা:',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            const SizedBox(height: 4),
+            GestureDetector(
+              onTap: () => _sendEmail('support@mechfind.com.bd'),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      'support@mechfind.com.bd',
+                      style: AppTextStyles.body.copyWith(
+                        color: Colors.blue,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(Icons.open_in_new, size: 16, color: Colors.blue),
+                  ],
+                ),
+              ),
             ),
-            Text(context.locale.languageCode == 'en' 
-              ? 'House 45, Road 12\nDhanmondi, Dhaka-1209\nBangladesh'
-              : 'বাড়ি ৪৫, রোড ১২\nধানমন্ডি, ঢাকা-১২০৯\nবাংলাদেশ'),
-            SizedBox(height: 10),
-            Text(
-              context.locale.languageCode == 'en' ? 'Phone:' : 'ফোন:',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            
+            const SizedBox(height: 16),
+            
+            // Phone Section
+            Row(
+              children: [
+                Icon(Icons.phone_outlined, size: 20, color: AppColors.tealPrimary),
+                const SizedBox(width: 8),
+                Text(
+                  isEnglish ? 'Phone:' : 'ফোন:',
+                  style: AppTextStyles.body.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ],
             ),
-            Text('+880-2-9661234'),
+            const SizedBox(height: 4),
+            GestureDetector(
+              onTap: () => _makePhoneCall('+880-2-9661234'),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      '+880-2-9661234',
+                      style: AppTextStyles.body.copyWith(
+                        color: Colors.green,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(Icons.call, size: 16, color: Colors.green),
+                  ],
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Address Section
+            Row(
+              children: [
+                Icon(Icons.location_on_outlined, size: 20, color: AppColors.tealPrimary),
+                const SizedBox(width: 8),
+                Text(
+                  isEnglish ? 'Office Address:' : 'অফিস ঠিকানা:',
+                  style: AppTextStyles.body.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.withOpacity(0.3)),
+              ),
+              child: Text(
+                isEnglish 
+                  ? 'House 45, Road 12\nDhanmondi, Dhaka-1209\nBangladesh'
+                  : 'বাড়ি ৪৫, রোড ১২\nধানমন্ডি, ঢাকা-১২০৯\nবাংলাদেশ',
+                style: AppTextStyles.body.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text(context.locale.languageCode == 'en' ? 'Close' : 'বন্ধ'),
+            style: TextButton.styleFrom(
+              backgroundColor: AppColors.primary.withOpacity(0.1),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: Text(
+              isEnglish ? 'Close' : 'বন্ধ',
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
