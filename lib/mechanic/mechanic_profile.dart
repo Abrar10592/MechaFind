@@ -158,6 +158,7 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
 
   @override
   void dispose() {
+    _clearBanner(); // Clear any existing banners
     _fadeController.dispose();
     _slideController.dispose();
     _pulseController.dispose();
@@ -303,22 +304,24 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
       }
 
       // Update local state
-      setState(() {
-        if (newName != null) mechanicName = newName;
-        if (newEmail != null) {
-          mechanicEmail = newEmail;
-          editableEmail = newEmail;
-        }
-        if (newPhone != null) {
-          mechanicPhone = newPhone;
-          editablePhoneNumber = newPhone;
-        }
-        if (newImageUrl != null) mechanicImageUrl = newImageUrl;
-        if (newLocationX != null) mechanicLocationX = newLocationX;
-        if (newLocationY != null) mechanicLocationY = newLocationY;
-      });
+      if (mounted) {
+        setState(() {
+          if (newName != null) mechanicName = newName;
+          if (newEmail != null) {
+            mechanicEmail = newEmail;
+            editableEmail = newEmail;
+          }
+          if (newPhone != null) {
+            mechanicPhone = newPhone;
+            editablePhoneNumber = newPhone;
+          }
+          if (newImageUrl != null) mechanicImageUrl = newImageUrl;
+          if (newLocationX != null) mechanicLocationX = newLocationX;
+          if (newLocationY != null) mechanicLocationY = newLocationY;
+        });
+      }
 
-      _showBanner('Profile updated successfully!');
+      _showBanner('Profile updated successfully!', autoHide: true);
       print('✅ Profile updated successfully');
 
     } catch (e) {
@@ -703,7 +706,7 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
           })
           .eq('id', requestId);
 
-      _showBanner('Job accepted successfully!');
+      _showBanner('Job accepted successfully!', autoHide: true);
       
       // Refresh the upcoming jobs list
       await _fetchUpcomingJobs();
@@ -783,7 +786,7 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
           })
           .eq('id', requestId);
 
-      _showBanner('Job rejected');
+      _showBanner('Job rejected', autoHide: true);
       
       // Refresh the appropriate list based on where the rejection came from
       if (isFromPending) {
@@ -865,7 +868,7 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
           })
           .eq('id', requestId);
 
-      _showBanner('Job completed successfully!');
+      _showBanner('Job completed successfully!', autoHide: true);
       
       // Refresh both pending jobs and recent activities
       await _fetchPendingJobs();
@@ -929,7 +932,15 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
     }
   }
 
-  void _showBanner(String message) {
+  void _clearBanner() {
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+    }
+  }
+
+  void _showBanner(String message, {bool autoHide = false, Duration? duration}) {
+    if (!mounted) return;
+    
     ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
 
     ScaffoldMessenger.of(context).showMaterialBanner(
@@ -940,13 +951,20 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
         actions: [
           TextButton(
             onPressed: () {
-              ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+              _clearBanner();
             },
             child: const Text('Dismiss', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
+
+    // Auto-hide banner for success messages
+    if (autoHide) {
+      Future.delayed(duration ?? const Duration(seconds: 3), () {
+        _clearBanner();
+      });
+    }
   }
 
   void _showEditContactsDialog() {
