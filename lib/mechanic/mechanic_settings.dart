@@ -90,6 +90,7 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       selectedLanguage = context.locale.languageCode;
+      // Set default to Bengali name, will be translated for display
       selectedServiceArea = prefs.getString('service_area') ?? 'ঢাকা, বাংলাদেশ';
     });
   }
@@ -97,6 +98,40 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
   Future<void> _saveSettings() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('service_area', selectedServiceArea);
+  }
+
+  // Helper method to translate service area for display
+  String _getTranslatedServiceArea(String serviceArea, bool isEnglish) {
+    final cityMap = {
+      'Dhaka, Bangladesh': 'ঢাকা, বাংলাদেশ',
+      'Chittagong, Bangladesh': 'চট্টগ্রাম, বাংলাদেশ',
+      'Sylhet, Bangladesh': 'সিলেট, বাংলাদেশ',
+      'Rajshahi, Bangladesh': 'রাজশাহী, বাংলাদেশ',
+      'Khulna, Bangladesh': 'খুলনা, বাংলাদেশ',
+      'Barisal, Bangladesh': 'বরিশাল, বাংলাদেশ',
+      'Rangpur, Bangladesh': 'রংপুর, বাংলাদেশ',
+      'Mymensingh, Bangladesh': 'ময়মনসিংহ, বাংলাদেশ',
+      'Comilla, Bangladesh': 'কুমিল্লা, বাংলাদেশ',
+      'Narayanganj, Bangladesh': 'নারায়ণগঞ্জ, বাংলাদেশ',
+      'Gazipur, Bangladesh': 'গাজীপুর, বাংলাদেশ',
+      'Savar, Bangladesh': 'সাভার, বাংলাদেশ',
+      'Jessore, Bangladesh': 'জেসোর, বাংলাদেশ',
+      'Dinajpur, Bangladesh': 'দিনাজপুর, বাংলাদেশ',
+      'Bogra, Bangladesh': 'বগুড়া, বাংলাদেশ'
+    };
+
+    if (isEnglish) {
+      // If current language is English, check if serviceArea is in Bengali, then translate to English
+      final englishKey = cityMap.entries
+          .firstWhere((entry) => entry.value == serviceArea, 
+                     orElse: () => MapEntry(serviceArea, serviceArea))
+          .key;
+      return englishKey;
+    } else {
+      // If current language is Bengali, check if serviceArea is in English, then translate to Bengali
+      final bengaliValue = cityMap[serviceArea] ?? serviceArea;
+      return bengaliValue;
+    }
   }
 
   void _showContactSupport() {
@@ -287,23 +322,31 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
   }
 
   void _showServiceAreaSelection() {
-    final bangladeshiCities = [
-      'ঢাকা, বাংলাদেশ',
-      'চট্টগ্রাম, বাংলাদেশ', 
-      'সিলেট, বাংলাদেশ',
-      'রাজশাহী, বাংলাদেশ',
-      'খুলনা, বাংলাদেশ',
-      'বরিশাল, বাংলাদেশ',
-      'রংপুর, বাংলাদেশ',
-      'ময়মনসিংহ, বাংলাদেশ',
-      'কুমিল্লা, বাংলাদেশ',
-      'নারায়ণগঞ্জ, বাংলাদেশ',
-      'গাজীপুর, বাংলাদেশ',
-      'সাভার, বাংলাদেশ',
-      'জেসোর, বাংলাদেশ',
-      'দিনাজপুর, বাংলাদেশ',
-      'বগুড়া, বাংলাদেশ'
-    ];
+    final isEnglish = context.locale.languageCode == 'en';
+    
+    // Bilingual city names - English and Bengali pairs
+    final cityMap = {
+      'Dhaka, Bangladesh': 'ঢাকা, বাংলাদেশ',
+      'Chittagong, Bangladesh': 'চট্টগ্রাম, বাংলাদেশ',
+      'Sylhet, Bangladesh': 'সিলেট, বাংলাদেশ',
+      'Rajshahi, Bangladesh': 'রাজশাহী, বাংলাদেশ',
+      'Khulna, Bangladesh': 'খুলনা, বাংলাদেশ',
+      'Barisal, Bangladesh': 'বরিশাল, বাংলাদেশ',
+      'Rangpur, Bangladesh': 'রংপুর, বাংলাদেশ',
+      'Mymensingh, Bangladesh': 'ময়মনসিংহ, বাংলাদেশ',
+      'Comilla, Bangladesh': 'কুমিল্লা, বাংলাদেশ',
+      'Narayanganj, Bangladesh': 'নারায়ণগঞ্জ, বাংলাদেশ',
+      'Gazipur, Bangladesh': 'গাজীপুর, বাংলাদেশ',
+      'Savar, Bangladesh': 'সাভার, বাংলাদেশ',
+      'Jessore, Bangladesh': 'জেসোর, বাংলাদেশ',
+      'Dinajpur, Bangladesh': 'দিনাজপুর, বাংলাদেশ',
+      'Bogra, Bangladesh': 'বগুড়া, বাংলাদেশ'
+    };
+    
+    // Get display names based on current language
+    final displayCities = isEnglish 
+      ? cityMap.keys.toList() 
+      : cityMap.values.toList();
 
     showDialog(
       context: context,
@@ -313,9 +356,9 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
           width: double.maxFinite,
           height: 300,
           child: ListView.builder(
-            itemCount: bangladeshiCities.length,
+            itemCount: displayCities.length,
             itemBuilder: (context, index) {
-              final city = bangladeshiCities[index];
+              final city = displayCities[index];
               return RadioListTile<String>(
                 title: Text(city),
                 value: city,
@@ -509,8 +552,8 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
                         _buildModernClickableItem(
                           title: isEnglish ? 'Service Area' : 'সেবা এলাকা',
                           subtitle: isEnglish 
-                            ? 'Currently: ${selectedServiceArea.split(',')[0]}' 
-                            : 'বর্তমান: ${selectedServiceArea.split(',')[0]}',
+                            ? 'Currently: ${_getTranslatedServiceArea(selectedServiceArea, true).split(',')[0]}' 
+                            : 'বর্তমান: ${_getTranslatedServiceArea(selectedServiceArea, false).split(',')[0]}',
                           icon: Icons.map_outlined,
                           onTap: _showServiceAreaSelection,
                         ),
