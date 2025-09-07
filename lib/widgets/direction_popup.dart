@@ -45,12 +45,15 @@ class _DirectionPopupState extends State<DirectionPopup>
   latlng.LatLng? _mechanicLocation;
   List<List<latlng.LatLng>> _routes = [];
   StreamSubscription<LocationData>? _locationSubscription;
+  Timer? _requestMonitoringTimer; // Timer to monitor request status
+  RealtimeChannel? _requestSubscription; // Realtime subscription for request changes
 
   double _currentZoom = 14;
   bool _userMovedMap = false;
   double? _distanceInMeters;
   bool _isLoadingRoute = false;
   double? _mechanicHeading; // Direction the mechanic is facing
+  bool _isRejecting = false; // Flag to prevent double rejection
 
   // Animation controllers
   late AnimationController _slideController;
@@ -66,6 +69,7 @@ class _DirectionPopupState extends State<DirectionPopup>
     super.initState();
     _initAnimations();
     _initLocation();
+    _setupRequestMonitoring();
   }
 
   void _initAnimations() {
@@ -143,6 +147,8 @@ class _DirectionPopupState extends State<DirectionPopup>
   }
 
   void _updateMechanicLocation(LocationData locData) {
+    if (!mounted) return;
+    
     final newLoc = latlng.LatLng(locData.latitude!, locData.longitude!);
     setState(() {
       _mechanicLocation = newLoc;
@@ -157,9 +163,11 @@ class _DirectionPopupState extends State<DirectionPopup>
   }
 
   Future<void> _fetchRoutes(latlng.LatLng start, latlng.LatLng end) async {
-    setState(() {
-      _isLoadingRoute = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoadingRoute = true;
+      });
+    }
 
     final accessToken =
         'pk.eyJ1IjoiYWRpbDQyMCIsImEiOiJjbWRrN3dhb2wwdXRnMmxvZ2dhNmY2Nzc3In0.yrzJJ09yyfdT4Zg4Y_CJhQ';
@@ -177,9 +185,11 @@ class _DirectionPopupState extends State<DirectionPopup>
 
         if (routes.isEmpty) {
           debugPrint('No routes found');
-          setState(() {
-            _isLoadingRoute = false;
-          });
+          if (mounted) {
+            setState(() {
+              _isLoadingRoute = false;
+            });
+          }
           return;
         }
 
@@ -199,22 +209,28 @@ class _DirectionPopupState extends State<DirectionPopup>
           }
         }
 
-        setState(() {
-          _routes = parsedRoutes;
-          _distanceInMeters = minDistance;
-          _isLoadingRoute = false;
-        });
+        if (mounted) {
+          setState(() {
+            _routes = parsedRoutes;
+            _distanceInMeters = minDistance;
+            _isLoadingRoute = false;
+          });
+        }
       } else {
         debugPrint('Failed to get routes: ${response.statusCode}');
+        if (mounted) {
+          setState(() {
+            _isLoadingRoute = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching routes: $e');
+      if (mounted) {
         setState(() {
           _isLoadingRoute = false;
         });
       }
-    } catch (e) {
-      debugPrint('Error fetching routes: $e');
-      setState(() {
-        _isLoadingRoute = false;
-      });
     }
   }
 
@@ -231,7 +247,7 @@ class _DirectionPopupState extends State<DirectionPopup>
       builder: (_) => AlertDialog(
         title: Text("Reject Request", style: AppTextStyles.heading),
         content: Text(
-          "Are you sure you want to reject this request?",
+          "Are you sure you want to reject this request? This will permanently ignore it and it won't appear again for you.",
           style: AppTextStyles.body,
         ),
         actions: [
@@ -241,7 +257,39 @@ class _DirectionPopupState extends State<DirectionPopup>
           ),
           TextButton(
             onPressed: () async {
+              if (_isRejecting) return; // Prevent double execution
+              
+              setState(() {
+                _isRejecting = true;
+              });
+              
               try {
+                // Stop monitoring first to prevent interference
+                _requestMonitoringTimer?.cancel();
+                _requestSubscription?.unsubscribe();
+                
+                // Check authentication state before proceeding
+                final currentUser = supabase.auth.currentUser;
+                if (currentUser == null) {
+                  throw Exception('Authentication required');
+                }
+                
+                print('Rejecting request ${widget.requestId} for user ${currentUser.id}');
+                
+                // First, add this request to ignored_requests table to permanently blacklist it
+                try {
+                  await supabase.from('ignored_requests').insert({
+                    'mechanic_id': currentUser.id,
+                    'request_id': widget.requestId,
+                    'ignored_at': DateTime.now().toIso8601String(),
+                  });
+                  print('Request ${widget.requestId} added to ignored list for mechanic ${currentUser.id}');
+                } catch (ignoreError) {
+                  // If ignore insert fails, just log it but continue with rejection
+                  print('Warning: Failed to add request to ignored list: $ignoreError');
+                }
+                
+                // Then update the request to make it available for other mechanics
                 await supabase
                     .from('requests')
                     .update({
@@ -249,19 +297,74 @@ class _DirectionPopupState extends State<DirectionPopup>
                       'status': 'pending',
                       'mech_lat': null,
                       'mech_lng': null,
+                      'rejection_reason': 'mechanic_rejected', // Mark as mechanic rejection
                     })
                     .eq('id', widget.requestId);
+                    
                 print(
-                  'Request ${widget.requestId} rejected: Cleared mechanic_id, mech_lat, mech_lng, and set status to pending',
+                  'Request ${widget.requestId} rejected and permanently ignored: Cleared mechanic_id, mech_lat, mech_lng, and set status to pending',
                 );
-                Navigator.of(context).pop(); // Close dialog
-                Navigator.of(context).pop(); // Close modal
-                widget.onReject(); // Trigger UI update in MechanicLandingScreen
+                
+                if (mounted) {
+                  // Check if we're still on the right page before navigation
+                  final currentRoute = ModalRoute.of(context);
+                  print('Current route: ${currentRoute?.settings.name}');
+                  
+                  Navigator.of(context).pop(); // Close dialog
+                  
+                  // Small delay to prevent navigation stack issues
+                  await Future.delayed(const Duration(milliseconds: 50));
+                  
+                  if (mounted) {
+                    Navigator.of(context).pop(); // Close modal
+                    
+                    // Show success message
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Request rejected and permanently ignored'),
+                        backgroundColor: Colors.green,
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                    
+                    // Small delay to prevent navigation conflicts
+                    await Future.delayed(const Duration(milliseconds: 100));
+                    
+                    if (mounted) {
+                      widget.onReject(); // Trigger UI update in MechanicLandingScreen
+                    }
+                  }
+                }
               } catch (e) {
                 print('Error rejecting request ${widget.requestId}: $e');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error rejecting request: $e')),
-                );
+                if (mounted) {
+                  String errorMessage = 'Error rejecting request';
+                  
+                  // Handle specific error types
+                  if (e.toString().contains('row-level security') || 
+                      e.toString().contains('RLS') || 
+                      e.toString().contains('policy')) {
+                    errorMessage = 'Permission denied. Please check your authentication.';
+                  } else if (e.toString().contains('Authentication required')) {
+                    errorMessage = 'Please sign in again to reject requests.';
+                  } else if (e.toString().contains('network') || 
+                             e.toString().contains('connection')) {
+                    errorMessage = 'Network error. Please check your connection.';
+                  } else if (e.toString().contains('ignored_requests')) {
+                    errorMessage = 'Request rejected but may appear again due to ignore list error.';
+                  }
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(errorMessage),
+                      backgroundColor: Colors.red,
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                }
+                setState(() {
+                  _isRejecting = false; // Reset flag on error
+                });
               }
             },
             child: Text("Yes", style: AppTextStyles.label),
@@ -271,12 +374,184 @@ class _DirectionPopupState extends State<DirectionPopup>
     );
   }
 
+  void _setupRequestMonitoring() {
+    print('Setting up request monitoring for direction popup');
+    
+    // Setup realtime subscription for request changes
+    _requestSubscription = supabase
+        .channel('direction_popup_requests')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'requests',
+          callback: (payload) {
+            final payloadRequestId = (payload.newRecord['id'] ?? payload.oldRecord['id'])?.toString();
+            
+            if (payloadRequestId == widget.requestId) {
+              print('Direction popup: Request ${widget.requestId} changed: ${payload.eventType}');
+              
+              if (payload.eventType == PostgresChangeEvent.update) {
+                final newStatus = payload.newRecord['status'];
+                final newMechanicId = payload.newRecord['mechanic_id'];
+                final rejectionReason = payload.newRecord['rejection_reason'];
+                final currentUserId = supabase.auth.currentUser?.id;
+                
+                print('Status: $newStatus, MechanicId: $newMechanicId, RejectionReason: $rejectionReason, CurrentUser: $currentUserId');
+                
+                if (newStatus == 'completed' || 
+                    newStatus == 'canceled' ||
+                    (newStatus == 'pending' && newMechanicId == null) ||
+                    (newMechanicId != null && newMechanicId != currentUserId)) {
+                  
+                  // Don't show cancellation message if it was rejected by a mechanic
+                  if (rejectionReason == 'mechanic_rejected') {
+                    print('Direction popup: Request was rejected by mechanic, closing silently');
+                    // Close popup without showing message
+                    if (mounted) {
+                      Navigator.of(context).pop();
+                      widget.onReject();
+                    }
+                    return;
+                  }
+                  
+                  String reason = 'Request was cancelled by the user';
+                  if (newStatus == 'completed') {
+                    reason = 'Request was completed';
+                  } else if (newMechanicId != null && newMechanicId != currentUserId) {
+                    reason = 'Request was assigned to another mechanic';
+                  }
+                  
+                  _handleRequestCancellation(reason);
+                }
+              }
+            }
+          },
+        )
+        .subscribe();
+
+    // Start periodic verification
+    _requestMonitoringTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (timer) => _verifyRequestStatus(),
+    );
+  }
+
+  Future<void> _verifyRequestStatus() async {
+    // Don't verify if we're in the middle of rejecting
+    if (_isRejecting) {
+      print('Direction popup: Skipping verification during rejection process');
+      return;
+    }
+    
+    try {
+      // Check authentication state first
+      final currentUser = supabase.auth.currentUser;
+      if (currentUser == null) {
+        print('Direction popup: User not authenticated, stopping verification');
+        _handleRequestCancellation('Session expired. Please sign in again.');
+        return;
+      }
+      
+      final currentRequest = await supabase
+          .from('requests')
+          .select('id, status, mechanic_id, rejection_reason')
+          .eq('id', widget.requestId)
+          .maybeSingle();
+
+      if (currentRequest == null) {
+        print('Direction popup: Request ${widget.requestId} was deleted');
+        _handleRequestCancellation('Request was cancelled by the user');
+      } else {
+        final currentUserId = supabase.auth.currentUser?.id;
+        final status = currentRequest['status'];
+        final mechanicId = currentRequest['mechanic_id'];
+        final rejectionReason = currentRequest['rejection_reason'];
+        
+        if (status != 'accepted' || mechanicId != currentUserId) {
+          print('Direction popup: Request status/assignment changed: $currentRequest');
+          
+          // Don't show cancellation message if it was rejected by a mechanic
+          if (rejectionReason == 'mechanic_rejected') {
+            print('Direction popup: Request was rejected by mechanic, closing silently');
+            // Close popup without showing message
+            if (mounted) {
+              Navigator.of(context).pop();
+              widget.onReject();
+            }
+            return;
+          }
+          
+          String reason = 'Request was cancelled by the user';
+          if (status == 'completed') {
+            reason = 'Request was completed';
+          } else if (mechanicId != null && mechanicId != currentUserId) {
+            reason = 'Request was assigned to another mechanic';
+          }
+          _handleRequestCancellation(reason);
+        } else {
+          print('Direction popup: Request ${widget.requestId} verified as active');
+        }
+      }
+    } catch (e) {
+      print('Direction popup: Error verifying request status: $e');
+      
+      // Only handle critical errors that might indicate auth issues
+      if (e.toString().contains('JWT') || 
+          e.toString().contains('auth') ||
+          e.toString().contains('unauthorized')) {
+        _handleRequestCancellation('Authentication error. Please sign in again.');
+      }
+      // Don't close on other errors, might be temporary network issue
+    }
+  }
+
+  void _handleRequestCancellation(String reason) {
+    // Don't handle cancellation if we're already in the middle of rejecting
+    if (_isRejecting) {
+      print('Direction popup: Ignoring cancellation during manual rejection');
+      return;
+    }
+    
+    print('Direction popup: Handling request cancellation - $reason');
+    
+    // Stop monitoring
+    _requestMonitoringTimer?.cancel();
+    _requestSubscription?.unsubscribe();
+    
+    // Show message to user
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(reason),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      
+      // Close the direction popup
+      try {
+        Navigator.of(context).pop();
+      } catch (e) {
+        print('Error closing direction popup: $e');
+      }
+      
+      // Trigger the onReject callback to update the main screen
+      try {
+        widget.onReject();
+      } catch (e) {
+        print('Error calling onReject callback: $e');
+      }
+    }
+  }
+
   @override
   void dispose() {
     _slideController.dispose();
     _pulseController.dispose();
     _buttonController.dispose();
     _locationSubscription?.cancel();
+    _requestMonitoringTimer?.cancel();
+    _requestSubscription?.unsubscribe();
     super.dispose();
   }
 
@@ -663,6 +938,7 @@ class _DirectionPopupState extends State<DirectionPopup>
                           ],
                         ),
                         child: FloatingActionButton(
+                          heroTag: "direction_location_fab", // Unique hero tag
                           onPressed: () {
                             if (_mechanicLocation != null) {
                               _userMovedMap = false;
@@ -674,7 +950,7 @@ class _DirectionPopupState extends State<DirectionPopup>
                           child: const Icon(
                             Icons.my_location_rounded,
                             color: Colors.white,
-                            size: 24,
+                            size: 28,
                           ),
                         ),
                       ),

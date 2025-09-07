@@ -26,9 +26,6 @@ class _MechanicMapState extends State<MechanicMap> with TickerProviderStateMixin
   bool _isLocationLoading = true;
   bool _isRequestsLoading = false;
   
-  // Store request data for markers
-  List<Map<String, dynamic>> _sosRequestsData = [];
-  
   // Animation controllers for pulsating effect
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -173,17 +170,26 @@ class _MechanicMapState extends State<MechanicMap> with TickerProviderStateMixin
     });
 
     try {
+      // Fetch requests with same filters as mechanic landing screen PLUS accepted requests by this mechanic
       final response = await supabase
           .from('requests')
-          .select('id, user_id, vehicle, description, image, lat, lng, users!left(full_name, phone, image_url)')
-          .eq('status', 'pending')
-          .filter('mechanic_id', 'is', null)
+          .select('id, user_id, guest_id, vehicle, description, image, lat, lng, request_type, status, mechanic_id, users!left(full_name, phone, image_url)')
+          .eq('request_type', 'emergency') // Only emergency requests
+          .or('status.eq.pending,and(status.eq.accepted,mechanic_id.eq.${user.id})') // Pending requests OR accepted by this mechanic
           .timeout(
             const Duration(seconds: 10),
             onTimeout: () => throw Exception('Request timed out'),
           );
 
-      print('Pending requests from Supabase: $response');
+      print('Pending/Accepted SOS requests from Supabase: $response');
+
+      // Fetch ignored requests for this mechanic (same as landing screen)
+      final ignoredResponse = await supabase
+          .from('ignored_requests')
+          .select('request_id')
+          .eq('mechanic_id', user.id);
+
+      final ignoredRequestIds = ignoredResponse.map((item) => item['request_id'].toString()).toSet();
 
       const double maxDistanceKm = 10.0;
       final latlng.Distance distanceCalc = const latlng.Distance();
@@ -193,9 +199,29 @@ class _MechanicMapState extends State<MechanicMap> with TickerProviderStateMixin
 
       for (var request in response) {
         try {
+          final requestStatus = request['status'] ?? 'pending';
+          final requestMechanicId = request['mechanic_id'];
+          
+          // For pending requests, skip ignored ones. For accepted requests, only show if assigned to this mechanic
+          if (requestStatus == 'pending') {
+            if (ignoredRequestIds.contains(request['id'].toString())) {
+              continue; // Skip ignored pending requests
+            }
+            if (requestMechanicId != null) {
+              continue; // Skip pending requests already assigned to someone
+            }
+          } else if (requestStatus == 'accepted') {
+            if (requestMechanicId != user.id) {
+              continue; // Skip accepted requests not assigned to this mechanic
+            }
+          } else {
+            continue; // Skip requests with other statuses
+          }
+          
           final lat = double.tryParse(request['lat']?.toString() ?? '') ?? 0.0;
           final lng = double.tryParse(request['lng']?.toString() ?? '') ?? 0.0;
           
+          // Valid location data filter (same as landing screen)
           if (lat == 0.0 || lng == 0.0) continue;
           
           final point = latlng.LatLng(lat, lng);
@@ -205,11 +231,54 @@ class _MechanicMapState extends State<MechanicMap> with TickerProviderStateMixin
             point,
           );
 
+          // Distance filter (same as landing screen)
           if (distance <= maxDistanceKm) {
-            // Store request data
-            filteredRequestsData.add(request);
+            // Valid user data filter (same as landing screen)
+            if (request['user_id'] == null && request['guest_id'] == null) {
+              // Invalid request - skip
+              continue;
+            }
             
-            // Create marker
+            // Store request data with proper user handling
+            Map<String, dynamic> processedRequest = {
+              'id': request['id'],
+              'vehicle': request['vehicle'],
+              'description': request['description'],
+              'image': request['image'],
+              'lat': lat,
+              'lng': lng,
+              'request_type': request['request_type'] ?? 'emergency',
+              'status': requestStatus,
+              'mechanic_id': requestMechanicId,
+              'distance': distance,
+            };
+            
+            // Handle both guest and authenticated user requests (same as landing screen)
+            if (request['user_id'] != null) {
+              // Authenticated user request
+              processedRequest['user_id'] = request['user_id'];
+              processedRequest['guest_id'] = null;
+              final fullName = request['users']?['full_name'];
+              final phone = request['users']?['phone'];
+              final imageUrl = request['users']?['image_url'];
+              
+              processedRequest['user_name'] = fullName ?? 'Unknown User';
+              processedRequest['phone'] = phone ?? 'N/A';
+              processedRequest['image_url'] = imageUrl;
+            } else if (request['guest_id'] != null) {
+              // Guest request
+              processedRequest['user_id'] = null;
+              processedRequest['guest_id'] = request['guest_id'];
+              processedRequest['user_name'] = 'Guest User';
+              processedRequest['phone'] = 'Contact via app';
+              processedRequest['image_url'] = null;
+            }
+            
+            filteredRequestsData.add(processedRequest);
+            
+            // Create marker using processed data with different styling based on status
+            final isAccepted = requestStatus == 'accepted';
+            
             filteredMarkers.add(
               Marker(
                 point: point,
@@ -221,7 +290,7 @@ class _MechanicMapState extends State<MechanicMap> with TickerProviderStateMixin
                       context: context,
                       isScrollControlled: true,
                       backgroundColor: Colors.transparent,
-                      builder: (_) => _buildEnhancedRequestDetails(request),
+                      builder: (_) => _buildEnhancedRequestDetails(processedRequest),
                     );
                   },
                   child: Container(
@@ -229,22 +298,46 @@ class _MechanicMapState extends State<MechanicMap> with TickerProviderStateMixin
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.red.withOpacity(0.3),
+                          color: (isAccepted ? Colors.green : Colors.red).withOpacity(0.3),
                           blurRadius: 8,
                           spreadRadius: 2,
                         ),
                       ],
                     ),
-                    child: CircleAvatar(
-                      backgroundColor: Colors.white,
-                      radius: 23,
-                      child: CircleAvatar(
-                        radius: 20,
-                        backgroundImage: (request['users']?['image_url'] != null && 
-                            request['users']['image_url'].toString().isNotEmpty)
-                            ? NetworkImage(request['users']['image_url'])
-                            : const AssetImage('zob_assets/user_icon.png') as ImageProvider,
-                      ),
+                    child: Stack(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: Colors.white,
+                          radius: 23,
+                          child: CircleAvatar(
+                            radius: 20,
+                            backgroundImage: (processedRequest['image_url'] != null && 
+                                processedRequest['image_url'].toString().isNotEmpty)
+                                ? NetworkImage(processedRequest['image_url'])
+                                : const AssetImage('zob_assets/user_icon.png') as ImageProvider,
+                          ),
+                        ),
+                        // Add accepted indicator
+                        if (isAccepted)
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            child: Container(
+                              width: 16,
+                              height: 16,
+                              decoration: BoxDecoration(
+                                color: Colors.green,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              child: const Icon(
+                                Icons.check,
+                                size: 10,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -258,10 +351,9 @@ class _MechanicMapState extends State<MechanicMap> with TickerProviderStateMixin
 
       setState(() {
         _sosMarkers = filteredMarkers;
-        _sosRequestsData = filteredRequestsData;
         _isRequestsLoading = false;
       });
-      print('Filtered SOS markers: ${filteredMarkers.length}');
+      print('Filtered SOS markers (pending + accepted): ${filteredMarkers.length}');
     } catch (e) {
       setState(() {
         _isRequestsLoading = false;
@@ -344,9 +436,9 @@ class _MechanicMapState extends State<MechanicMap> with TickerProviderStateMixin
                       backgroundColor: Colors.white,
                       child: CircleAvatar(
                         radius: 32,
-                        backgroundImage: (data['users']?['image_url'] != null && 
-                            data['users']['image_url'].toString().isNotEmpty)
-                            ? NetworkImage(data['users']['image_url'])
+                        backgroundImage: (data['image_url'] != null && 
+                            data['image_url'].toString().isNotEmpty)
+                            ? NetworkImage(data['image_url'])
                             : const AssetImage('zob_assets/user_icon.png') as ImageProvider,
                       ),
                     ),
@@ -357,7 +449,7 @@ class _MechanicMapState extends State<MechanicMap> with TickerProviderStateMixin
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          data['users']?['full_name'] ?? 'Unknown User',
+                          data['user_name'] ?? 'Unknown User',
                           style: AppTextStyles.heading.copyWith(
                             fontSize: FontSizes.subHeading + 2,
                             fontWeight: FontWeight.bold,
@@ -368,13 +460,13 @@ class _MechanicMapState extends State<MechanicMap> with TickerProviderStateMixin
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.1),
+                            color: (data['status'] == 'accepted' ? Colors.green : Colors.red).withOpacity(0.1),
                             borderRadius: BorderRadius.circular(15),
                           ),
                           child: Text(
-                            'Emergency Request',
+                            data['status'] == 'accepted' ? 'Accepted by You' : 'Emergency Request',
                             style: TextStyle(
-                              color: Colors.red,
+                              color: data['status'] == 'accepted' ? Colors.green : Colors.red,
                               fontWeight: FontWeight.w600,
                               fontSize: FontSizes.caption,
                             ),
@@ -464,75 +556,188 @@ class _MechanicMapState extends State<MechanicMap> with TickerProviderStateMixin
                       },
                     ),
                     const SizedBox(height: 16),
-                    _buildEnhancedInfoRow(Icons.phone_rounded, "Phone", data['users']?['phone'] ?? 'Not available'),
+                    _buildEnhancedInfoRow(Icons.phone_rounded, "Phone", data['phone'] ?? 'Not available'),
                   ],
                 ),
               ),
               
               const SizedBox(height: 24),
               
-              // Action buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppColors.primary,
-                            AppColors.primary.withOpacity(0.8),
+              // Action buttons - different based on request status
+              if (data['status'] == 'accepted')
+                // Accepted request buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.green,
+                              Colors.green.withOpacity(0.8),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(25),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.green.withOpacity(0.4),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
+                            ),
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(25),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withOpacity(0.4),
-                            blurRadius: 12,
-                            offset: const Offset(0, 6),
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            // TODO: Navigate to active request page or start navigation
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Navigate to request location'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25),
+                            ),
                           ),
-                        ],
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.navigation_rounded, color: Colors.white),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Navigate',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: FontSizes.body,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      child: ElevatedButton(
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            // TODO: Mark as complete
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Mark request as completed'),
+                                backgroundColor: Colors.blue,
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.check_circle_outline, color: Colors.blue.shade600),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Complete',
+                                style: TextStyle(
+                                  color: Colors.blue.shade600,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: FontSizes.body,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                // Pending request buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.primary,
+                              AppColors.primary.withOpacity(0.8),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(25),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.4),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            // TODO: Add accept request logic here
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Accept request functionality will be implemented'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                          ),
+                          child: Text(
+                            'Accept Request',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: FontSizes.body,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(25),
+                      ),
+                      child: IconButton(
                         onPressed: () {
                           Navigator.pop(context);
-                          // Add accept request logic here
                         },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(25),
-                          ),
-                        ),
-                        child: Text(
-                          'Accept Request',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: FontSizes.body,
-                          ),
-                        ),
+                        icon: const Icon(Icons.close_rounded),
+                        color: Colors.grey.shade600,
+                        iconSize: 28,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(25),
-                    ),
-                    child: IconButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      icon: const Icon(Icons.close_rounded),
-                      color: Colors.grey.shade600,
-                      iconSize: 28,
-                    ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
               
               const SizedBox(height: 16),
             ],
