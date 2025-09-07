@@ -422,21 +422,26 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
       Map<String, dynamic> mechanicUpdateData = {};
       if (newLocationX != null) mechanicUpdateData['location_x'] = newLocationX;
       if (newLocationY != null) mechanicUpdateData['location_y'] = newLocationY;
+      if (newImageUrl != null) mechanicUpdateData['image_url'] = newImageUrl; // Add image to mechanics table too
 
       // Update users table if there's data to update
       if (userUpdateData.isNotEmpty) {
+        print('🔄 Updating users table with: $userUpdateData');
         await supabase
             .from('users')
             .update(userUpdateData)
             .eq('id', user.id);
+        print('✅ Users table updated successfully');
       }
 
-      // Update mechanics table if there's location data to update
+      // Update mechanics table if there's data to update
       if (mechanicUpdateData.isNotEmpty) {
+        print('🔄 Updating mechanics table with: $mechanicUpdateData');
         await supabase
             .from('mechanics')
             .update(mechanicUpdateData)
             .eq('id', user.id);
+        print('✅ Mechanics table updated successfully');
       }
 
       // Update local state
@@ -451,7 +456,11 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
             mechanicPhone = newPhone;
             editablePhoneNumber = newPhone;
           }
-          if (newImageUrl != null) mechanicImageUrl = newImageUrl;
+          if (newImageUrl != null) {
+            mechanicImageUrl = newImageUrl;
+            // Only clear local images if we successfully saved to database
+            print('✅ Database image URL updated, clearing local cache');
+          }
           if (newLocationX != null) mechanicLocationX = newLocationX;
           if (newLocationY != null) mechanicLocationY = newLocationY;
         });
@@ -463,6 +472,17 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
     } catch (e) {
       print('❌ Error updating profile: $e');
       _showBanner('Failed to update profile. Please try again.');
+    }
+  }
+
+  // Method to refresh profile data (useful after image updates)
+  Future<void> _refreshProfileData() async {
+    print('🔄 Refreshing profile data...');
+    await _fetchProfileData();
+    if (mounted) {
+      setState(() {
+        // Force UI rebuild
+      });
     }
   }
 
@@ -1115,23 +1135,73 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
         // Small delay for visual feedback
         await Future.delayed(Duration(milliseconds: 300));
         
+        // Always update local image first for immediate UI feedback
         if (kIsWeb) {
-          // For web platform
           final bytes = await pickedFile.readAsBytes();
           setState(() {
             _webImage = bytes;
-            _profileImage = null; // Clear mobile image
+            _profileImage = null;
           });
         } else {
-          // For mobile platform
           setState(() {
             _profileImage = File(pickedFile.path);
-            _webImage = null; // Clear web image
+            _webImage = null;
           });
         }
         
         ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
-        _showBanner('Profile picture updated successfully!');
+        _showBanner('Uploading to database...');
+        
+        // Try to upload to storage and update database
+        try {
+          print('📤 Starting upload process...');
+          final bytes = kIsWeb ? _webImage! : await _profileImage!.readAsBytes();
+          print('📦 Image bytes size: ${bytes.length}');
+          
+          final uploadedImageUrl = await _uploadImageToStorage(bytes, pickedFile.name);
+          print('🔗 Upload result: $uploadedImageUrl');
+          
+          if (uploadedImageUrl != null) {
+            print('✅ Upload successful, updating database...');
+            // Successfully uploaded, update database
+            await _updateProfile(newImageUrl: uploadedImageUrl);
+            
+            // Update local state to sync everywhere
+            setState(() {
+              mechanicImageUrl = uploadedImageUrl;
+            });
+            
+            // Refresh profile data to ensure sync
+            await _refreshProfileData();
+            
+            print('✅ Profile updated successfully with new image');
+            ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+            _showBanner('Profile picture updated successfully!', autoHide: true);
+          } else {
+            // Storage upload failed, try saving as base64 fallback
+            print('⚠️ Storage failed, trying base64 fallback...');
+            try {
+              final base64Image = 'data:image/${pickedFile.name.split('.').last};base64,${base64Encode(bytes)}';
+              await _updateProfile(newImageUrl: base64Image);
+              
+              setState(() {
+                mechanicImageUrl = base64Image;
+              });
+              
+              print('✅ Saved as base64 fallback');
+              ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+              _showBanner('Profile picture updated (local storage)!', autoHide: true);
+            } catch (base64Error) {
+              print('❌ Base64 fallback also failed: $base64Error');
+              ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+              _showBanner('Image updated locally only. Database save failed.', autoHide: true);
+            }
+          }
+        } catch (uploadError) {
+          print('❌ Upload/Database error: $uploadError');
+          ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+          _showBanner('Image updated locally. Cloud sync failed.', autoHide: true);
+        }
       } else {
         ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
       }
@@ -1139,6 +1209,91 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
       ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
       _showBanner('Image selection failed. Please try again.');
       print('Image picker error: $e');
+    }
+  }
+  
+  Future<String?> _uploadImageToStorage(Uint8List bytes, String fileName) async {
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) {
+        print('❌ Upload failed: No authenticated user');
+        return null;
+      }
+      
+      print('📤 Starting image upload for user: ${user.id}');
+      
+      // Create unique filename
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileExtension = fileName.split('.').last;
+      final uniqueFileName = 'profile_${user.id}_$timestamp.$fileExtension';
+      
+      print('📁 Uploading to filename: $uniqueFileName');
+      
+      // Check if storage is available first
+      try {
+        final buckets = await supabase.storage.listBuckets();
+        print('📦 Available buckets: ${buckets.map((b) => b.name).toList()}');
+        
+        if (buckets.isEmpty) {
+          print('❌ No storage buckets found. Storage might not be configured.');
+          return null;
+        }
+      } catch (listError) {
+        print('❌ Failed to list buckets: $listError');
+        // Continue anyway, try to upload
+      }
+      
+      // Try to create and use a simple bucket approach
+      try {
+        // First try the most likely bucket name
+        final imageUrl = await _tryUploadToBucket('avatars', uniqueFileName, bytes);
+        if (imageUrl != null) return imageUrl;
+        
+        // Try alternative bucket names
+        final bucketNames = ['profile-pictures', 'profiles', 'images', 'pictures'];
+        for (String bucketName in bucketNames) {
+          final url = await _tryUploadToBucket(bucketName, uniqueFileName, bytes);
+          if (url != null) return url;
+        }
+        
+        print('❌ All storage buckets failed');
+        return null;
+        
+      } catch (storageError) {
+        print('❌ Storage service error: $storageError');
+        return null;
+      }
+      
+    } catch (e) {
+      print('❌ Image upload error: $e');
+      return null;
+    }
+  }
+  
+  Future<String?> _tryUploadToBucket(String bucketName, String fileName, Uint8List bytes) async {
+    try {
+      print('🔄 Trying bucket: $bucketName');
+      
+      // Upload to Supabase storage
+      await supabase.storage
+          .from(bucketName)
+          .uploadBinary(fileName, bytes);
+      
+      // Get public URL
+      final imageUrl = supabase.storage
+          .from(bucketName)
+          .getPublicUrl(fileName);
+      
+      if (imageUrl.isNotEmpty) {
+        print('✅ Successfully uploaded to bucket: $bucketName');
+        print('🔗 Public URL: $imageUrl');
+        return imageUrl;
+      }
+      
+      return null;
+    } catch (e) {
+      print('❌ Failed bucket $bucketName: $e');
+      return null;
     }
   }
 
@@ -1407,12 +1562,14 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
                   CircleAvatar(
                     radius: 30,
                     backgroundColor: Colors.white.withOpacity(0.2),
-                    backgroundImage: _hasProfileImage() 
-                      ? _getProfileImage()
-                      : null,
-                    child: !_hasProfileImage() 
-                      ? Icon(Icons.person, color: Colors.white, size: 30)
-                      : null,
+                    backgroundImage: mechanicImageUrl.isNotEmpty 
+                        ? NetworkImage(mechanicImageUrl)
+                        : _hasProfileImage() 
+                            ? _getProfileImage()
+                            : null,
+                    child: (mechanicImageUrl.isEmpty && !_hasProfileImage()) 
+                        ? Icon(Icons.person, color: Colors.white, size: 30)
+                        : null,
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -1706,10 +1863,10 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
                                 child: CircleAvatar(
                                   radius: 38,
                                   backgroundColor: Colors.indigo.shade50,
-                                  backgroundImage: mechanicImageUrl.isNotEmpty 
-                                      ? NetworkImage(mechanicImageUrl)
-                                      : _getProfileImage(),
-                                  child: (mechanicImageUrl.isEmpty && !_hasProfileImage()) ? Icon(
+                                  backgroundImage: _hasProfileImage() 
+                                      ? _getProfileImage()
+                                      : null,
+                                  child: !_hasProfileImage() ? Icon(
                                     Icons.person_rounded,
                                     size: 52,
                                     color: Colors.indigo.shade400,
@@ -3321,6 +3478,19 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
 
   // Helper methods
   ImageProvider? _getProfileImage() {
+    // Prioritize network image from database
+    if (mechanicImageUrl.isNotEmpty) {
+      if (mechanicImageUrl.startsWith('data:image/')) {
+        // Handle base64 images
+        final base64String = mechanicImageUrl.split(',')[1];
+        final bytes = base64Decode(base64String);
+        return MemoryImage(bytes);
+      } else {
+        // Handle network URLs
+        return NetworkImage(mechanicImageUrl);
+      }
+    }
+    // Fall back to local images
     if (kIsWeb && _webImage != null) {
       return MemoryImage(_webImage!);
     } else if (!kIsWeb && _profileImage != null) {
@@ -3330,7 +3500,9 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
   }
 
   bool _hasProfileImage() {
-    return (kIsWeb && _webImage != null) || (!kIsWeb && _profileImage != null);
+    return mechanicImageUrl.isNotEmpty || 
+           (kIsWeb && _webImage != null) || 
+           (!kIsWeb && _profileImage != null);
   }
 }
 
