@@ -158,6 +158,7 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
 
   @override
   void dispose() {
+    _clearBanner(); // Clear any existing banners
     _fadeController.dispose();
     _slideController.dispose();
     _pulseController.dispose();
@@ -303,22 +304,24 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
       }
 
       // Update local state
-      setState(() {
-        if (newName != null) mechanicName = newName;
-        if (newEmail != null) {
-          mechanicEmail = newEmail;
-          editableEmail = newEmail;
-        }
-        if (newPhone != null) {
-          mechanicPhone = newPhone;
-          editablePhoneNumber = newPhone;
-        }
-        if (newImageUrl != null) mechanicImageUrl = newImageUrl;
-        if (newLocationX != null) mechanicLocationX = newLocationX;
-        if (newLocationY != null) mechanicLocationY = newLocationY;
-      });
+      if (mounted) {
+        setState(() {
+          if (newName != null) mechanicName = newName;
+          if (newEmail != null) {
+            mechanicEmail = newEmail;
+            editableEmail = newEmail;
+          }
+          if (newPhone != null) {
+            mechanicPhone = newPhone;
+            editablePhoneNumber = newPhone;
+          }
+          if (newImageUrl != null) mechanicImageUrl = newImageUrl;
+          if (newLocationX != null) mechanicLocationX = newLocationX;
+          if (newLocationY != null) mechanicLocationY = newLocationY;
+        });
+      }
 
-      _showBanner('Profile updated successfully!');
+      _showBanner('Profile updated successfully!', autoHide: true);
       print('✅ Profile updated successfully');
 
     } catch (e) {
@@ -703,7 +706,7 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
           })
           .eq('id', requestId);
 
-      _showBanner('Job accepted successfully!');
+      _showBanner('Job accepted successfully!', autoHide: true);
       
       // Refresh the upcoming jobs list
       await _fetchUpcomingJobs();
@@ -783,7 +786,7 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
           })
           .eq('id', requestId);
 
-      _showBanner('Job rejected');
+      _showBanner('Job rejected', autoHide: true);
       
       // Refresh the appropriate list based on where the rejection came from
       if (isFromPending) {
@@ -865,7 +868,7 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
           })
           .eq('id', requestId);
 
-      _showBanner('Job completed successfully!');
+      _showBanner('Job completed successfully!', autoHide: true);
       
       // Refresh both pending jobs and recent activities
       await _fetchPendingJobs();
@@ -929,7 +932,15 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
     }
   }
 
-  void _showBanner(String message) {
+  void _clearBanner() {
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+    }
+  }
+
+  void _showBanner(String message, {bool autoHide = false, Duration? duration}) {
+    if (!mounted) return;
+    
     ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
 
     ScaffoldMessenger.of(context).showMaterialBanner(
@@ -940,13 +951,20 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
         actions: [
           TextButton(
             onPressed: () {
-              ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+              _clearBanner();
             },
             child: const Text('Dismiss', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
+
+    // Auto-hide banner for success messages
+    if (autoHide) {
+      Future.delayed(duration ?? const Duration(seconds: 3), () {
+        _clearBanner();
+      });
+    }
   }
 
   void _showEditContactsDialog() {
@@ -1179,7 +1197,12 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
                   CircleAvatar(
                     radius: 30,
                     backgroundColor: Colors.white.withOpacity(0.2),
-                    child: Icon(Icons.person, color: Colors.white, size: 30),
+                    backgroundImage: _hasProfileImage() 
+                      ? _getProfileImage()
+                      : null,
+                    child: !_hasProfileImage() 
+                      ? Icon(Icons.person, color: Colors.white, size: 30)
+                      : null,
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -1342,172 +1365,312 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
+            Colors.indigo.shade50,
+            Colors.blue.shade50,
             Colors.white,
-            Colors.grey.shade50,
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          stops: [0.0, 0.5, 1.0],
         ),
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: Colors.indigo.withOpacity(0.1),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.15),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-            spreadRadius: 2,
+            color: Colors.indigo.withOpacity(0.08),
+            blurRadius: 25,
+            offset: const Offset(0, 12),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: Colors.blue.withOpacity(0.05),
+            blurRadius: 40,
+            offset: const Offset(0, 5),
+            spreadRadius: 5,
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Row(
-          children: [
-            // Profile Image with Pulse Animation
-            AnimatedBuilder(
-              animation: _pulseAnimation,
-              builder: (context, child) {
-                return Transform.scale(
-                  scale: _pulseAnimation.value,
-                  child: GestureDetector(
-                    onTap: _pickProfileImage,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withOpacity(0.3),
-                            blurRadius: 20,
-                            spreadRadius: 5,
-                          ),
-                        ],
-                      ),
-                      child: Stack(
-                        children: [
-                          CircleAvatar(
-                            radius: 40,
-                            backgroundColor: Colors.white,
-                            child: CircleAvatar(
-                              radius: 36,
-                              backgroundColor: AppColors.primary.withOpacity(0.1),
-                              backgroundImage: mechanicImageUrl.isNotEmpty 
-                                  ? NetworkImage(mechanicImageUrl)
-                                  : _getProfileImage(),
-                              child: (mechanicImageUrl.isEmpty && !_hasProfileImage()) ? Icon(
-                                Icons.person_rounded,
-                                size: 48,
-                                color: AppColors.primary,
-                              ) : null,
-                            ),
-                          ),
-                          Positioned(
-                            bottom: 2,
-                            right: 2,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    AppColors.primary,
-                                    AppColors.primary.withOpacity(0.8),
-                                  ],
-                                ),
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 3),
-                              ),
-                              padding: const EdgeInsets.all(8),
-                              child: const Icon(
-                                Icons.camera_alt_rounded,
-                                color: Colors.white,
-                                size: 16,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
+      child: Stack(
+        children: [
+          // Background Pattern
+          Positioned(
+            top: -20,
+            right: -20,
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    Colors.indigo.withOpacity(0.03),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(width: 20),
-            // Profile Info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isLoadingProfile ? 'Loading...' : mechanicName,
-                    style: AppTextStyles.heading.copyWith(
-                      fontSize: FontSizes.heading,
-                      fontFamily: AppFonts.primaryFont,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.primary.withOpacity(0.1),
-                          AppColors.secondary.withOpacity(0.1),
-                        ],
+          ),
+          Positioned(
+            bottom: -30,
+            left: -30,
+            child: Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    Colors.blue.withOpacity(0.03),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          
+          // Header Banner
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              height: 6,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.indigo.shade400,
+                    Colors.blue.shade400,
+                    Colors.cyan.shade400,
+                  ],
+                ),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(24),
+                  topRight: Radius.circular(24),
+                ),
+              ),
+            ),
+          ),
+          
+          // Main Content
+          Padding(
+            padding: const EdgeInsets.all(28),
+            child: Row(
+              children: [
+                // Profile Image with Enhanced Styling
+                AnimatedBuilder(
+                  animation: _pulseAnimation,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: _pulseAnimation.value,
+                      child: GestureDetector(
+                        onTap: _pickProfileImage,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.indigo.withOpacity(0.1),
+                                Colors.blue.withOpacity(0.1),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.indigo.withOpacity(0.2),
+                                blurRadius: 20,
+                                spreadRadius: 2,
+                                offset: Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          padding: EdgeInsets.all(4),
+                          child: Stack(
+                            children: [
+                              CircleAvatar(
+                                radius: 42,
+                                backgroundColor: Colors.white,
+                                child: CircleAvatar(
+                                  radius: 38,
+                                  backgroundColor: Colors.indigo.shade50,
+                                  backgroundImage: mechanicImageUrl.isNotEmpty 
+                                      ? NetworkImage(mechanicImageUrl)
+                                      : _getProfileImage(),
+                                  child: (mechanicImageUrl.isEmpty && !_hasProfileImage()) ? Icon(
+                                    Icons.person_rounded,
+                                    size: 52,
+                                    color: Colors.indigo.shade400,
+                                  ) : null,
+                                ),
+                              ),
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.indigo.shade400,
+                                        Colors.blue.shade400,
+                                      ],
+                                    ),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 3),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.indigo.withOpacity(0.3),
+                                        blurRadius: 8,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  padding: const EdgeInsets.all(8),
+                                  child: const Icon(
+                                    Icons.camera_alt_rounded,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      isEnglish ? 'Certified Mechanic' : 'প্রত্যয়িত মেকানিক',
-                      style: AppTextStyles.label.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Rating and Reviews
-                  Row(
+                    );
+                  },
+                ),
+                const SizedBox(width: 24),
+                // Profile Info with Enhanced Design
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Name with enhanced styling
+                      Text(
+                        isLoadingProfile ? 'Loading...' : mechanicName,
+                        style: AppTextStyles.heading.copyWith(
+                          fontSize: 22,
+                          fontFamily: AppFonts.primaryFont,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.indigo.shade800,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      // Professional Badge
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.amber.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.indigo.shade400,
+                              Colors.blue.shade400,
+                            ],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
+                          borderRadius: BorderRadius.circular(25),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.indigo.withOpacity(0.3),
+                              blurRadius: 12,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
-                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.verified,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                            SizedBox(width: 6),
                             Text(
-                              isLoadingProfile ? '0.0' : mechanicRating.toStringAsFixed(1),
-                              style: AppTextStyles.label.copyWith(
-                                color: Colors.amber.shade700,
+                              isEnglish ? 'Certified Mechanic' : 'প্রত্যয়িত মেকানিক',
+                              style: TextStyle(
+                                color: Colors.white,
                                 fontWeight: FontWeight.w600,
+                                fontSize: 13,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Text(
-                        isLoadingProfile 
-                            ? (isEnglish ? 'Loading...' : 'লোড হচ্ছে...')
-                            : isEnglish 
-                                ? '$totalReviews Reviews' 
-                                : '$totalReviews পর্যালোচনা',
-                        style: AppTextStyles.label.copyWith(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                        ),
+                      const SizedBox(height: 16),
+                      
+                      // Rating and Reviews with Enhanced Design
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.amber.shade100,
+                                  Colors.orange.shade100,
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(15),
+                              border: Border.all(
+                                color: Colors.amber.withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isLoadingProfile ? '0.0' : mechanicRating.toStringAsFixed(1),
+                                  style: TextStyle(
+                                    color: Colors.amber.shade700,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.indigo.shade50,
+                              borderRadius: BorderRadius.circular(15),
+                              border: Border.all(
+                                color: Colors.indigo.withOpacity(0.2),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              isLoadingProfile 
+                                  ? (isEnglish ? 'Loading...' : 'লোড হচ্ছে...')
+                                  : isEnglish 
+                                      ? '$totalReviews Reviews' 
+                                      : '$totalReviews পর্যালোচনা',
+                              style: TextStyle(
+                                color: Colors.indigo.shade600,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

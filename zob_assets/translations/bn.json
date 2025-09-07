@@ -145,5 +145,20 @@
   "messages": "বার্তা",
   "no_conversations_yet": "এখনো কোনো কথোপকথন নেই",
   "no_conversations_description": "যখন ব্যবহারকারীরা তাদের গাড়ির সমস্যা নিয়ে আপনাকে বার্তা পাঠাবেন, কথোপকথনগুলো এখানে প্রদর্শিত হবে",
-  "yesterday": "গতকাল"
+  "yesterday": "গতকাল",
+  "send_complaint": "অভিযোগ পাঠান",
+  "your_name": "আপনার নাম",
+  "enter_your_name": "আপনার নাম লিখুন",
+  "complaint_category": "অভিযোগের ধরন",
+  "general_issue": "সাধারণ সমস্যা",
+  "app_bug": "অ্যাপের ত্রুটি",
+  "payment_issue": "পেমেন্ট সমস্যা",
+  "booking_issue": "বুকিং সমস্যা",
+  "profile_issue": "প্রোফাইল সমস্যা",
+  "other": "অন্যান্য",
+  "subject": "বিষয়",
+  "brief_subject": "সংক্ষিপ্ত বিষয়",
+  "complaint_details": "অভিযোগের বিস্তারিত",
+  "describe_your_complaint": "আপনার অভিযোগ বিস্তারিতভাবে বর্ণনা করুন",
+  "please_enter_complaint_details": "অনুগ্রহ করে অভিযোগের বিবরণ লিখুন"
 }
