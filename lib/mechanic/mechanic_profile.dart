@@ -83,6 +83,52 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
     _fetchRecentActivities();
     _fetchUpcomingJobs();
     _fetchPendingJobs();
+    _setupRealtimeSubscription();
+  }
+
+  // Setup real-time subscription for reviews
+  void _setupRealtimeSubscription() {
+    final user = supabase.auth.currentUser;
+    if (user != null) {
+      // Subscribe to reviews table changes for this mechanic
+      supabase
+          .channel('reviews_${user.id}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'reviews',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'mechanic_id',
+              value: user.id,
+            ),
+            callback: (payload) {
+              print('Real-time review update received: ${payload.eventType}');
+              // Refresh profile data when reviews change
+              _fetchProfileData();
+            },
+          )
+          .subscribe();
+    }
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _slideController.dispose();
+    _pulseController.dispose();
+    // Unsubscribe from real-time updates
+    try {
+      final user = supabase.auth.currentUser;
+      if (user != null) {
+        // Note: In a production app, you'd store the channel reference
+        // For now, we'll just ensure cleanup happens
+        supabase.removeAllChannels();
+      }
+    } catch (e) {
+      print('Error cleaning up real-time subscriptions: $e');
+    }
+    super.dispose();
   }
   IconData _getServiceIcon(String serviceType) {
     switch (serviceType.toLowerCase()) {
@@ -156,15 +202,6 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
     _slideController.forward();
   }
 
-  @override
-  void dispose() {
-    _clearBanner(); // Clear any existing banners
-    _fadeController.dispose();
-    _slideController.dispose();
-    _pulseController.dispose();
-    super.dispose();
-  }
-
   Future<void> _fetchProfileData() async {
     final user = supabase.auth.currentUser;
     if (user == null) {
@@ -194,16 +231,35 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
           .eq('id', user.id)
           .single();
 
+      print('Mechanic data retrieved: ${mechanicResponse}'); // Debug log
+      print('Mechanic ID being used: ${user.id}'); // Debug log
+
       // Use the mechanic rating if available, otherwise calculate from reviews
       double mechanicDbRating = (mechanicResponse['rating'] as num?)?.toDouble() ?? 0.0;
       double? locationX = (mechanicResponse['location_x'] as num?)?.toDouble();
       double? locationY = (mechanicResponse['location_y'] as num?)?.toDouble();
 
-      // Fetch reviews count
+      // First, let's check if there are ANY reviews in the reviews table
+      final allReviewsResponse = await supabase
+          .from('reviews')
+          .select('id, mechanic_id')
+          .limit(10);
+      
+      print('Total reviews in database: ${allReviewsResponse.length}'); // Debug log
+      if (allReviewsResponse.isNotEmpty) {
+        print('Sample review mechanic_ids: ${allReviewsResponse.map((r) => r['mechanic_id']).take(3).toList()}'); // Debug log
+      }
+
+      // Fetch reviews count with better debugging
+      print('Fetching reviews count for mechanic: ${user.id}'); // Debug log
+      
       final reviewsResponse = await supabase
           .from('reviews')
-          .select('rating')
-          .eq('mechanic_id', user.id);
+          .select('rating, created_at')
+          .eq('mechanic_id', user.id)
+          .order('created_at', ascending: false);
+
+      print('Reviews response: ${reviewsResponse.length} reviews found'); // Debug log
 
       // Calculate rating and review count
       final reviews = reviewsResponse as List<dynamic>;
@@ -255,6 +311,86 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
         isLoadingProfile = false;
       });
       _showBanner('Failed to load profile data. Please try again.');
+    }
+  }
+
+  // Show reviews screen with individual reviews
+  void _showReviewsScreen() async {
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return ReviewsDialog(
+          mechanicId: supabase.auth.currentUser?.id ?? '',
+          mechanicName: mechanicName,
+          mechanicRating: mechanicRating,
+          totalReviews: totalReviews,
+        );
+      },
+    );
+    
+    // Refresh profile data when returning from reviews screen
+    // This ensures the review count is always up-to-date
+    _fetchProfileData();
+  }
+
+  // Test method to verify database connectivity and data
+  Future<void> _testDatabaseConnection() async {
+    try {
+      print('=== DATABASE CONNECTIVITY TEST ===');
+      final user = supabase.auth.currentUser;
+      if (user == null) {
+        print('❌ No user logged in');
+        return;
+      }
+      
+      print('✅ User logged in: ${user.id}');
+      
+      // Test 1: Check if mechanic exists in mechanics table
+      try {
+        final mechanicCheck = await supabase
+            .from('mechanics')
+            .select('id')
+            .eq('id', user.id);
+        print('✅ Mechanic exists in mechanics table: ${mechanicCheck.isNotEmpty}');
+        if (mechanicCheck.isEmpty) {
+          print('❌ Current user is not in mechanics table!');
+        }
+      } catch (e) {
+        print('❌ Error checking mechanics table: $e');
+      }
+      
+      // Test 2: Check total reviews in database
+      try {
+        final allReviews = await supabase
+            .from('reviews')
+            .select('id, mechanic_id, user_id, rating');
+        print('✅ Total reviews in database: ${allReviews.length}');
+        if (allReviews.isNotEmpty) {
+          final uniqueMechanics = allReviews.map((r) => r['mechanic_id']).toSet();
+          print('✅ Reviews for ${uniqueMechanics.length} different mechanics');
+          print('✅ Sample mechanic IDs with reviews: ${uniqueMechanics.take(3).toList()}');
+        }
+      } catch (e) {
+        print('❌ Error fetching all reviews: $e');
+      }
+      
+      // Test 3: Check reviews for current user
+      try {
+        final myReviews = await supabase
+            .from('reviews')
+            .select('*')
+            .eq('mechanic_id', user.id);
+        print('✅ Reviews for current mechanic (${user.id}): ${myReviews.length}');
+        if (myReviews.isNotEmpty) {
+          print('✅ Sample review: ${myReviews[0]}');
+        }
+      } catch (e) {
+        print('❌ Error fetching my reviews: $e');
+      }
+      
+      print('=== END DATABASE TEST ===');
+    } catch (e) {
+      print('❌ Database test failed: $e');
     }
   }
 
@@ -1639,26 +1775,43 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
                             ),
                           ),
                           const SizedBox(width: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.indigo.shade50,
-                              borderRadius: BorderRadius.circular(15),
-                              border: Border.all(
-                                color: Colors.indigo.withOpacity(0.2),
-                                width: 1,
+                          GestureDetector(
+                            onTap: totalReviews > 0 ? () => _showReviewsScreen() : null,
+                            onLongPress: () => _testDatabaseConnection(), // Debug: Long press to test database
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: totalReviews > 0 ? Colors.indigo.shade50 : Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(15),
+                                border: Border.all(
+                                  color: totalReviews > 0 ? Colors.indigo.withOpacity(0.2) : Colors.grey.withOpacity(0.3),
+                                  width: 1,
+                                ),
                               ),
-                            ),
-                            child: Text(
-                              isLoadingProfile 
-                                  ? (isEnglish ? 'Loading...' : 'লোড হচ্ছে...')
-                                  : isEnglish 
-                                      ? '$totalReviews Reviews' 
-                                      : '$totalReviews পর্যালোচনা',
-                              style: TextStyle(
-                                color: Colors.indigo.shade600,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    isLoadingProfile 
+                                        ? (isEnglish ? 'Loading...' : 'লোড হচ্ছে...')
+                                        : isEnglish 
+                                            ? '$totalReviews Reviews' 
+                                            : '$totalReviews পর্যালোচনা',
+                                    style: TextStyle(
+                                      color: totalReviews > 0 ? Colors.indigo.shade600 : Colors.grey.shade600,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  if (totalReviews > 0) ...[
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      Icons.arrow_forward_ios_rounded,
+                                      size: 10,
+                                      color: Colors.indigo.shade600,
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                           ),
@@ -3319,5 +3472,427 @@ class _MapLocationPickerState extends State<_MapLocationPicker> {
         ],
       ),
     );
+  }
+}
+
+// Reviews Dialog Widget
+class ReviewsDialog extends StatefulWidget {
+  final String mechanicId;
+  final String mechanicName;
+  final double mechanicRating;
+  final int totalReviews;
+
+  const ReviewsDialog({
+    super.key,
+    required this.mechanicId,
+    required this.mechanicName,
+    required this.mechanicRating,
+    required this.totalReviews,
+  });
+
+  @override
+  State<ReviewsDialog> createState() => _ReviewsDialogState();
+}
+
+class _ReviewsDialogState extends State<ReviewsDialog> {
+  List<Map<String, dynamic>> reviews = [];
+  bool isLoading = true;
+  final supabase = Supabase.instance.client;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchReviews();
+  }
+
+  Future<void> _fetchReviews() async {
+    try {
+      setState(() {
+        isLoading = true;
+      });
+
+      print('Fetching reviews for mechanic: ${widget.mechanicId}'); // Debug log
+
+      // First, let's check if there are reviews at all for this mechanic
+      final basicReviewsResponse = await supabase
+          .from('reviews')
+          .select('id, rating, mechanic_id, user_id')
+          .eq('mechanic_id', widget.mechanicId);
+
+      print('Basic reviews found: ${basicReviewsResponse.length}'); // Debug log
+      if (basicReviewsResponse.isNotEmpty) {
+        print('Sample basic review: ${basicReviewsResponse[0]}'); // Debug log
+      }
+
+      // Check if any reviews have user_id
+      final reviewsWithUsers = basicReviewsResponse.where((r) => r['user_id'] != null).length;
+      print('Reviews with user_id: $reviewsWithUsers out of ${basicReviewsResponse.length}'); // Debug log
+
+      // Try to fetch detailed reviews with user information (optional join)
+      final response = await supabase
+          .from('reviews')
+          .select('''
+            id,
+            rating,
+            comment,
+            created_at,
+            user_id,
+            mechanic_id,
+            users(full_name, image_url)
+          ''')
+          .eq('mechanic_id', widget.mechanicId)
+          .order('created_at', ascending: false);
+
+      print('Detailed reviews fetched: ${response.length}'); // Debug log
+      print('Sample detailed review: ${response.isNotEmpty ? response[0] : 'No data'}'); // Debug log
+
+      setState(() {
+        reviews = List<Map<String, dynamic>>.from(response);
+        isLoading = false;
+      });
+
+    } catch (e) {
+      print('Error fetching reviews: $e');
+      print('Stack trace: ${StackTrace.current}'); // More detailed error info
+      
+      // Try a simpler query without user join as fallback
+      try {
+        print('Attempting fallback query without user join...'); // Debug log
+        final fallbackResponse = await supabase
+            .from('reviews')
+            .select('id, rating, comment, created_at, user_id, mechanic_id')
+            .eq('mechanic_id', widget.mechanicId)
+            .order('created_at', ascending: false);
+        
+        print('Fallback query successful: ${fallbackResponse.length} reviews'); // Debug log
+        
+        setState(() {
+          reviews = List<Map<String, dynamic>>.from(fallbackResponse);
+          isLoading = false;
+        });
+      } catch (fallbackError) {
+        print('Fallback query also failed: $fallbackError'); // Debug log
+        setState(() {
+          isLoading = false;
+          reviews = []; // Clear any existing data on error
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isEnglish = context.locale.languageCode == 'en';
+    
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.9,
+        height: MediaQuery.of(context).size.height * 0.8,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            colors: [
+              Colors.white,
+              Colors.blue.shade50,
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.indigo.shade600,
+                    Colors.purple.shade600,
+                  ],
+                ),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          isEnglish ? 'Customer Reviews' : 'গ্রাহক পর্যালোচনা',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      // Add refresh button
+                      IconButton(
+                        onPressed: isLoading ? null : _fetchReviews,
+                        icon: Icon(
+                          Icons.refresh_rounded,
+                          color: isLoading ? Colors.white54 : Colors.white,
+                        ),
+                        tooltip: isEnglish ? 'Refresh Reviews' : 'পর্যালোচনা রিফ্রেশ করুন',
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Rating Summary
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Column(
+                          children: [
+                            Text(
+                              widget.mechanicRating.toStringAsFixed(1),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Row(
+                              children: List.generate(5, (index) {
+                                return Icon(
+                                  index < widget.mechanicRating.floor()
+                                      ? Icons.star_rounded
+                                      : index < widget.mechanicRating
+                                          ? Icons.star_half_rounded
+                                          : Icons.star_outline_rounded,
+                                  color: Colors.amber,
+                                  size: 16,
+                                );
+                              }),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 20),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.mechanicName,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                isEnglish
+                                    ? '${widget.totalReviews} reviews'
+                                    : '${widget.totalReviews} পর্যালোচনা',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Reviews List
+            Expanded(
+              child: isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(),
+                    )
+                  : reviews.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.rate_review_outlined,
+                                size: 64,
+                                color: Colors.grey.shade400,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                isEnglish
+                                    ? 'No reviews yet'
+                                    : 'এখনও কোন পর্যালোচনা নেই',
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                isEnglish
+                                    ? 'Reviews from customers will appear here'
+                                    : 'গ্রাহকদের পর্যালোচনা এখানে দেখা যাবে',
+                                style: TextStyle(
+                                  color: Colors.grey.shade500,
+                                  fontSize: 14,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: reviews.length,
+                          itemBuilder: (context, index) {
+                            final review = reviews[index];
+                            return _buildReviewCard(review, isEnglish);
+                          },
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReviewCard(Map<String, dynamic> review, bool isEnglish) {
+    final DateTime reviewDate = DateTime.parse(review['created_at']);
+    final String customerName = review['users']?['full_name'] ?? 'Anonymous Customer';
+    final String customerImageUrl = review['users']?['image_url'] ?? '';
+    final int rating = review['rating'] ?? 0;
+    final String comment = review['comment'] ?? '';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            spreadRadius: 1,
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              // Customer Avatar
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: Colors.indigo.shade100,
+                backgroundImage: customerImageUrl.isNotEmpty
+                    ? NetworkImage(customerImageUrl)
+                    : null,
+                child: customerImageUrl.isEmpty
+                    ? Icon(
+                        Icons.person,
+                        color: Colors.indigo.shade600,
+                        size: 20,
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      customerName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        // Star rating
+                        Row(
+                          children: List.generate(5, (index) {
+                            return Icon(
+                              index < rating
+                                  ? Icons.star_rounded
+                                  : Icons.star_outline_rounded,
+                              color: Colors.amber,
+                              size: 16,
+                            );
+                          }),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _getTimeAgo(reviewDate, isEnglish),
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (comment.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                comment,
+                style: const TextStyle(
+                  fontSize: 14,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _getTimeAgo(DateTime dateTime, bool isEnglish) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inDays > 30) {
+      final months = (difference.inDays / 30).floor();
+      return isEnglish ? '$months month${months > 1 ? 's' : ''} ago' : '$months মাস আগে';
+    } else if (difference.inDays > 0) {
+      return isEnglish ? '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago' : '${difference.inDays} দিন আগে';
+    } else if (difference.inHours > 0) {
+      return isEnglish ? '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago' : '${difference.inHours} ঘন্টা আগে';
+    } else if (difference.inMinutes > 0) {
+      return isEnglish ? '${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''} ago' : '${difference.inMinutes} মিনিট আগে';
+    } else {
+      return isEnglish ? 'Just now' : 'এইমাত্র';
+    }
   }
 }
