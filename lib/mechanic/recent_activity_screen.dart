@@ -50,7 +50,6 @@ class _RecentActivityScreenState extends State<RecentActivityScreen> {
           ''')
           .eq('mechanic_id', user.id)
           .eq('status', 'completed')
-          .eq('request_type', 'emergency')
           .order('created_at', ascending: false)
           .limit(20);
 

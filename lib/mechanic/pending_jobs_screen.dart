@@ -55,7 +55,6 @@ class _PendingJobsScreenState extends State<PendingJobsScreen> {
           ''')
           .eq('mechanic_id', user.id)
           .eq('status', 'accepted')
-          .eq('request_type', 'normal')
           .order('created_at', ascending: false)
           .limit(10);
 

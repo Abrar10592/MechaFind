@@ -577,11 +577,14 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
 
       final user = supabase.auth.currentUser;
       if (user == null) {
+        print('DEBUG: No authenticated user found');
         setState(() {
           isLoadingActivities = false;
         });
         return;
       }
+
+      print('DEBUG: Fetching recent activities for mechanic_id: ${user.id}');
 
       final response = await supabase
           .from('requests')
@@ -594,13 +597,48 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
             status,
             user_id,
             guest_id,
+            mechanic_id,
             users(full_name, phone, image_url)
           ''')
           .eq('mechanic_id', user.id)
           .eq('status', 'completed')
-          .eq('request_type', 'emergency')
           .order('created_at', ascending: false)
-          .limit(10);
+          .limit(20);
+
+      print('DEBUG: Recent activities query response: ${response.length} records found');
+      
+      // Debug: Print all completed tasks for this mechanic
+      for (var i = 0; i < response.length; i++) {
+        final activity = response[i];
+        print('DEBUG Activity $i: ID=${activity['id']}, Type=${activity['request_type']}, Status=${activity['status']}, Created=${activity['created_at']}, Description=${activity['description']}');
+      }
+
+      // Also fetch ALL completed tasks to check if the missing one exists
+      final allCompletedResponse = await supabase
+          .from('requests')
+          .select('''
+            id,
+            request_type,
+            description,
+            created_at,
+            status,
+            mechanic_id,
+            users(full_name, phone, image_url)
+          ''')
+          .eq('status', 'completed')
+          .order('created_at', ascending: false);
+
+      print('DEBUG: Total completed tasks in system: ${allCompletedResponse.length}');
+      print('DEBUG: Tasks assigned to this mechanic (${user.id}):');
+      
+      var mechanicTaskCount = 0;
+      for (var task in allCompletedResponse) {
+        if (task['mechanic_id'] == user.id) {
+          mechanicTaskCount++;
+          print('DEBUG Mechanic Task: ID=${task['id']}, Created=${task['created_at']}, Type=${task['request_type']}');
+        }
+      }
+      print('DEBUG: Total completed tasks for this mechanic: $mechanicTaskCount');
 
       // Process response to add customer name
       final List<Map<String, dynamic>> processedActivities = [];
@@ -619,6 +657,44 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
         }
         
         processedActivities.add(processedActivity);
+      }
+
+      // Debug: Cross-reference with reviews to find missing completed tasks
+      try {
+        final reviewsResponse = await supabase
+            .from('reviews')
+            .select('id, mechanic_id, request_id, rating, comment, created_at')
+            .eq('mechanic_id', user.id);
+        
+        print('DEBUG: Found ${reviewsResponse.length} reviews for this mechanic');
+        
+        final requestIdsFromReviews = reviewsResponse.map((review) => review['request_id']).toSet();
+        final requestIdsFromActivities = response.map((activity) => activity['id']).toSet();
+        
+        print('DEBUG: Request IDs from reviews: $requestIdsFromReviews');
+        print('DEBUG: Request IDs from recent activities: $requestIdsFromActivities');
+        
+        final missingRequestIds = requestIdsFromReviews.difference(requestIdsFromActivities);
+        if (missingRequestIds.isNotEmpty) {
+          print('DEBUG: FOUND MISSING TASKS! Request IDs with reviews but not in recent activities: $missingRequestIds');
+          
+          // Fetch details of missing tasks
+          for (var requestId in missingRequestIds) {
+            final missingTaskResponse = await supabase
+                .from('requests')
+                .select('id, status, mechanic_id, created_at, request_type, description')
+                .eq('id', requestId);
+            
+            if (missingTaskResponse.isNotEmpty) {
+              final task = missingTaskResponse.first;
+              print('DEBUG: Missing task details: ID=${task['id']}, Status=${task['status']}, MechanicID=${task['mechanic_id']}, Created=${task['created_at']}');
+            }
+          }
+        } else {
+          print('DEBUG: All reviewed tasks are showing in recent activities');
+        }
+      } catch (reviewsError) {
+        print('DEBUG: Error checking reviews cross-reference: $reviewsError');
       }
 
       setState(() {
@@ -667,7 +743,6 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
           ''')
           .eq('mechanic_id', user.id)
           .eq('status', 'pending')
-          .eq('request_type', 'normal')
           .order('created_at', ascending: false)
           .limit(10);
 
@@ -736,7 +811,6 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
           ''')
           .eq('mechanic_id', user.id)
           .eq('status', 'accepted')
-          .eq('request_type', 'normal')
           .order('created_at', ascending: false)
           .limit(10);
 
