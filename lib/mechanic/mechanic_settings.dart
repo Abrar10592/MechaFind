@@ -1558,8 +1558,6 @@ Sent from MechFind Mobile App
                     
                     // Action Buttons
                     _buildModernSignOutButton(isEnglish),
-                    const SizedBox(height: 16),
-                    _buildModernDeleteButton(isEnglish),
                     const SizedBox(height: 32),
                   ],
                 ),
@@ -1631,52 +1629,6 @@ Sent from MechFind Mobile App
             Navigator.of(context).pushNamedAndRemoveUntil('/signin', (route) => false);
           },
           child: Text(context.locale.languageCode == 'en' ? 'Sign Out' : 'সাইন আউট'),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDeleteButton(BuildContext context) {
-    return Center(
-      child: SizedBox(
-        width: 200, // Fixed width (same as sign out)
-        height: 45, // Fixed height (same as sign out)
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.grey[800],
-            foregroundColor: Colors.white,
-          ),
-          onPressed: () async {
-            final confirmed = await showDialog<bool>(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: Text(context.locale.languageCode == 'en' ? 'Delete Account' : 'অ্যাকাউন্ট মুছুন'),
-                content: Text(context.locale.languageCode == 'en' ? 'Are you sure you want to delete your account? This action cannot be undone.' : 'আপনি কি নিশ্চিত যে আপনি আপনার অ্যাকাউন্ট মুছতে চান? এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না।'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: Text(context.locale.languageCode == 'en' ? 'Cancel' : 'বাতিল'),
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: () => Navigator.of(context).pop(true),
-                    child: Text(context.locale.languageCode == 'en' ? 'Delete' : 'মুছুন'),
-                  ),
-                ],
-              ),
-            );
-            if (confirmed == true) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(context.locale.languageCode == 'en' ? 'Account deleted' : 'অ্যাকাউন্ট মুছে ফেলা হয়েছে')
-                )
-              );
-            }
-          },
-          child: Text(context.locale.languageCode == 'en' ? 'Delete Account' : 'অ্যাকাউন্ট মুছুন'),
         ),
       ),
     );
@@ -2128,41 +2080,6 @@ Sent from MechFind Mobile App
     );
   }
 
-  Widget _buildModernDeleteButton(bool isEnglish) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.danger.withOpacity(0.3), width: 2),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: ElevatedButton.icon(
-        onPressed: () => _showDeleteConfirmation(context, isEnglish),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 16),
-        ),
-        icon: Icon(
-          Icons.delete_outline,
-          color: AppColors.danger,
-          size: 20,
-        ),
-        label: Text(
-          isEnglish ? 'Delete Account' : 'অ্যাকাউন্ট মুছুন',
-          style: AppTextStyles.body.copyWith(
-            color: AppColors.danger,
-            fontFamily: AppFonts.primaryFont,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
-  }
-
   void _showSignOutConfirmation(BuildContext context, bool isEnglish) {
     showDialog(
       context: context,
@@ -2213,76 +2130,6 @@ Sent from MechFind Mobile App
             ),
             child: Text(
               isEnglish ? 'Sign Out' : 'সাইন আউট',
-              style: AppTextStyles.body.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDeleteConfirmation(BuildContext context, bool isEnglish) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(Icons.delete_outline, color: AppColors.danger),
-            const SizedBox(width: 12),
-            Text(
-              isEnglish ? 'Delete Account' : 'অ্যাকাউন্ট মুছুন',
-              style: AppTextStyles.heading.copyWith(
-                color: AppColors.danger,
-                fontSize: 18,
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          isEnglish 
-            ? 'Are you sure you want to delete your account? This action cannot be undone.' 
-            : 'আপনি কি নিশ্চিত যে আপনি আপনার অ্যাকাউন্ট মুছতে চান? এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না।',
-          style: AppTextStyles.body.copyWith(
-            color: AppColors.textSecondary,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(
-              isEnglish ? 'Cancel' : 'বাতিল',
-              style: AppTextStyles.body.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              // Add delete account logic here
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    isEnglish 
-                      ? 'Account deletion requested' 
-                      : 'অ্যাকাউন্ট মুছে ফেলার অনুরোধ করা হয়েছে',
-                  ),
-                  backgroundColor: AppColors.danger,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.danger,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              isEnglish ? 'Delete' : 'মুছুন',
               style: AppTextStyles.body.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w600,
