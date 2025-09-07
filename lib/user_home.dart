@@ -529,7 +529,12 @@ mechanic_services(service_id, services(name))
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                 onPressed: () async {
                   try {
-                    await supabase.from('requests').update({'status': 'canceled'}).eq('id', request['id']);
+                    await supabase.from('requests').update({
+                      'status': 'canceled',
+                      'mechanic_id': null,
+                      'mech_lat': null,
+                      'mech_lng': null,
+                    }).eq('id', request['id']);
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Request cancelled')),

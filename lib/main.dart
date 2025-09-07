@@ -18,6 +18,7 @@ import 'screens/history/history_page.dart';
 import 'screens/messages/messages_page.dart';
 import 'screens/settings/settings_profile_screen.dart';
 import 'screens/splash/splash_screen.dart';
+import 'mechanic/notifications_page.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'services/message_notification_service.dart';
 import 'utils.dart';
@@ -217,6 +218,7 @@ class _MechFindAppState extends State<MechFindApp> {
         '/messages': (context) => const MessagesPage(),
         '/history': (context) => const HistoryPage(),
         '/settings': (context) => const SettingsProfileScreen(),
+        '/notifications': (context) => const NotificationsPage(),
         '/active_emergency_route': (context) {
           final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
           return ActiveEmergencyRoutePage(requestId: args['requestId'], userLocation: args['userLocation']);

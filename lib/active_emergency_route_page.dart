@@ -516,6 +516,15 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage>
     try {
       debugPrint('🗑️ Removing mechanic - updating request to pending status...');
       
+      // Get the current mechanic ID before removing
+      final currentRequest = await Supabase.instance.client
+          .from('requests')
+          .select('mechanic_id')
+          .eq('id', widget.requestId)
+          .single();
+      
+      final mechanicId = currentRequest['mechanic_id'];
+      
       // Immediately update local state to show waiting UI
       setState(() {
         _mechanicRemoved = true;
@@ -544,6 +553,23 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage>
           .select();
 
       debugPrint('✅ Mechanic removal update completed: $updateResult');
+      
+      // Add the fired mechanic to ignored_requests table so they don't see this request again
+      if (mechanicId != null) {
+        try {
+          await Supabase.instance.client
+              .from('ignored_requests')
+              .insert({
+                'mechanic_id': mechanicId,
+                'request_id': widget.requestId,
+                'ignored_at': DateTime.now().toIso8601String(),
+              });
+          debugPrint('✅ Added fired mechanic $mechanicId to ignored_requests for request ${widget.requestId}');
+        } catch (ignoreError) {
+          // Log but don't fail the main operation if this fails
+          debugPrint('⚠️ Failed to add mechanic to ignored_requests: $ignoreError');
+        }
+      }
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
