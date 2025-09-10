@@ -52,7 +52,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     try {
-      final response = await supabase
+      final List<dynamic> data = await supabase
           .from('messages')
           .select('id, sender_id, receiver_id, content, created_at, is_read')
           .or(
@@ -61,14 +61,18 @@ class _ChatScreenState extends State<ChatScreen> {
           .order('created_at', ascending: true);
 
       setState(() {
-        _messages = List<Map<String, dynamic>>.from(response)
-          ..sort((a, b) => DateTime.parse(a['created_at'])
+        _messages = List<Map<String, dynamic>>.from(data);
+        if (_messages.isNotEmpty) {
+          _messages.sort((a, b) => DateTime.parse(a['created_at'])
               .compareTo(DateTime.parse(b['created_at'])));
+        }
         _isLoading = false;
       });
 
-      // Mark messages from mechanic as read
-      await _markMessagesAsRead();
+      if (_messages.isNotEmpty) {
+        // Only mark messages as read if there are any
+        await _markMessagesAsRead();
+      }
       
       Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
     } catch (e) {

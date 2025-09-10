@@ -7,6 +7,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:mechfind/utils.dart';
 import 'widgets/emergency_form_dialog.dart';
 import 'widgets/service_booking_dialog.dart';
+import 'screens/chat/chat_screen.dart';
 
 import 'location_service.dart';
 
@@ -502,8 +503,15 @@ mechanic_services(service_id, services(name))
                 label: const Text('Message'),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Message feature not implemented')),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ChatScreen(
+                        mechanicId: mechanic['id'].toString(),
+                        mechanicName: mechanic['name'] ?? 'Mechanic',
+                        mechanicImageUrl: mechanic['image_url'],
+                      ),
+                    ),
                   );
                 },
               ),
