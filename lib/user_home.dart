@@ -45,6 +45,7 @@ class _UserHomePageState extends State<UserHomePage> with WidgetsBindingObserver
   List<Map<String, dynamic>> nearbyMechanics = [];
   List<Map<String, dynamic>> activeRequests = [];
   RealtimeChannel? _requestSubscription;
+  double searchRadius = 7.0; // Default radius in km
   final supabase = Supabase.instance.client;
 
   // Animation controllers for beautiful UI
@@ -355,7 +356,7 @@ mechanic_services(service_id, services(name))
             ? mech['location_y']
             : double.tryParse(mech['location_y'].toString()) ?? 0.0;
         final distance = _calculateDistanceKm(userLat!, userLng!, mLat, mLng);
-        if (distance <= 7.0) {
+        if (distance <= searchRadius) {
           final services = (mech['mechanic_services'] as List)
               .map((s) => s['services']?['name'] as String?)
               .whereType<String>()
@@ -981,45 +982,91 @@ mechanic_services(service_id, services(name))
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header and Radius Control
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppColors.orangePrimary,
-                        AppColors.orangeSecondary,
-                      ],
+                // Header with icon
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.orangePrimary,
+                            AppColors.orangeSecondary,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.handyman, color: Colors.white),
                     ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.engineering,
-                    color: Colors.white,
-                    size: 20,
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Nearby Mechanics',
+                            style: AppTextStyles.heading.copyWith(
+                              color: AppColors.primary,
+                              fontFamily: AppFonts.primaryFont,
+                              fontSize: 20,
+                            ),
+                          ),
+                          Text(
+                            '${nearbyMechanics.length} mechanics available',
+                            style: AppTextStyles.label.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
+                const SizedBox(height: 16),
+                // Radius Control
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Nearby Mechanics',
-                        style: AppTextStyles.heading.copyWith(
-                          color: AppColors.primary,
-                          fontFamily: AppFonts.primaryFont,
-                          fontSize: 20,
+                        'Search Radius: ${searchRadius.toStringAsFixed(1)} km',
+                        style: AppTextStyles.body.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      Text(
-                        '${nearbyMechanics.length} mechanics available',
-                        style: AppTextStyles.label.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
+                      Slider(
+                        value: searchRadius,
+                        min: 0.0,
+                        max: 25.0,
+                        divisions: 50,
+                        activeColor: AppColors.tealPrimary,
+                        inactiveColor: AppColors.tealPrimary.withOpacity(0.2),
+                        label: '${searchRadius.toStringAsFixed(1)} km',
+                        onChanged: (newValue) {
+                          setState(() {
+                            searchRadius = newValue;
+                          });
+                          _fetchMechanicsFromDB();
+                        },
                       ),
                     ],
                   ),
@@ -1028,6 +1075,7 @@ mechanic_services(service_id, services(name))
             ),
           ),
           const SizedBox(height: 16),
+          // Mechanics List
           if (nearbyMechanics.isEmpty)
             _buildEmptyMechanicsState()
           else
