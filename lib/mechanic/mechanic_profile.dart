@@ -50,13 +50,16 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
   bool isLoadingProfile = true;
   bool isProcessingJob = false;
   final supabase = Supabase.instance.client;
+  
+  // Real-time subscription
+  RealtimeChannel? _reviewsChannel;
 
   // Profile data
   String mechanicName = 'Loading...';
   String mechanicEmail = '';
   String mechanicPhone = '';
   String mechanicImageUrl = '';
-  double mechanicRating = 0.0;
+  double mechanicRating = 5.0;
   int totalReviews = 0;
   double? mechanicLocationX;
   double? mechanicLocationY;
@@ -91,7 +94,7 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
     final user = supabase.auth.currentUser;
     if (user != null) {
       // Subscribe to reviews table changes for this mechanic
-      supabase
+      _reviewsChannel = supabase
           .channel('reviews_${user.id}')
           .onPostgresChanges(
             event: PostgresChangeEvent.all,
@@ -117,17 +120,17 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
     _fadeController.dispose();
     _slideController.dispose();
     _pulseController.dispose();
-    // Unsubscribe from real-time updates
+    
+    // Properly dispose of real-time subscription
     try {
-      final user = supabase.auth.currentUser;
-      if (user != null) {
-        // Note: In a production app, you'd store the channel reference
-        // For now, we'll just ensure cleanup happens
-        supabase.removeAllChannels();
+      if (_reviewsChannel != null) {
+        _reviewsChannel!.unsubscribe();
+        _reviewsChannel = null;
       }
     } catch (e) {
-      print('Error cleaning up real-time subscriptions: $e');
+      print('Error cleaning up real-time subscription: $e');
     }
+    
     super.dispose();
   }
   IconData _getServiceIcon(String serviceType) {
@@ -235,7 +238,9 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
       print('Mechanic ID being used: ${user.id}'); // Debug log
 
       // Use the mechanic rating if available, otherwise calculate from reviews
-      double mechanicDbRating = (mechanicResponse['rating'] as num?)?.toDouble() ?? 0.0;
+      // Handle null vs 0.0 properly - null means no rating set, 0.0 is a valid rating
+      num? rawRating = mechanicResponse['rating'] as num?;
+      double? mechanicDbRating = rawRating?.toDouble();
       double? locationX = (mechanicResponse['location_x'] as num?)?.toDouble();
       double? locationY = (mechanicResponse['location_y'] as num?)?.toDouble();
 
@@ -263,10 +268,11 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
 
       // Calculate rating and review count
       final reviews = reviewsResponse as List<dynamic>;
-      double totalRating = 0.0;
+      double totalRating = 5.0; // Default to 5.0 when no reviews
       int reviewCount = reviews.length;
       
       if (reviewCount > 0) {
+        totalRating = 0.0; // Reset to calculate from reviews
         for (var review in reviews) {
           totalRating += (review['rating'] as num).toDouble();
         }
@@ -278,8 +284,15 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
         mechanicEmail = userResponse['email'] ?? '';
         mechanicPhone = userResponse['phone'] ?? '';
         mechanicImageUrl = userResponse['image_url'] ?? '';
-        // Use database rating if available, otherwise use calculated rating
-        mechanicRating = mechanicDbRating > 0 ? mechanicDbRating : totalRating;
+        // Use calculated rating from reviews if available, otherwise use database rating
+        // If both are 0 or unavailable, default to 5.0
+        if (reviewCount > 0) {
+          mechanicRating = totalRating; // Use calculated rating when reviews exist
+        } else if (mechanicDbRating != null && mechanicDbRating > 0) {
+          mechanicRating = mechanicDbRating; // Use database rating if it's set and > 0
+        } else {
+          mechanicRating = 5.0; // Default to 5.0 when no reviews and no valid database rating
+        }
         totalReviews = reviewCount;
         mechanicLocationX = locationX;
         mechanicLocationY = locationY;
@@ -309,8 +322,27 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
       print('❌ Error fetching profile data: $e');
       setState(() {
         isLoadingProfile = false;
+        mechanicName = 'Failed to load';
+        mechanicEmail = '';
+        mechanicPhone = '';
+        mechanicImageUrl = '';
+        mechanicRating = 5.0;
+        totalReviews = 0;
+        mechanicAddress = 'Address unavailable';
+        isLoadingAddress = false;
       });
-      _showBanner('Failed to load profile data. Please try again.');
+      
+      // Show user-friendly error message based on error type
+      String errorMessage = 'Failed to load profile data. Please try again.';
+      if (e.toString().contains('network')) {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (e.toString().contains('auth')) {
+        errorMessage = 'Authentication error. Please log in again.';
+      } else if (e.toString().contains('timeout')) {
+        errorMessage = 'Request timed out. Please try again.';
+      }
+      
+      _showBanner(errorMessage);
     }
   }
 
@@ -1995,7 +2027,7 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
                                 const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
                                 const SizedBox(width: 4),
                                 Text(
-                                  isLoadingProfile ? '0.0' : mechanicRating.toStringAsFixed(1),
+                                  isLoadingProfile ? '5.0' : mechanicRating.toStringAsFixed(1),
                                   style: TextStyle(
                                     color: Colors.amber.shade700,
                                     fontWeight: FontWeight.w600,

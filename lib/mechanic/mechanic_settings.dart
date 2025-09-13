@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as latlng;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils.dart';
 
 class MechanicSettings extends StatefulWidget {
@@ -16,9 +17,19 @@ class MechanicSettings extends StatefulWidget {
 }
 
 class _MechanicSettingsState extends State<MechanicSettings> with TickerProviderStateMixin {
+  final SupabaseClient _supabase = Supabase.instance.client;
+  
   bool pushNotifications = true;
   bool locationAccess = true;
   String selectedLanguage = 'en';
+  
+  // Profile data from database
+  String userName = '';
+  String userEmail = '';
+  String userPhone = '';
+  String userImageUrl = '';
+  double mechanicRating = 5.0;
+  bool isLoading = true;
   
   // Service area
   String selectedServiceArea = '';
@@ -97,21 +108,99 @@ class _MechanicSettingsState extends State<MechanicSettings> with TickerProvider
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
     setState(() {
-      selectedLanguage = context.locale.languageCode;
-      // Set default to Bengali name, will be translated for display
-      selectedServiceArea = prefs.getString('service_area') ?? 'ঢাকা, বাংলাদেশ';
-      
-      // Load time preferences
-      final startHour = prefs.getInt('work_start_hour') ?? 9;
-      final startMinute = prefs.getInt('work_start_minute') ?? 0;
-      final endHour = prefs.getInt('work_end_hour') ?? 18;
-      final endMinute = prefs.getInt('work_end_minute') ?? 0;
-      
-      workStartTime = TimeOfDay(hour: startHour, minute: startMinute);
-      workEndTime = TimeOfDay(hour: endHour, minute: endMinute);
+      isLoading = true;
     });
+    
+    try {
+      // Load profile data from database
+      await _fetchProfileData();
+      
+      // Load local settings
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        selectedLanguage = context.locale.languageCode;
+        // Set default to Bengali name, will be translated for display
+        selectedServiceArea = prefs.getString('service_area') ?? 'ঢাকা, বাংলাদেশ';
+        
+        // Load time preferences
+        final startHour = prefs.getInt('work_start_hour') ?? 9;
+        final startMinute = prefs.getInt('work_start_minute') ?? 0;
+        final endHour = prefs.getInt('work_end_hour') ?? 18;
+        final endMinute = prefs.getInt('work_end_minute') ?? 0;
+        
+        workStartTime = TimeOfDay(hour: startHour, minute: startMinute);
+        workEndTime = TimeOfDay(hour: endHour, minute: endMinute);
+      });
+    } catch (e) {
+      print('Error loading settings: $e');
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+  
+  Future<void> _fetchProfileData() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    
+    try {
+      // Fetch user data
+      final userResponse = await _supabase
+          .from('users')
+          .select('full_name, email, phone, image_url')
+          .eq('id', userId)
+          .single();
+      
+      // Fetch mechanic data
+      final mechanicResponse = await _supabase
+          .from('mechanics')
+          .select('rating')
+          .eq('id', userId)
+          .single();
+      
+      setState(() {
+        userName = userResponse['full_name'] ?? '';
+        userEmail = userResponse['email'] ?? '';
+        userPhone = userResponse['phone'] ?? '';
+        userImageUrl = userResponse['image_url'] ?? '';
+        mechanicRating = (mechanicResponse['rating'] as num?)?.toDouble() ?? 5.0;
+      });
+    } catch (e) {
+      print('Error fetching profile data: $e');
+      // Set default values on error
+      setState(() {
+        userName = 'Profile unavailable';
+        userEmail = '';
+        userPhone = '';
+        userImageUrl = '';
+        mechanicRating = 5.0;
+      });
+      
+      // Show user-friendly error message
+      String errorMessage = 'Failed to load profile data.';
+      if (e.toString().contains('network')) {
+        errorMessage = 'Network error. Check your connection.';
+      } else if (e.toString().contains('auth')) {
+        errorMessage = 'Please log in again.';
+      }
+      
+      // Show snackbar or dialog for error feedback
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: () => _fetchProfileData(),
+            ),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _saveSettings() async {
