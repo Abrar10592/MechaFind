@@ -984,13 +984,49 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
   }
 
   Future<void> _rejectJob(String requestId, {bool isFromPending = false}) async {
-    final currentLang = context.locale.languageCode;
-    final isEnglish = currentLang == 'en';
-    
-    // Show rejection dialog with reason selection
-    final result = await _showRejectJobDialog(isEnglish);
+    // Show confirmation dialog
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Reject Job',
+          style: AppTextStyles.heading.copyWith(
+            color: Colors.red.shade600,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to reject this job request? This will make the request available for other mechanics.',
+          style: AppTextStyles.body,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'Cancel',
+              style: AppTextStyles.label.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(
+              'Reject Job',
+              style: AppTextStyles.label.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
 
-    if (result == null || result['confirmed'] != true) return;
+    if (confirmed != true) return;
 
     if (isProcessingJob) return; // Prevent multiple requests
 
@@ -999,284 +1035,36 @@ class _MechanicProfileState extends State<MechanicProfile> with TickerProviderSt
         isProcessingJob = true;
       });
       
-      _showBanner(isEnglish ? 'Rejecting job...' : 'চাকরি প্রত্যাখ্যান করা হচ্ছে...');
+      _showBanner('Rejecting job...');
 
-      // Get current user ID
-      final user = supabase.auth.currentUser;
-      if (user == null) {
-        _showBanner(isEnglish ? 'User not logged in' : 'ব্যবহারকারী লগ ইন করেননি');
-        return;
-      }
+      // Update request status to rejected and clear mechanic assignment
+      await supabase
+          .from('requests')
+          .update({
+            'status': 'rejected',
+            'mechanic_id': null, // Clear mechanic assignment
+            'mech_lat': null,    // Clear mechanic location
+            'mech_lng': null,    // Clear mechanic location
+          })
+          .eq('id', requestId);
 
-      // Update request status to canceled (rejected) and clear mechanic assignment
-      print('🔄 Updating request $requestId to canceled status...');
-      print('📋 Update data: {status: canceled, mechanic_id: null, reason: ${result['reason']}}');
+      _showBanner('Job rejected', autoHide: true);
       
-      final currentUserId = supabase.auth.currentUser?.id;
-      if (currentUserId == null) {
-        print('❌ No authenticated user found');
-        return;
-      }
-
-      try {
-        // Simple approach: Just change status to canceled 
-        // This should work with existing RLS policies
-        print('🔄 Attempting to update request $requestId to canceled status');
-        print('👤 Current user ID: $currentUserId');
-        
-        final updateResponse = await supabase
-            .from('requests')
-            .update({'status': 'canceled'})
-            .eq('id', requestId)
-            .eq('mechanic_id', currentUserId) // Only update if assigned to current user
-            .select(); // Add select to see what was updated
-            
-        print('✅ Request status updated to canceled');
-        print('📋 Update response: $updateResponse');
-        
-        // If the update response is empty, it means no rows were affected
-        if (updateResponse.isEmpty) {
-          print('⚠️ No rows were updated - request may not exist or not assigned to current user');
-          
-          // Let's verify the request exists and check its current assignment
-          final checkResponse = await supabase
-              .from('requests')
-              .select('id, status, mechanic_id')
-              .eq('id', requestId)
-              .maybeSingle();
-              
-          print('🔍 Request check: $checkResponse');
-        }
-        
-        // Separately add to ignored requests (if this table allows inserts)
-        try {
-          await supabase.from('ignored_requests').insert({
-            'mechanic_id': currentUserId,
-            'request_id': requestId,
-            'reason': result['reason'],
-          });
-          print('✅ Added to ignored requests');
-        } catch (ignoreError) {
-          print('⚠️ Could not add to ignored requests: $ignoreError');
-          // This is not critical, continue
-        }
-      } catch (updateError) {
-        print('❌ Database update failed: $updateError');
-        throw updateError; // Re-throw to be caught by outer catch block
-      }
-      
-      // Small delay to ensure database update has propagated
-      await Future.delayed(const Duration(milliseconds: 500));
-      
-      // Verify the update was successful
-      try {
-        final verifyResponse = await supabase
-            .from('requests')
-            .select('id, status, mechanic_id, rejection_reason')
-            .eq('id', requestId)
-            .single();
-        print('🔍 Verification query result: $verifyResponse');
-        
-        if (verifyResponse['status'] != 'canceled') {
-          print('⚠️ WARNING: Status was not updated to canceled!');
-        }
-        if (verifyResponse['mechanic_id'] != null) {
-          print('⚠️ WARNING: Mechanic ID was not cleared!');
-        }
-      } catch (verifyError) {
-        print('❌ Verification query failed: $verifyError');
-      }
-
-      // Add to ignored requests so this request won't appear again for this mechanic
-      try {
-        await supabase
-            .from('ignored_requests')
-            .insert({
-              'mechanic_id': user.id,
-              'request_id': requestId,
-            });
-        print('✅ Request added to ignored list for mechanic');
-      } catch (e) {
-        // Ignore if already exists (duplicate key constraint)
-        print('⚠️ Request might already be in ignored list: $e');
-      }
-
-      _showBanner(
-        isEnglish 
-          ? 'Job rejected successfully!' 
-          : 'চাকরি সফলভাবে প্রত্যাখ্যান করা হয়েছে!', 
-        autoHide: true
-      );
-      
-      // Force refresh both job lists to ensure UI is updated
-      print('🔄 Refreshing job lists after rejection...');
+      // Refresh the appropriate list based on where the rejection came from
       if (isFromPending) {
         await _fetchPendingJobs();
-        print('✅ Pending jobs refreshed');
       } else {
         await _fetchUpcomingJobs();
-        print('✅ Upcoming jobs refreshed');
-      }
-      
-      // Also refresh the other list in case the request appeared in both
-      if (isFromPending) {
-        await _fetchUpcomingJobs();
-        print('✅ Also refreshed upcoming jobs');
-      } else {
-        await _fetchPendingJobs();
-        print('✅ Also refreshed pending jobs');
       }
       
     } catch (e) {
-      print('❌ Error rejecting job: $e');
-      _showBanner(
-        isEnglish 
-          ? 'Failed to reject job. Please try again.' 
-          : 'চাকরি প্রত্যাখ্যান করতে ব্যর্থ। আবার চেষ্টা করুন।'
-      );
+      print('Error rejecting job: $e');
+      _showBanner('Failed to reject job');
     } finally {
       setState(() {
         isProcessingJob = false;
       });
     }
-  }
-
-  Future<Map<String, dynamic>?> _showRejectJobDialog(bool isEnglish) async {
-    String? selectedReason;
-    final TextEditingController customReasonController = TextEditingController();
-
-    final List<String> reasonsEnglish = [
-      'Too far from my location',
-      'Already have too many jobs',
-      'Not available at this time',
-      'Service not in my expertise',
-      'Customer location is unsafe',
-      'Other (specify below)'
-    ];
-
-    final List<String> reasonsBengali = [
-      'আমার অবস্থান থেকে অনেক দূরে',
-      'ইতিমধ্যে অনেক কাজ আছে',
-      'এই সময়ে পাওয়া যাচ্ছে না',
-      'এই সেবা আমার দক্ষতায় নেই',
-      'গ্রাহকের অবস্থান নিরাপদ নয়',
-      'অন্যান্য (নিচে উল্লেখ করুন)'
-    ];
-
-    final reasons = isEnglish ? reasonsEnglish : reasonsBengali;
-
-    return await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              Icon(Icons.cancel_outlined, color: Colors.red.shade600, size: 24),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  isEnglish ? 'Reject Job Request' : 'চাকরির অনুরোধ প্রত্যাখ্যান',
-                  style: AppTextStyles.heading.copyWith(
-                    color: Colors.red.shade600,
-                    fontSize: 18,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isEnglish 
-                    ? 'Please select a reason for rejecting this job request:'
-                    : 'এই কাজের অনুরোধ প্রত্যাখ্যানের কারণ নির্বাচন করুন:',
-                  style: AppTextStyles.body,
-                ),
-                const SizedBox(height: 16),
-                
-                // Reason selection
-                ...reasons.map((reason) => RadioListTile<String>(
-                  value: reason,
-                  groupValue: selectedReason,
-                  onChanged: (value) => setDialogState(() => selectedReason = value),
-                  title: Text(
-                    reason,
-                    style: AppTextStyles.body.copyWith(fontSize: 14),
-                  ),
-                  activeColor: AppColors.primary,
-                  contentPadding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                )).toList(),
-                
-                // Custom reason text field (shown when "Other" is selected)
-                if (selectedReason == reasons.last) ...[
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: customReasonController,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      hintText: isEnglish 
-                        ? 'Please specify your reason...'
-                        : 'আপনার কারণ উল্লেখ করুন...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: AppColors.primary, width: 2),
-                      ),
-                      contentPadding: const EdgeInsets.all(12),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                customReasonController.dispose();
-                Navigator.pop(context, {'confirmed': false});
-              },
-              child: Text(
-                isEnglish ? 'Cancel' : 'বাতিল',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: selectedReason == null ? null : () {
-                String finalReason = selectedReason!;
-                
-                // Use custom reason if "Other" is selected and text is provided
-                if (selectedReason == reasons.last) {
-                  final customText = customReasonController.text.trim();
-                  if (customText.isNotEmpty) {
-                    finalReason = customText;
-                  }
-                }
-                
-                customReasonController.dispose();
-                Navigator.pop(context, {
-                  'confirmed': true,
-                  'reason': finalReason,
-                });
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.shade600,
-                foregroundColor: Colors.white,
-              ),
-              child: Text(
-                isEnglish ? 'Reject Job' : 'চাকরি প্রত্যাখ্যান',
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Future<void> _completeJob(String requestId) async {
