@@ -1,8 +1,8 @@
-# MechaFind
+# MechFind
 
 Connecting drivers in Bangladesh to instant, reliable roadside assistance.
 
-Countless drivers across Bangladesh face vulnerability and stress when their vehicles break down in unfamiliar locations—especially at night or in rural areas where existing roadside services rarely reach. Most solutions require memberships or fail to connect users with verified local mechanics, leaving drivers stranded, unsafe, and anxious. **MechaFind** bridges this critical gap by offering an inclusive platform for instant help, reducing response times, and increasing road safety for everyone.
+Countless drivers across Bangladesh face vulnerability and stress when their vehicles break down in unfamiliar locations—especially at night or in rural areas where existing roadside services rarely reach. Most solutions require memberships or fail to connect users with verified local mechanics, leaving drivers stranded, unsafe, and anxious. **MechFind** bridges this critical gap by offering an inclusive platform for instant help, reducing response times, and increasing road safety for everyone.
 
 ---
 
@@ -21,7 +21,7 @@ Countless drivers across Bangladesh face vulnerability and stress when their veh
 
 ## Project Description & Purpose
 
-MechaFind is a bilingual Flutter mobile application designed to instantly connect drivers (both guests and registered users) throughout Bangladesh with verified local mechanics—no membership needed. Leveraging GPS and robust networking, MechaFind ensures fast, trustworthy, and transparent assistance by dispatching SOS requests and facilitating direct communication, especially in rural and out-of-coverage zones.
+MechFind is a bilingual Flutter mobile application designed to instantly connect drivers (both guests and registered users) throughout Bangladesh with verified local mechanics—no membership needed. Leveraging GPS and robust networking, MechaFind ensures fast, trustworthy, and transparent assistance by dispatching SOS requests and facilitating direct communication, especially in rural and out-of-coverage zones.
 
 ### Goals
 
@@ -106,7 +106,7 @@ Special thanks to all contributors, and the wider Flutter open-source community 
 
 ---
 
-MechaFind transforms driving in Bangladesh by making emergency and routine roadside help accessible, trustworthy, and fast—advancing safety and peace of mind for everyone on the road.
+MechFind transforms driving in Bangladesh by making emergency and routine roadside help accessible, trustworthy, and fast—advancing safety and peace of mind for everyone on the road.
 
 
 
