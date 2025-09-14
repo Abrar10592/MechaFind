@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'user_home.dart';
 import 'utils.dart';
+import 'screens/chat/chat_screen.dart';
 class ActiveEmergencyRoutePage extends StatefulWidget {
   final String requestId;
   final LatLng userLocation;
@@ -332,6 +333,7 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage>
           .toList();
       debugPrint('🛠 Extracted expertise list: $expertise');
       final data = {
+        'id': mechanicId,  // Add the mechanic ID to the data structure
         'rating': res['rating'],
         'full_name': res['users']?['full_name'],
         'phone': res['users']?['phone'],
@@ -1554,10 +1556,26 @@ class _ActiveEmergencyRoutePageState extends State<ActiveEmergencyRoutePage>
                   label: "Chat",
                   color: AppColors.tealPrimary,
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Chat feature coming soon!'),
-                        backgroundColor: AppColors.tealPrimary,
+                    // Check if mechanic ID is valid before navigating
+                    final mechanicId = mechanic['id'];
+                    if (mechanicId == null || mechanicId.toString().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Unable to start chat: Mechanic ID not available'),
+                          backgroundColor: AppColors.danger,
+                        ),
+                      );
+                      return;
+                    }
+                    
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ChatScreen(
+                          mechanicId: mechanicId.toString(),
+                          mechanicName: mechanic['full_name'] ?? 'Mechanic',
+                          mechanicImageUrl: mechanic['image_url'],
+                        ),
                       ),
                     );
                   },
